@@ -4,4 +4,4 @@
 
 **Coming soon!**
 
-Contact: rdube@ethz.ch
+Contact: rdube(at)ethz.ch
