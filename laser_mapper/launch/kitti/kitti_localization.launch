@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+  
+  <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
+  
+  <!-- Bag file path -->  
+  <arg name="bag_file" value="$(find laser_mapper)/demonstration_files/kitti/2011_10_03_drive_27.bag"/>
+  <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
+	
+  <!-- Rviz visualization config file path -->
+  <arg name="rviz_config_file" value="$(find laser_mapper)/demonstration_files/kitti/kitti_localization.rviz"/>
+
+  <!-- ROS parameters -->
+  <rosparam>use_sim_time: true</rosparam>
+  <rosparam command="load" file="$(find laser_mapper)/launch/kitti/kitti_localization.yaml"/>
+
+  <!-- rviz node -->
+  <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
+  
+  <!-- load classifier -->
+  <arg name="classifier" value="$(find laser_mapper)/demonstration_files/kitti/random_forest_eigen_25trees.xml"/>
+  <rosparam param="/LaserMapper/SegMatchWorker/SegMatch/Classifier/classifier_filename" subst_value="True">$(arg classifier)</rosparam>
+  
+  <!-- Target cloud -->
+  <arg name="target_cloud" value="$(find laser_mapper)/demonstration_files/kitti/drive27_target_map.pcd"/>
+  <rosparam param="/LaserMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
+  
+  <!-- laser_mapper node -->
+  <include file="$(find laser_mapper)/launch/laser_mapper.launch">
+    <arg name="icp_configuration_file" value="$(find laser_mapper)/launch/kitti/icp_dynamic_outdoor.yaml"/>
+    <arg name="icp_input_filters_file" value="$(find laser_mapper)/launch/kitti/input_filters_outdoor.yaml"/>
+  </include>
+  
+    <!-- rosbag player node -->
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 333 --clock --pause $(arg bag_file)"/>	
+ 
+  <!-- octomap nodes with parameters from Luigi -->
+  <!--node name="octomap_mux" pkg="octomap_mux" type="octomap_mux_node" respawn="$(arg respawn_value)" output="screen">
+  </node-->   
+	
+</launch>
