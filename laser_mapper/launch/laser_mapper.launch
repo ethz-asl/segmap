@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>	
+	
+<launch>
+  <!-- ICP configuration file -->
+  <arg name="icp_configuration_file" default="$(find laser_mapper)/cfg/icp_dynamic_indoor.yaml"/>
+  <!-- Input filters file -->
+  <arg name="icp_input_filters_file" default="$(find laser_mapper)/cfg/input_filters_indoor.yaml"/>
+  	
+  <!-- laser_mapper node -->
+  <node name="laser_mapper" pkg="laser_mapper" type="laser_mapper_node" output="screen" respawn="true">
+    <param name="icp_configuration_file" value="$(arg icp_configuration_file)"/>
+    <param name="icp_input_filters_file" value="$(arg icp_input_filters_file)"/>
+  </node>
+
+</launch>

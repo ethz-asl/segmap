@@ -1,0 +1,60 @@
+# Specific Files #
+##################
+laser_mapper/demonstration_files
+python/database
+*.ckpt
+*.meta
+*.csv
+
+# Compiled Binaries #
+#####################
+build/
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*.pyc
+.ipynb_checkpoints/
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Point-Cloud Files #
+#####################
+*.pcd
+*.vtk
+
+# Swap Files #
+##############
+*~
+*.bak
+*.swp
+*.swo
+
+# Vim Tags #
+############
+tags
+.ycm_extra_conf.py
+.ycm_extra_conf.pyc
+.project_vimrc
+
+# Rosbags and rviz config #
+###########################
+*.rviz
+*.bag
+
+# Matlab data #
+###############
+matlab/data
