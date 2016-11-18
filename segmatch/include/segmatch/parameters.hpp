@@ -63,14 +63,14 @@ struct ClassifierParams {
   // OpenCv random forest parameters.
   int rf_max_depth;
   double rf_min_sample_ratio;
-  float rf_regression_accuracy;
+  double rf_regression_accuracy;
   bool rf_use_surrogates;
   int rf_max_categories;
-  std::vector<float> rf_priors;
+  std::vector<double> rf_priors;
   bool rf_calc_var_importance;
   int rf_n_active_vars;
   int rf_max_num_of_trees;
-  float rf_accuracy;
+  double rf_accuracy;
 
   // A convenience copy from DescriptorsParameters.
   std::vector<std::string> descriptor_types;
