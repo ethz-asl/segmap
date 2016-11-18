@@ -20,6 +20,7 @@
   <depend>glog_catkin</depend>
   <depend>gtsam_catkin</depend>
   <depend>laser_slam</depend>
+  <depend>laser_slam_ros</depend>
   <depend>libpointmatcher</depend>
   <depend>libpointmatcher_ros</depend>
   <depend>message_generation</depend>
