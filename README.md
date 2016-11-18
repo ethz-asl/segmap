@@ -20,6 +20,7 @@ $ wstool update
 ```
 Finally build the *laser_mapper* package which will compile all *SegMatch* modules:
 ```
+$ cd ~/catkin_ws
 $ catkin build -DCMAKE_BUILD_TYPE=Release laser_mapper
 ```
 Building dependencies can take several minutes according to which new package need to be built. See this link for installing [catkin_tools](http://catkin-tools.readthedocs.io/en/latest/installing.html). 
