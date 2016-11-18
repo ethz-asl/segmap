@@ -9,6 +9,7 @@
 #include <Eigen/Eigenvalues>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <laser_slam_ros/common.hpp>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -492,12 +493,6 @@ void LaserMapper::getFilteredMap(PointCloud* filtered_map) {
 }
 
 void LaserMapper::getParameters() {
-  // ICP configuration files.
-  nh_.getParam("icp_configuration_file",
-               params_.online_estimator_params.laser_track_params.icp_configuration_file);
-  nh_.getParam("icp_input_filters_file",
-               params_.online_estimator_params.laser_track_params.icp_input_filters_file);
-
   // LaserMapper parameters.
   nh_.getParam("/LaserMapper/distance_to_consider_fixed",
                params_.distance_to_consider_fixed);
@@ -551,53 +546,14 @@ void LaserMapper::getParameters() {
   nh_.getParam("/LaserMapper/clear_local_map_after_loop_closure",
                params_.clear_local_map_after_loop_closure);
 
-  // TODO the following is laser_slam specific. Can we separate like below for matcher?
-  // Online Estimator parameters.
-  std::vector<float> odometry_noise_model, icp_noise_model, loop_closure_noise_model;
-  constexpr unsigned int kNoiseModelDimension = 6u;
-  nh_.getParam("/LaserMapper/OnlineEstimator/odometry_noise_model", odometry_noise_model);
-  CHECK_EQ(odometry_noise_model.size(), kNoiseModelDimension);
-  for (size_t i = 0u; i < 6u; ++i) {
-    params_.online_estimator_params.odometry_noise_model[i] = odometry_noise_model.at(i);
-  }
-  nh_.getParam("/LaserMapper/OnlineEstimator/icp_noise_model", icp_noise_model);
-  CHECK_EQ(icp_noise_model.size(), kNoiseModelDimension);
-  for (size_t i = 0u; i < 6u; ++i) {
-    params_.online_estimator_params.icp_noise_model[i] = icp_noise_model.at(i);
-  }
-  nh_.getParam("/LaserMapper/OnlineEstimator/loop_closure_noise_model", loop_closure_noise_model);
-  CHECK_EQ(loop_closure_noise_model.size(), kNoiseModelDimension);
-  for (size_t i = 0u; i < 6u; ++i) {
-    params_.online_estimator_params.loop_closure_noise_model[i] = loop_closure_noise_model.at(i);
-  }
-  nh_.getParam("/LaserMapper/OnlineEstimator/add_m_estimator_on_odom",
-               params_.online_estimator_params.add_m_estimator_on_odom);
-  nh_.getParam("/LaserMapper/OnlineEstimator/add_m_estimator_on_icp",
-               params_.online_estimator_params.add_m_estimator_on_icp);
-  nh_.getParam("/LaserMapper/OnlineEstimator/add_m_estimator_on_loop_closures",
-               params_.online_estimator_params.add_m_estimator_on_loop_closures);
-  nh_.getParam("/LaserMapper/OnlineEstimator/sliding_window_size",
-               params_.online_estimator_params.sliding_window_size);
-  nh_.getParam("/LaserMapper/OnlineEstimator/add_intermediate_poses",
-               params_.online_estimator_params.add_intermediate_poses);
-  nh_.getParam("/LaserMapper/OnlineEstimator/publish_covariances",
-               params_.online_estimator_params.publish_covariances);
+  // Online estimator parameters.
+  params_.online_estimator_params = laser_slam_ros::getOnlineEstimatorParams(nh_, "/LaserMapper");
 
-  // LaserTrack parameters.
-  nh_.getParam("/LaserMapper/LaserTrack/use_icp_factors",
-               params_.online_estimator_params.laser_track_params.use_icp_factors);
-  nh_.getParam("/LaserMapper/LaserTrack/strategy_for_icp_transformations",
-               params_.online_estimator_params.laser_track_params.strategy_for_icp_transformations);
-  nh_.getParam("/LaserMapper/LaserTrack/nscan_to_match",
-               params_.online_estimator_params.laser_track_params.nscan_to_match);
-  nh_.getParam("/LaserMapper/LaserTrack/nscan_in_sub_map",
-               params_.online_estimator_params.laser_track_params.nscan_in_sub_map);
-  nh_.getParam("/LaserMapper/LaserTrack/save_icp_results",
-               params_.online_estimator_params.laser_track_params.save_icp_results);
-  nh_.getParam("/LaserMapper/LaserTrack/do_icp_step_on_loop_closures",
-               params_.online_estimator_params.laser_track_params.do_icp_step_on_loop_closures);
-  nh_.getParam("/LaserMapper/LaserTrack/loop_closures_sub_maps_radius",
-               params_.online_estimator_params.laser_track_params.loop_closures_sub_maps_radius);
+  // ICP configuration files.
+  nh_.getParam("icp_configuration_file",
+               params_.online_estimator_params.laser_track_params.icp_configuration_file);
+  nh_.getParam("icp_input_filters_file",
+               params_.online_estimator_params.laser_track_params.icp_input_filters_file);
 
   // SegMatchWorker parameters.
   segmatch_worker_params_ = segmatch_ros::getSegMatchWorkerParams(nh_, "/LaserMapper");
