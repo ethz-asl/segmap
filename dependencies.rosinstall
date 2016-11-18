@@ -1,57 +1,54 @@
 - git:
    local-name: laser_slam
-   uri: https://github.com/ethz-asl/laser_slam
+   uri: https://github.com/ethz-asl/laser_slam.git
 - git:
    local-name: eigen_catkin
-   uri: https://github.com/ethz-asl/eigen_catkin
+   uri: https://github.com/ethz-asl/eigen_catkin.git
 - git:
    local-name: glog_catkin
-   uri: https://github.com/ethz-asl/glog_catkin
+   uri: https://github.com/ethz-asl/glog_catkin.git
 - git:
    local-name: gflags_catkin
-   uri: https://github.com/ethz-asl/gflags_catkin
+   uri: https://github.com/ethz-asl/gflags_catkin.git
 - git:
    local-name: eigen_checks
-   uri: https://github.com/ethz-asl/eigen_checks
+   uri: https://github.com/ethz-asl/eigen_checks.git
 - git:
    local-name: doxygen_catkin
-   uri: https://github.com/ethz-asl/doxygen_catkin
+   uri: https://github.com/ethz-asl/doxygen_catkin.git
 - git:
    local-name: mincurves
    uri: https://github.com/ethz-asl/mincurves.git
 - git:
    local-name: gtsam_catkin
-   uri: https://github.com/ethz-asl/gtsam_catkin
+   uri: https://github.com/ethz-asl/gtsam_catkin.git
 - git:
    local-name: libnabo
    uri: https://github.com/ethz-asl/libnabo.git
 - git:
    local-name: libpointmatcher
-   uri: https://github.com/ethz-asl/libpointmatcher
+   uri: https://github.com/ethz-asl/libpointmatcher.git
    version: 5f9d925
 - git:
    local-name: minkindr
-   uri: https://github.com/ethz-asl/minkindr
+   uri: https://github.com/ethz-asl/minkindr.git
 - git:
    local-name: minkindr_gtsam
-   uri: https://github.com/ethz-asl/minkindr_gtsam
+   uri: https://github.com/ethz-asl/minkindr_gtsam.git
 - git:
    local-name: minkindr_ros
    uri: https://github.com/ethz-asl/minkindr_ros.git
 - git:
    local-name: libpointmatcher_ros
-   uri: https://github.com/ethz-asl/ethzasl_icp_mapping
+   uri: https://github.com/ethz-asl/ethzasl_icp_mapping.git
    version: indigo_devel
 - git:
    local-name: GTSAM
-   uri: https://bitbucket.org/gtborg/gtsam
+   uri: https://bitbucket.org/gtborg/gtsam.git
    version: b66dda2fe5ed2cf9e801119e481530e4cf13a94e
 - git:
    local-name: catkin_simple
    uri: https://github.com/catkin/catkin_simple.git
-- git:
-   local-name: point_coud_io
-   uri: https://github.com/ethz-asl/point_cloud_io
 - git:
    local-name: pcl_catkin
    uri: https://github.com/ethz-asl/pcl_catkin.git
