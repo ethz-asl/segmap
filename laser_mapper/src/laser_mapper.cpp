@@ -179,11 +179,6 @@ void LaserMapper::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in) {
     bool process_scan = false;
     SE3 current_pose;
 
-    // Convert input cloud to laser scan.
-    LaserScan new_scan;
-    new_scan.scan = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(cloud_msg_in);
-    new_scan.time_ns = rosTimeToCurveTime(cloud_msg_in.header.stamp.toNSec());
-
     if (!last_pose_set_) {
       process_scan = true;
       last_pose_set_ = true;
