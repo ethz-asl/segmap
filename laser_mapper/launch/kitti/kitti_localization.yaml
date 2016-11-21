@@ -94,6 +94,9 @@ LaserMapper: {
     sliding_window_size: 3,
     add_intermediate_poses: false,
     publish_covariances: false,
+    
+    do_icp_step_on_loop_closures: true,
+    loop_closures_sub_maps_radius: 3,
 
     LaserTrack: {
       odometry_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15], # odometry_noise_model: [0.05, 0.005, 0.005, 0.015, 0.015, 0.15],
@@ -105,9 +108,7 @@ LaserMapper: {
       strategy_for_icp_transformations: "local_scan_to_sub_map",
       nscan_to_match: 3,
       nscan_in_sub_map: 10,
-      save_icp_results: false,
-      do_icp_step_on_loop_closures: true,
-      loop_closures_sub_maps_radius: 3
+      save_icp_results: false
     }
   }
 }
