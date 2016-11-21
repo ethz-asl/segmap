@@ -6,7 +6,7 @@
 #include <vector>
 
 #include <laser_slam/parameters.hpp>
-#include <laser_slam/sliding_window_estimator.hpp>
+#include <laser_slam/incremental_estimator.hpp>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
 #include <segmatch/common.hpp>
@@ -28,7 +28,7 @@ struct LaserMapperParams {
   bool clear_local_map_after_loop_closure = true;
 
   // Trajectory estimator parameters.
-  laser_slam::OnlineEstimatorParams online_estimator_params;
+  laser_slam::EstimatorParams online_estimator_params;
 
   // Frames.
   std::string world_frame;
@@ -155,8 +155,8 @@ class LaserMapper {
   tf::TransformListener tf_listener_;
 
   // Sliding Window estimator.
-  laser_slam::SlidingWindowEstimator swe_;
-  std::mutex swe_mutex_;
+  laser_slam::IncrementalEstimator incremental_estimator_;
+  std::mutex incremental_estimator_mutex_;
 
   // Contains the map which is estimated by the sliding window.
   segmatch::PointCloud local_map_;

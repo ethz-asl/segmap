@@ -63,9 +63,9 @@ LaserMapper::LaserMapper(ros::NodeHandle& n) : nh_(n) {
                                                                  kPublisherQueueSize);
 
   // Create a sliding-window estimator.
-  swe_mutex_.lock();
-  swe_ = SlidingWindowEstimator(params_.online_estimator_params);
-  swe_mutex_.unlock();
+  incremental_estimator_mutex_.lock();
+  incremental_estimator_ = IncrementalEstimator(params_.online_estimator_params);
+  incremental_estimator_mutex_.unlock();
 
   // Advertise the save_map and save_distant_map services.
   save_map_ = nh_.advertiseService("save_map", &LaserMapper::saveMapServiceCall, this);
@@ -128,9 +128,9 @@ void LaserMapper::segMatchThread() {
         source_cloud_ready_mutex_.unlock();
 
         // Get current pose.
-        swe_mutex_.lock();
-        Pose current_pose = swe_.getCurrentPose();
-        swe_mutex_.unlock();
+        incremental_estimator_mutex_.lock();
+        Pose current_pose = incremental_estimator_.getCurrentPose();
+        incremental_estimator_mutex_.unlock();
 
         // Get source cloud.
         local_map_filtered_mutex_.lock();
@@ -146,10 +146,10 @@ void LaserMapper::segMatchThread() {
           // If there is a loop closure.
           if (segmatch_worker_.processSourceCloud(source_cloud, current_pose, &loop_closure)) {
             Trajectory new_traj;
-            swe_mutex_.lock();
-            swe_.processLoopClosure(loop_closure);
-            swe_.getTrajectory(&new_traj);
-            swe_mutex_.unlock();
+            incremental_estimator_mutex_.lock();
+            incremental_estimator_.processLoopClosure(loop_closure);
+            incremental_estimator_.getTrajectory(&new_traj);
+            incremental_estimator_mutex_.unlock();
 
             // Clear the local map if desired.
             if (params_.clear_local_map_after_loop_closure) {
@@ -204,14 +204,14 @@ void LaserMapper::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in) {
       new_scan.time_ns = rosTimeToCurveTime(cloud_msg_in.header.stamp.toNSec());
 
       // Process the pose and the laser scan.
-      swe_mutex_.lock();
-      swe_.processPoseAndLaserScan(tfTransformToPose(tf_transform), new_scan);
-      swe_mutex_.unlock();
+      incremental_estimator_mutex_.lock();
+      incremental_estimator_.processPoseAndLaserScan(tfTransformToPose(tf_transform), new_scan);
+      incremental_estimator_mutex_.unlock();
 
       // Adjust the correction between the world and odom frames.
-      swe_mutex_.lock();
-      Pose current_pose = swe_.getCurrentPose();
-      swe_mutex_.unlock();
+      incremental_estimator_mutex_.lock();
+      Pose current_pose = incremental_estimator_.getCurrentPose();
+      incremental_estimator_mutex_.unlock();
 
       SE3 T_odom_sensor = tfTransformToPose(tf_transform).T_w;
       SE3 T_w_sensor = current_pose.T_w;
@@ -232,9 +232,9 @@ void LaserMapper::scanCallback(const sensor_msgs::PointCloud2& cloud_msg_in) {
 
       // Publish the local scans which are completely estimated and static.
       laser_slam::DataPoints new_fixed_cloud;
-      swe_mutex_.lock();
-      swe_.appendFixedScans(&new_fixed_cloud);
-      swe_mutex_.unlock();
+      incremental_estimator_mutex_.lock();
+      incremental_estimator_.appendFixedScans(&new_fixed_cloud);
+      incremental_estimator_mutex_.unlock();
 
       //TODO(Renaud) move to a transformPointCloud() fct.
       laser_slam::PointMatcher::TransformationParameters transformation_matrix =
@@ -375,13 +375,13 @@ void LaserMapper::publishMap() {
 
 void LaserMapper::publishTrajectories() {
   Trajectory trajectory;
-  swe_mutex_.lock();
-  swe_.getTrajectory(&trajectory);
-  swe_mutex_.unlock();
+  incremental_estimator_mutex_.lock();
+  incremental_estimator_.getTrajectory(&trajectory);
+  incremental_estimator_mutex_.unlock();
   publishTrajectory(trajectory, trajectory_pub_);
-  swe_mutex_.lock();
-  swe_.getOdometryTrajectory(&trajectory);
-  swe_mutex_.unlock();
+  incremental_estimator_mutex_.lock();
+  incremental_estimator_.getOdometryTrajectory(&trajectory);
+  incremental_estimator_mutex_.unlock();
   publishTrajectory(trajectory, odometry_trajectory_pub_);
 }
 
@@ -416,9 +416,9 @@ Time LaserMapper::curveTimeToRosTime(const Time& timestamp_ns) const {
 
 // TODO one shot of cleaning.
 void LaserMapper::getFilteredMap(PointCloud* filtered_map) {
-  swe_mutex_.lock();
-  laser_slam::Pose current_pose = swe_.getCurrentPose();
-  swe_mutex_.unlock();
+  incremental_estimator_mutex_.lock();
+  laser_slam::Pose current_pose = incremental_estimator_.getCurrentPose();
+  incremental_estimator_mutex_.unlock();
 
   PclPoint current_position;
   current_position.x = current_pose.T_w.getPosition()[0];

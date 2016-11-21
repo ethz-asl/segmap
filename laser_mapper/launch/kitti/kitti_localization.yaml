@@ -86,18 +86,21 @@ LaserMapper: {
     }
   },
   },
+  
   OnlineEstimator: {
-    odometry_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15], # odometry_noise_model: [0.05, 0.005, 0.005, 0.015, 0.015, 0.15],
-    icp_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15],
-    loop_closure_noise_model: [0.05, 0.005, 0.005, 0.015, 0.15, 0.015],
-    add_m_estimator_on_odom: false,
-    add_m_estimator_on_icp: true,
+    loop_closure_noise_model: [0.005, 0.005, 0.005, 0.0015, 0.0015, 0.0015],
     add_m_estimator_on_loop_closures: true,
+    
     sliding_window_size: 3,
     add_intermediate_poses: false,
     publish_covariances: false,
 
     LaserTrack: {
+      odometry_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15], # odometry_noise_model: [0.05, 0.005, 0.005, 0.015, 0.015, 0.15],
+      icp_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15],
+      add_m_estimator_on_odom: false,
+      add_m_estimator_on_icp: true,
+      
       use_icp_factors: false,
       strategy_for_icp_transformations: "local_scan_to_sub_map",
       nscan_to_match: 3,
@@ -105,7 +108,7 @@ LaserMapper: {
       save_icp_results: false,
       do_icp_step_on_loop_closures: true,
       loop_closures_sub_maps_radius: 3
-    }  
+    }
   }
 }
 
