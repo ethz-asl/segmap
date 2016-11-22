@@ -131,9 +131,7 @@ class LaserMapper {
 
   // Subscribers.
   ros::Subscriber scan_sub_;
-  ros::Subscriber loop_closure_sub_;
   ros::Subscriber tf_sub_;
-  
   
   // Publishers.
   ros::Publisher trajectory_pub_;

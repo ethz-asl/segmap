@@ -63,7 +63,7 @@ class SegMatchWorker {
   static constexpr float kLineScaleLoopClosures = 3.0;
 
   static constexpr unsigned int kPublisherQueueSize = 50u;
-}; // LaserMapper
+}; // SegMatchWorker
 
 } // namespace segmatch_ros
 
