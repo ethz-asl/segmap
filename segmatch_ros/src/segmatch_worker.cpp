@@ -50,11 +50,14 @@ void SegMatchWorker::loadTargetCloud() {
 
 bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
                                         const laser_slam::Pose& latest_pose,
+                                        unsigned int track_id,
                                         RelativePose* loop_closure) {
   if(params_.close_loops) {
     CHECK_NOTNULL(loop_closure);
   }
   bool loop_closure_found = false;
+
+  // TODO Check distance with track_id.
   if ((params_.localize && target_cloud_loaded_) || params_.close_loops) {
     laser_slam::Clock clock;
 
@@ -67,7 +70,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
 
       // Process the source cloud.
       clock.start();
-      segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose);
+      segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
       ROS_INFO_STREAM("Processing the source cloud took " << clock.takeRealTime() << " ms.");
 
       // Find matches.
@@ -80,9 +83,8 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       }
 
       // Filter matches.
-      PairwiseMatches filtered_matches;
-
       clock.start();
+      PairwiseMatches filtered_matches;
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
                                                    loop_closure);
       ROS_INFO_STREAM("Filtering matches took " << clock.takeRealTime() << " ms.");

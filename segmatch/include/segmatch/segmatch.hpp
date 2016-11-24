@@ -47,7 +47,8 @@ class SegMatch {
 
   /// \brief Process a source cloud.
   void processAndSetAsSourceCloud(const PointICloud& source_cloud,
-                                  const laser_slam::Pose& latest_pose);
+                                  const laser_slam::Pose& latest_pose,
+                                  const unsigned int track_id);
 
   /// \brief Process a target cloud.
   void processAndSetAsTargetCloud(const PointICloud& target_cloud);

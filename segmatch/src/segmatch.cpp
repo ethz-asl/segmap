@@ -37,7 +37,8 @@ void SegMatch::setParams(const SegMatchParams& params) {
 }
 
 void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
-                                          const laser_slam::Pose& latest_pose) {
+                                          const laser_slam::Pose& latest_pose,
+                                          const unsigned int track_id) {
   // Save the segmentation pose.
   segmentation_poses_[latest_pose.time_ns] = latest_pose.T_w;
 
@@ -53,6 +54,7 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
       segmented_source_cloud_.getNumberOfValidSegments();
   segmented_source_cloud_.setTimeStampOfSegments(latest_pose.time_ns);
   segmented_source_cloud_.setLinkPoseOfSegments(latest_pose.T_w);
+  segmented_source_cloud_.setTrackId(track_id);
 
   // Filter the boundary segments.
   if (params_.filter_boundary_segments) {
@@ -88,10 +90,15 @@ void SegMatch::transferSourceToTarget() {
         target_queue_.erase(target_queue_.begin());
         ++num_cloud_transfered;
         try_adding_latest_cloud = true;
-      } else {
+      } else if (cloud_to_add.getValidSegmentByIndex(0u).track_id ==
+          segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
+        // Check distance since last segmentation.
         laser_slam::SE3 oldest_queue_pose = cloud_to_add.getValidSegmentByIndex(0u).T_w_linkpose;
-        laser_slam::SE3 latest_pose = segmentation_poses_.rbegin()->second;
-        if (distanceBetweenTwoSE3(oldest_queue_pose, latest_pose) > params_.segmentation_radius_m) {
+        laser_slam::SE3 latest_pose =
+            segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
+        double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
+        LOG(INFO) << "Distance since last segmentation" << distance;
+        if (distance > params_.segmentation_radius_m) {
           target_queue_.erase(target_queue_.begin());
           if (params_.filter_duplicate_segments) {
             filterDuplicateSegmentsOfTargetMap(cloud_to_add);

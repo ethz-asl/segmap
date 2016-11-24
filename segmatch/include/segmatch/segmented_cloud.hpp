@@ -81,6 +81,7 @@ struct Segment {
 
   // Trajectory pose to which the segment is linked.
   laser_slam::SE3 T_w_linkpose;
+  unsigned int track_id;
 };
 
 class SegmentedCloud {
@@ -158,9 +159,12 @@ class SegmentedCloud {
   PointICloud validSegmentsAsPointCloudFromIds(
       const std::vector<Id>& ids, std::vector<Id>* segment_id_for_each_point_ptr) const;
 
+  // TODO group in one segment parameters struct?
   void setTimeStampOfSegments(const laser_slam::Time& timestamp_ns);
 
   void setLinkPoseOfSegments(const laser_slam::SE3& link_pose);
+
+  void setTrackId(unsigned int track_id);
 
   void updateSegments(const laser_slam::Trajectory& trajectory);
 

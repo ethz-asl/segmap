@@ -467,6 +467,12 @@ void SegmentedCloud::setLinkPoseOfSegments(const laser_slam::SE3& link_pose) {
   }
 }
 
+void SegmentedCloud::setTrackId(unsigned int track_id) {
+  for (Segment& segment: valid_segments_) {
+    segment.track_id = track_id;
+  }
+}
+
 void SegmentedCloud::updateSegments(const laser_slam::Trajectory& trajectory) {
   for (Segment& segment: valid_segments_) {
     SE3 new_pose = trajectory.at(segment.timestamp_ns);

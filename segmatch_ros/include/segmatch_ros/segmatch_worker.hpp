@@ -17,8 +17,10 @@ class SegMatchWorker {
   void init(ros::NodeHandle& nh, const SegMatchWorkerParams& params);
 
   // Process the source cloud and return true if a loop closure was found.
+  // TODO change default track number.
   bool processSourceCloud(const segmatch::PointICloud& source_cloud,
                           const laser_slam::Pose& latest_pose,
+                          unsigned int track_id = 1u,
                           laser_slam::RelativePose* loop_closure = NULL);
 
   void update(const laser_slam::Trajectory& trajectory);
