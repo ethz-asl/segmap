@@ -282,12 +282,17 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       // For each segment, find the timestamp of the closest segmentation pose.
       std::vector<Time> source_segmentation_times;
       std::vector<Time> target_segmentation_times;
+      std::vector<Segment> source_segments;
+      std::vector<Segment> target_segments;
       for (const auto& match: filtered_matches) {
         Segment segment;
         CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
         source_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
+        source_segments.push_back(segment);
+
         CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
         target_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
+        target_segments.push_back(segment);
       }
 
       // Save the most occuring time stamps as timestamps for loop closure.
@@ -296,8 +301,26 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
 
-      SE3 T_w_a = segmentation_poses_.at(loop_closure->time_a_ns);
-      SE3 T_w_b = segmentation_poses_.at(loop_closure->time_b_ns);
+      // Get the T_w_linkpose and track_id of segments created at that time.
+      SE3 T_w_a, T_w_b;
+      bool found = false;
+      for (size_t i = 0u; i < source_segments.size(); ++i) {
+        if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
+          found = true;
+          T_w_b = source_segments[i].T_w_linkpose;
+          loop_closure->track_id_b = source_segments[i].track_id;
+        }
+      }
+      CHECK(found);
+      found = false;
+      for (size_t i = 0u; i < target_segments.size(); ++i) {
+        if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
+          found = true;
+          T_w_a = target_segments[i].T_w_linkpose;
+          loop_closure->track_id_a = target_segments[i].track_id;
+        }
+      }
+      CHECK(found);
 
       // Compute the loop closure transformation.
       // When applying the transformation to the source cloud, it will allign it with the
