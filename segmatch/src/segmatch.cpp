@@ -114,11 +114,11 @@ void SegMatch::transferSourceToTarget() {
           double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
           LOG(INFO) << "Distance since last segmentation" << distance;
           if (distance > params_.segmentation_radius_m) {
-            target_queue_.erase(it);
             if (params_.filter_duplicate_segments) {
               filterDuplicateSegmentsOfTargetMap(*it);
             }
             segmented_target_cloud_.addSegmentedCloud(*it);
+            target_queue_.erase(it);
             ++num_cloud_transfered;
             try_adding_latest_cloud = true;
             LOG(INFO) << "Transfered a source cloud to the target cloud.";

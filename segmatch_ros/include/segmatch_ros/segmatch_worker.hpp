@@ -1,6 +1,8 @@
 #ifndef SEGMATCH_ROS_SEGMATCH_WORKER_HPP_
 #define SEGMATCH_ROS_SEGMATCH_WORKER_HPP_
 
+#include <utility>
+
 #include <laser_slam/common.hpp>
 #include <segmatch/segmatch.hpp>
 
@@ -54,8 +56,8 @@ class SegMatchWorker {
 
   bool target_cloud_loaded_ = false;
 
-  laser_slam::Pose last_segmented_pose_;
-  bool last_segmented_pose_set_ = false;
+  typedef std::pair<laser_slam::Pose, unsigned int> PoseTrackIdPair;
+  std::vector<PoseTrackIdPair> last_segmented_poses_;
 
   bool first_localization_occured = false;
 

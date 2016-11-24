@@ -57,17 +57,33 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
   }
   bool loop_closure_found = false;
 
-  // TODO Check distance with track_id.
   if ((params_.localize && target_cloud_loaded_) || params_.close_loops) {
     laser_slam::Clock clock;
 
     // Check that the robot drove enough since last segmentation.
-    if (!last_segmented_pose_set_ ||
-        distanceBetweenTwoSE3(last_segmented_pose_.T_w,
-                              latest_pose.T_w) > params_.distance_between_segmentations_m) {
-      last_segmented_pose_set_ = true;
-      last_segmented_pose_ = latest_pose;
+    bool robot_drove_enough = false;
+    if (last_segmented_poses_.empty()) {
+      last_segmented_poses_.push_back(PoseTrackIdPair(latest_pose, track_id));
+      robot_drove_enough = true;
+    } else {
+      bool last_segmented_pose_set = false;
+      for (auto& pose_track_id_pair: last_segmented_poses_) {
+        if (pose_track_id_pair.second == track_id) {
+          last_segmented_pose_set = true;
+          if (distanceBetweenTwoSE3(pose_track_id_pair.first.T_w, latest_pose.T_w) >
+          params_.distance_between_segmentations_m) {
+            robot_drove_enough = true;
+            pose_track_id_pair.first = latest_pose;
+          }
+        }
+      }
+      if (!last_segmented_pose_set) {
+        robot_drove_enough = true;
+        last_segmented_poses_.push_back(PoseTrackIdPair(latest_pose, track_id));
+      }
+    }
 
+    if (robot_drove_enough) {
       // Process the source cloud.
       clock.start();
       segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
