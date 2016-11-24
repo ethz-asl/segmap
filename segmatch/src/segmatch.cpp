@@ -85,28 +85,44 @@ void SegMatch::transferSourceToTarget() {
   while (try_adding_latest_cloud && num_cloud_transfered < kMaxNumberOfCloudToTransfer) {
     try_adding_latest_cloud = false;
     if (!target_queue_.empty()) {
-      SegmentedCloud cloud_to_add = target_queue_.front();
-      if (cloud_to_add.empty()) {
-        target_queue_.erase(target_queue_.begin());
-        ++num_cloud_transfered;
-        try_adding_latest_cloud = true;
-      } else if (cloud_to_add.getValidSegmentByIndex(0u).track_id ==
-          segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
-        // Check distance since last segmentation.
-        laser_slam::SE3 oldest_queue_pose = cloud_to_add.getValidSegmentByIndex(0u).T_w_linkpose;
-        laser_slam::SE3 latest_pose =
-            segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
-        double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
-        LOG(INFO) << "Distance since last segmentation" << distance;
-        if (distance > params_.segmentation_radius_m) {
-          target_queue_.erase(target_queue_.begin());
-          if (params_.filter_duplicate_segments) {
-            filterDuplicateSegmentsOfTargetMap(cloud_to_add);
-          }
-          segmented_target_cloud_.addSegmentedCloud(cloud_to_add);
+      // Get an iterator to the latest cloud with the same track_id.
+      std::vector<SegmentedCloud>::iterator it = target_queue_.begin();
+      bool found = false;
+      while (!found && it != target_queue_.end()) {
+        if (it->empty()) {
+          // Also exit if the cloud to transfer is empty and erase it.
+          found = true;
+        } else if (it->getValidSegmentByIndex(0u).track_id ==
+            segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
+          found = true;
+        }
+        if (!found) {
+          ++it;
+        }
+      }
+
+      if (found) {
+        if (it->empty()) {
+          target_queue_.erase(it);
           ++num_cloud_transfered;
           try_adding_latest_cloud = true;
-          LOG(INFO) << "Transfered a source cloud to the target cloud.";
+        } else {
+          // Check distance since last segmentation.
+          laser_slam::SE3 oldest_queue_pose = it->getValidSegmentByIndex(0u).T_w_linkpose;
+          laser_slam::SE3 latest_pose =
+              segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
+          double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
+          LOG(INFO) << "Distance since last segmentation" << distance;
+          if (distance > params_.segmentation_radius_m) {
+            target_queue_.erase(it);
+            if (params_.filter_duplicate_segments) {
+              filterDuplicateSegmentsOfTargetMap(*it);
+            }
+            segmented_target_cloud_.addSegmentedCloud(*it);
+            ++num_cloud_transfered;
+            try_adding_latest_cloud = true;
+            LOG(INFO) << "Transfered a source cloud to the target cloud.";
+          }
         }
       }
     }
