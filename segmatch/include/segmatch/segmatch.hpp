@@ -68,7 +68,7 @@ class SegMatch {
                      laser_slam::RelativePose* loop_closure = NULL,
                      std::vector<PointICloudPair>* matched_segment_clouds = NULL);
 
-  void update(const laser_slam::Trajectory& trajectory);
+  void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
   /// \brief Get the internal representation of the source cloud.
   void getSourceRepresentation(PointICloud* source_representation,
@@ -121,7 +121,7 @@ class SegMatch {
     classifier_->computeFeaturesDistance(f1, f2, f_out);
   };
 
-  void getSegmentationPoses(laser_slam::Trajectory* poses) const {
+  void getSegmentationPoses(std::vector<laser_slam::Trajectory>* poses) const {
     CHECK_NOTNULL(poses);
     *poses = segmentation_poses_;
   };
@@ -152,7 +152,7 @@ class SegMatch {
   std::vector<SegmentedCloud> target_queue_;
 
   // Contains the poses where segmentation and matching was performed.
-  laser_slam::Trajectory segmentation_poses_;
+  std::vector<laser_slam::Trajectory> segmentation_poses_;
 
   PairwiseMatches last_filtered_matches_;
 

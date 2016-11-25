@@ -473,9 +473,9 @@ void SegmentedCloud::setTrackId(unsigned int track_id) {
   }
 }
 
-void SegmentedCloud::updateSegments(const laser_slam::Trajectory& trajectory) {
+void SegmentedCloud::updateSegments(const std::vector<laser_slam::Trajectory>& trajectories) {
   for (Segment& segment: valid_segments_) {
-    SE3 new_pose = trajectory.at(segment.timestamp_ns);
+    SE3 new_pose = trajectories.at(segment.track_id).at(segment.timestamp_ns);
 
     SE3 transformation = new_pose * segment.T_w_linkpose.inverse();
     // Transform the point cloud.

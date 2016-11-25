@@ -26,6 +26,8 @@ class SegMatchWorker {
 
   void update(const laser_slam::Trajectory& trajectory);
 
+  void update(const std::vector<laser_slam::Trajectory>& trajectories);
+
  private:
 
   void loadTargetCloud();

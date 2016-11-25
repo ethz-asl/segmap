@@ -26,6 +26,9 @@ void SegMatch::init(const SegMatchParams& params) {
   segmenter_ = create_segmenter(params.segmenter_params);
   classifier_ = std::unique_ptr<OpenCvRandomForest>(
       new OpenCvRandomForest(params.classifier_params));
+
+  // Create an empty trajectory for segmentation poses.
+  segmentation_poses_.push_back(laser_slam::Trajectory());
 }
 
 void SegMatch::setParams(const SegMatchParams& params) {
@@ -40,7 +43,11 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                                           const laser_slam::Pose& latest_pose,
                                           const unsigned int track_id) {
   // Save the segmentation pose.
-  segmentation_poses_[latest_pose.time_ns] = latest_pose.T_w;
+  // TODO initialize when creating SegMatch?
+  while (track_id >= segmentation_poses_.size()) {
+    segmentation_poses_.push_back(laser_slam::Trajectory());
+  }
+  segmentation_poses_[track_id][latest_pose.time_ns] = latest_pose.T_w;
 
   // Apply a cylindrical filter on the input cloud.
   PointICloud filtered_cloud = source_cloud;
@@ -341,17 +348,19 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
   return !filtered_matches.empty();
 }
 
-void SegMatch::update(const laser_slam::Trajectory& trajectory) {
+void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
+  CHECK_EQ(trajectories.size(), segmentation_poses_.size());
   // Update the segmentation positions.
-  for (auto& pose: segmentation_poses_){
-    pose.second = trajectory.at(pose.first);
+  for (size_t i = 0u; i < trajectories.size(); ++i) {
+    for (auto& pose: segmentation_poses_[i]){
+      pose.second = trajectories.at(i).at(pose.first);
+    }
   }
-
   // Update the source, target and clouds in the buffer.
-  segmented_source_cloud_.updateSegments(trajectory);
-  segmented_target_cloud_.updateSegments(trajectory);
+  segmented_source_cloud_.updateSegments(trajectories);
+  segmented_target_cloud_.updateSegments(trajectories);
   for (auto& segmented_cloud: target_queue_) {
-    segmented_cloud.updateSegments(trajectory);
+    segmented_cloud.updateSegments(trajectories);
   }
 
   // Update the last filtered matches.
@@ -525,12 +534,15 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   // Create a point cloud of segmentation poses which fall within a time window.
   PointCloud pose_cloud;
   std::vector<Time> pose_times;
-  for (const auto& pose: segmentation_poses_) {
-    if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
-      pose_cloud.points.push_back(se3ToPclPoint(pose.second));
-      pose_times.push_back(pose.first);
+  for (const auto& trajectory: segmentation_poses_) {
+    for (const auto& pose: trajectory) {
+      if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
+        pose_cloud.points.push_back(se3ToPclPoint(pose.second));
+        pose_times.push_back(pose.first);
+      }
     }
   }
+
   pose_cloud.width = 1;
   pose_cloud.height = pose_cloud.points.size();
 

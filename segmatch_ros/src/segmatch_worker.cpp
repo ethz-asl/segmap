@@ -137,8 +137,15 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
   return loop_closure_found;
 }
 
-void SegMatchWorker::update(const laser_slam::Trajectory& trajectory) {
-  segmatch_.update(trajectory);
+void SegMatchWorker::update(const Trajectory& trajectory) {
+  std::vector<Trajectory> trajectories;
+  trajectories.push_back(trajectory);
+  segmatch_.update(trajectories);
+  publish();
+}
+
+void SegMatchWorker::update(const std::vector<Trajectory>& trajectories) {
+  segmatch_.update(trajectories);
   publish();
 }
 
@@ -195,12 +202,14 @@ void SegMatchWorker::publishMatches() const {
 
 void SegMatchWorker::publishSegmentationPositions() const {
   PointCloud segmentation_positions_cloud;
-  Trajectory segmentation_poses;
+  std::vector<Trajectory> segmentation_poses;
   segmatch_.getSegmentationPoses(&segmentation_poses);
 
-  for (const auto& pose: segmentation_poses) {
-    segmentation_positions_cloud.points.push_back(
-        se3ToPclPoint(pose.second));
+  for (const auto& trajectory: segmentation_poses) {
+    for (const auto& pose: trajectory) {
+      segmentation_positions_cloud.points.push_back(
+          se3ToPclPoint(pose.second));
+    }
   }
 
   segmentation_positions_cloud.width = 1;
@@ -236,13 +245,15 @@ void SegMatchWorker::publishLoopClosures() const {
 
   std::vector<laser_slam::RelativePose> loop_closures;
   segmatch_.getLoopClosures(&loop_closures);
-  laser_slam::Trajectory segmentation_poses;
+  std::vector<laser_slam::Trajectory> segmentation_poses;
   segmatch_.getSegmentationPoses(&segmentation_poses);
 
   for (const auto& loop_closure: loop_closures) {
     PclPoint source_point, target_point;
-    source_point = se3ToPclPoint(segmentation_poses.at(loop_closure.time_a_ns));
-    target_point = se3ToPclPoint(segmentation_poses.at(loop_closure.time_b_ns));
+    source_point = se3ToPclPoint(
+        segmentation_poses.at(loop_closure.track_id_a).at(loop_closure.time_a_ns));
+    target_point = se3ToPclPoint(
+        segmentation_poses.at(loop_closure.track_id_b).at(loop_closure.time_b_ns));
     point_pairs.push_back(PointPair(source_point, target_point));
   }
 

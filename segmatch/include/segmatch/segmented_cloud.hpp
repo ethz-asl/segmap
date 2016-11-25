@@ -166,7 +166,7 @@ class SegmentedCloud {
 
   void setTrackId(unsigned int track_id);
 
-  void updateSegments(const laser_slam::Trajectory& trajectory);
+  void updateSegments(const std::vector<laser_slam::Trajectory>& trajectories);
 
 
   // TODO(daniel) delete.
