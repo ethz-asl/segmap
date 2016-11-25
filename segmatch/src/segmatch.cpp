@@ -548,6 +548,10 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   return pose_times.at(nearest_neighbour_indices.at(0));
 }
 
+void SegMatch::getLastTransform(Eigen::Matrix4d* out) const {
+  *out = last_transformation_.cast<double>();
+}
+
 void SegMatch::alignTargetMap() {
   segmented_target_cloud_.transform(last_transformation_.inverse());
 }

@@ -41,6 +41,7 @@ class SegMatchWorker {
   void publishLoopClosures() const;
   void publishTargetSegmentsCentroids() const;
   void publishSourceSegmentsCentroids() const;
+  void publishLastTransformation() const;
 
   // Parameters.
   SegMatchWorkerParams params_;
@@ -53,6 +54,7 @@ class SegMatchWorker {
   ros::Publisher segmentation_positions_pub_;
   ros::Publisher target_segments_centroids_pub_;
   ros::Publisher source_segments_centroids_pub_;
+  ros::Publisher last_transformation_pub_;
 
   // SegMatch object.
   segmatch::SegMatch segmatch_;
