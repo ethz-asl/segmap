@@ -36,7 +36,7 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
   source_segments_centroids_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
       "/segmatch/source_segments_centroids", kPublisherQueueSize);
   last_transformation_pub_ = nh.advertise<geometry_msgs::Transform>(
-      "/segmatch/last_transformation", 5);
+      "/segmatch/last_transformation", 5, true);
 
   if (params_.localize) {
     loadTargetCloud();
