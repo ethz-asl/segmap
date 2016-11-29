@@ -415,16 +415,6 @@ static PclPoint se3ToPclPoint(const laser_slam::SE3& transform) {
   return point;
 }
 
-static double distanceBetweenTwoSE3(const SE3& pose1, const SE3& pose2) {
-  return std::sqrt(
-      (pose1.getPosition()(0) - pose2.getPosition()(0)) *
-      (pose1.getPosition()(0) - pose2.getPosition()(0)) +
-      (pose1.getPosition()(1) - pose2.getPosition()(1)) *
-      (pose1.getPosition()(1) - pose2.getPosition()(1)) +
-      (pose1.getPosition()(2) - pose2.getPosition()(2)) *
-      (pose1.getPosition()(2) - pose2.getPosition()(2)));
-}
-
 static void transformPointCloud(const SE3& transform, PointICloud* point_cloud) {
   CHECK_NOTNULL(point_cloud);
   const Eigen::Matrix4f transform_matrix = transform.getTransformationMatrix().cast<float>();
