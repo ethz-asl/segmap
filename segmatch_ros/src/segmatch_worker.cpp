@@ -88,15 +88,15 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       // Process the source cloud.
       clock.start();
       segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
-      ROS_INFO_STREAM("Processing the source cloud took " << clock.takeRealTime() << " ms.");
+      LOG(INFO) << "Processing the source cloud took " << clock.takeRealTime() << " ms.";
 
       // Find matches.
       clock.start();
       PairwiseMatches predicted_matches = segmatch_.findMatches();
-      ROS_INFO_STREAM("Finding matches took " << clock.takeRealTime() << " ms.");
+      LOG(INFO) << "Finding matches took " << clock.takeRealTime() << " ms.";
       if (!predicted_matches.empty()) {
-        ROS_INFO_STREAM("Number of candidates after full matching: " << predicted_matches.size() <<
-                        ".");
+        LOG(INFO) << "Number of candidates after full matching: " << predicted_matches.size() <<
+                        ".";
       }
 
       // Filter matches.
@@ -104,7 +104,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       PairwiseMatches filtered_matches;
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
                                                    loop_closure);
-      ROS_INFO_STREAM("Filtering matches took " << clock.takeRealTime() << " ms.");
+      LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
 
       // TODO move after optimizing and updating target map?
       if (params_.close_loops) {

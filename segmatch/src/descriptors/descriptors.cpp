@@ -47,7 +47,6 @@ void Descriptors::describe(SegmentedCloud* segmented_cloud_ptr,
   if (timings != NULL) {
     timings->clear();
   }
-  LOG(INFO) << "Starting segments description.";
   CHECK_NOTNULL(segmented_cloud_ptr);
   CHECK_GT(descriptors_.size(), 0) << "Description impossible without a descriptor.";
   for (size_t i = 0u; i < descriptors_.size(); ++i) {

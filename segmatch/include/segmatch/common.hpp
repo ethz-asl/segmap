@@ -218,12 +218,9 @@ static void applyCylindricalFilter(const PclPoint& center, double radius_m,
       filtered_cloud.points.push_back(cloud->points[i]);
     }
   }
-
   filtered_cloud.width = 1;
   filtered_cloud.height = filtered_cloud.points.size();
 
-  ROS_INFO_STREAM("Applied cylindrical filter from " << cloud->size()
-                  << " points to " << filtered_cloud.size() << " points.");
   *cloud = filtered_cloud;
 }
 

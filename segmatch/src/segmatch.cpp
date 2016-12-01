@@ -55,10 +55,8 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                          params_.segmentation_radius_m,
                          kCylinderHeight_m, &filtered_cloud);
 
-  // Segment the cloud.
+  // Segment the cloud and set segment information.
   segmenter_->segment(filtered_cloud, &segmented_source_cloud_);
-  LOG(INFO) << "Number of valid segments after segmentation: " <<
-      segmented_source_cloud_.getNumberOfValidSegments();
   segmented_source_cloud_.setTimeStampOfSegments(latest_pose.time_ns);
   segmented_source_cloud_.setLinkPoseOfSegments(latest_pose.T_w);
   segmented_source_cloud_.setTrackId(track_id);
@@ -67,8 +65,6 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
   if (params_.filter_boundary_segments) {
     filterBoundarySegmentsOfSourceCloud(laserSlamPoseToPclPoint(latest_pose));
   }
-  LOG(INFO) << "Number of valid segments after filter_boundary_segments: " <<
-      segmented_source_cloud_.getNumberOfValidSegments();
 
   // Describe the cloud.
   descriptors_->describe(&segmented_source_cloud_);
@@ -119,7 +115,6 @@ void SegMatch::transferSourceToTarget() {
           laser_slam::SE3 latest_pose =
               segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
           double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
-          LOG(INFO) << "Distance since last segmentation" << distance;
           if (distance > params_.segmentation_radius_m) {
             if (params_.filter_duplicate_segments) {
               filterDuplicateSegmentsOfTargetMap(*it);
@@ -135,7 +130,6 @@ void SegMatch::transferSourceToTarget() {
     }
   }
   if (num_cloud_transfered > 0u) {
-    LOG(INFO) << "Updating the target inside the classifier.";
     classifier_->setTarget(segmented_target_cloud_);
   }
 }
@@ -180,13 +174,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
   Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
 
   if (!predicted_matches.empty()) {
-    LOG(INFO) << "Filtering the matches.";
     //TODO: use a (gc) filtering class for an extra layer of abstraction?
     // Build point clouds out of the centroids for geometric consistency grouping.
     pcl::CorrespondencesPtr correspondences(new pcl::Correspondences());
     PointCloudPtr first_cloud(new PointCloud());
     PointCloudPtr second_cloud(new PointCloud());
-    LOG(INFO) << "Creating clouds for geometric consistency.";
+
+    // Create clouds for geometric consistency.
     for (size_t i = 0u; i < predicted_matches.size(); ++i) {
       // First centroid.
       PclPoint first_centroid = predicted_matches.at(i).getCentroids().first;
@@ -200,7 +194,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
     if (!correspondences->empty()) {
       // Perform geometric consistency grouping.
-      LOG(INFO) << "Checking geometric consistency.";
       RotationsTranslations correspondence_transformations;
       Correspondences clustered_corrs;
       pcl::GeometricConsistencyGrouping<PclPoint, PclPoint> geometric_consistency_grouping;
@@ -214,11 +207,9 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       if (!clustered_corrs.empty()) {
         // Find largest cluster.
-        LOG(INFO) << "Extracting the largest cluster.";
         size_t largest_cluster_size = 0;
         size_t largest_cluster_index = 0;
         for (size_t i = 0u; i < clustered_corrs.size(); ++i) {
-          LOG(INFO) << "Cluster " << i << " has " << clustered_corrs[i].size() << "segments.";
           if (clustered_corrs[i].size() >= largest_cluster_size) {
             largest_cluster_size = clustered_corrs[i].size();
             largest_cluster_index = i;
