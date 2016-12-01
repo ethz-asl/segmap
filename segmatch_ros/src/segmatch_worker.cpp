@@ -11,11 +11,12 @@ SegMatchWorker::SegMatchWorker(){ }
 
 SegMatchWorker::~SegMatchWorker() { }
 
-void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& params) {
+void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& params,
+                          unsigned int num_tracks) {
   params_ = params;
 
   // Initialize SegMatch.
-  segmatch_.init(params_.segmatch_params);
+  segmatch_.init(params_.segmatch_params, num_tracks);
 
   // Setup publishers.
   source_representation_pub_ = nh.advertise<sensor_msgs::PointCloud2>(

@@ -20,15 +20,19 @@ SegMatch::~SegMatch() {
   segmenter_.reset();
 }
 
-void SegMatch::init(const SegMatchParams& params) {
+void SegMatch::init(const SegMatchParams& params,
+                    unsigned int num_tracks) {
   params_ = params;
   descriptors_ = std::unique_ptr<Descriptors>(new Descriptors(params.descriptors_params));
   segmenter_ = create_segmenter(params.segmenter_params);
   classifier_ = std::unique_ptr<OpenCvRandomForest>(
       new OpenCvRandomForest(params.classifier_params));
 
-  // Create an empty trajectory for segmentation poses.
-  segmentation_poses_.push_back(laser_slam::Trajectory());
+  // Create containers for the segmentation poses.
+  CHECK_GT(num_tracks, 0u);
+  for (unsigned int i = 0u; i < num_tracks; ++i) {
+    segmentation_poses_.push_back(laser_slam::Trajectory());
+  }
 }
 
 void SegMatch::setParams(const SegMatchParams& params) {
@@ -43,10 +47,6 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                                           const laser_slam::Pose& latest_pose,
                                           const unsigned int track_id) {
   // Save the segmentation pose.
-  // TODO initialize when creating SegMatch?
-  while (track_id >= segmentation_poses_.size()) {
-    segmentation_poses_.push_back(laser_slam::Trajectory());
-  }
   segmentation_poses_[track_id][latest_pose.time_ns] = latest_pose.T_w;
 
   // Apply a cylindrical filter on the input cloud.
@@ -524,21 +524,19 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   }
   const Time max_time_ns = segment_time_ns + kMaxTimeDiffBetweenSegmentAndPose_ns;
 
-  // Create a point cloud of segmentation poses which fall within a time window.
+  // Create a point cloud of segmentation poses which fall within a time window
+  // for the track associated to the segment.
   PointCloud pose_cloud;
   std::vector<Time> pose_times;
-  // TODO check only for that specific track.
-  for (const auto& trajectory: segmentation_poses_) {
-    for (const auto& pose: trajectory) {
-      if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
-        pose_cloud.points.push_back(se3ToPclPoint(pose.second));
-        pose_times.push_back(pose.first);
-      }
+  for (const auto& pose: segmentation_poses_.at(segment.track_id)) {
+    if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
+      pose_cloud.points.push_back(se3ToPclPoint(pose.second));
+      pose_times.push_back(pose.first);
     }
   }
-
   pose_cloud.width = 1;
   pose_cloud.height = pose_cloud.points.size();
+  CHECK_GT(pose_times.size(), 0u);
 
   // Find the nearest pose to the segment within that window.
   pcl::KdTreeFLANN<PclPoint> kd_tree;

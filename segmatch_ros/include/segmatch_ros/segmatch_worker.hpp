@@ -16,7 +16,8 @@ class SegMatchWorker {
   explicit SegMatchWorker();
   ~SegMatchWorker();
   
-  void init(ros::NodeHandle& nh, const SegMatchWorkerParams& params);
+  void init(ros::NodeHandle& nh, const SegMatchWorkerParams& params,
+            unsigned int num_tracks = 1u);
 
   // Process the source cloud and return true if a loop closure was found.
   bool processSourceCloud(const segmatch::PointICloud& source_cloud,

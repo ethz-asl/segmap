@@ -40,7 +40,8 @@ class SegMatch {
   ~SegMatch();
 
   /// \brief Init SegMatch.
-  void init(const SegMatchParams& params);
+  void init(const SegMatchParams& params,
+            unsigned int num_tracks = 1u);
 
   /// \brief Convenience function for setting part of the params.
   void setParams(const SegMatchParams& params);
@@ -164,7 +165,7 @@ class SegMatch {
   static constexpr double kCylinderHeight_m = 40;
   static constexpr unsigned int kMaxNumberOfCloudToTransfer = 1u;
 
-  static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 10000000000u;
+  static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 20000000000u;
 
 }; // class SegMatch
 
