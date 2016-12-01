@@ -308,13 +308,11 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
 
-      // Get the T_w_linkpose and track_id of segments created at that time.
-      SE3 T_w_a, T_w_b;
+      // Get the track_id of segments created at that time.
       bool found = false;
       for (size_t i = 0u; i < source_segments.size(); ++i) {
         if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
           found = true;
-          T_w_b = source_segments[i].T_w_linkpose;
           loop_closure->track_id_b = source_segments[i].track_id;
         }
       }
@@ -323,18 +321,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       for (size_t i = 0u; i < target_segments.size(); ++i) {
         if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
           found = true;
-          T_w_a = target_segments[i].T_w_linkpose;
           loop_closure->track_id_a = target_segments[i].track_id;
         }
       }
       CHECK(found);
 
-      // Compute the loop closure transformation.
-      // When applying the transformation to the source cloud, it will allign it with the
-      // target cloud.
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
-      SE3 T_a_b = T_w_a.inverse() * w_T_a_b * T_w_a * (T_w_b.inverse() * T_w_a).inverse();
-      loop_closure->T_a_b = T_a_b;
+      loop_closure->T_a_b = w_T_a_b;
 
       // Save the loop closure.
       loop_closures_.push_back(*loop_closure);
@@ -534,6 +527,7 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   // Create a point cloud of segmentation poses which fall within a time window.
   PointCloud pose_cloud;
   std::vector<Time> pose_times;
+  // TODO check only for that specific track.
   for (const auto& trajectory: segmentation_poses_) {
     for (const auto& pose: trajectory) {
       if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
