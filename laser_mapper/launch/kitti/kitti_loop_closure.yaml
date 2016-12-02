@@ -1,32 +1,34 @@
-LaserMapper: {
-  distance_to_consider_fixed: 80,
-  separate_distant_map: true,
-  create_filtered_map: true,
-  minimum_distance_to_add_pose: 1,
-  voxel_size_m: 0.10,
-  minimum_point_number_per_voxel: 1,
-  clear_local_map_after_loop_closure: true,
-  
+LaserMapper: { 
   world_frame: "map",
-  odom_frame: "world", # In the KITTI bag, transform is given from /world to /velodyne
-  sensor_frame: "velodyne",
-  
-  assembled_cloud_sub_topic: "/velodyne_points",
-  trajectory_pub_topic: "trajectory",
-  odometry_trajectory_pub_topic: "odometry_trajectory",
-  full_map_pub_topic: "full_map",
-  local_map_pub_topic: "local_map",
-  distant_map_pub_topic: "distant_map",
-  covariances_pub_topic: "covariances",
-
-  publish_local_map: true,
-  publish_distant_map: false,
-  publish_full_map: false,
-  map_publication_rate_hz: 3,
+  clear_local_map_after_loop_closure: true,
   
   publish_world_to_odom: true,
   tf_publication_rate_hz: 10,
   
+  LaserSlamWorker: {
+    distance_to_consider_fixed: 80,
+    separate_distant_map: true,
+    create_filtered_map: true,
+    minimum_distance_to_add_pose: 1,
+    voxel_size_m: 0.10,
+    minimum_point_number_per_voxel: 1,
+    
+    odom_frame: "world",
+    sensor_frame: "velodyne",
+    
+    assembled_cloud_sub_topic: "/velodyne_points",
+    trajectory_pub_topic: "trajectory",
+    odometry_trajectory_pub_topic: "odometry_trajectory",
+    full_map_pub_topic: "full_map",
+    local_map_pub_topic: "local_map",
+    distant_map_pub_topic: "distant_map",
+    
+    publish_local_map: true,
+    publish_distant_map: false,
+    publish_full_map: false,
+    map_publication_rate_hz: 3,
+  },
+ 
   # SegMatchWorker parameters
   SegMatchWorker: {
   localize: false,
@@ -41,7 +43,7 @@ LaserMapper: {
 
   SegMatch: {
     segmentation_radius_m: 60.0,
-    
+
     filter_boundary_segments: true,
     boundary_radius_m: 59.0,
     filter_duplicate_segments: true,
@@ -68,7 +70,7 @@ LaserMapper: {
     },
 
     Classifier: {
-     threshold_to_accept_match: 0.70,
+     threshold_to_accept_match: 0.65,
      n_nearest_neighbours: 200,
      knn_feature_dim: 7,
      enable_two_stage_retrieval: true,
@@ -82,18 +84,14 @@ LaserMapper: {
 
     GeometricConsistency: {
       resolution: 0.4,
-      min_cluster_size: 5
+      min_cluster_size: 4
     }
   },
   },
   
   OnlineEstimator: {
-    loop_closure_noise_model: [0.005, 0.005, 0.005, 0.0015, 0.0015, 0.0015],
-    add_m_estimator_on_loop_closures: true,
-    
-    sliding_window_size: 3,
-    add_intermediate_poses: false,
-    publish_covariances: false,
+    loop_closure_noise_model: [0.0005, 0.0005, 0.0005, 0.00015, 0.00015, 0.00015],
+    add_m_estimator_on_loop_closures: false,
     
     do_icp_step_on_loop_closures: true,
     loop_closures_sub_maps_radius: 3,
@@ -105,9 +103,8 @@ LaserMapper: {
       add_m_estimator_on_icp: true,
     
       use_icp_factors: true, #Introducing ICP constraints will introduce a drift.
-      strategy_for_icp_transformations: "local_scan_to_sub_map",
       nscan_to_match: 3,
-      nscan_in_sub_map: 20,
+      nscan_in_sub_map: 5,
       save_icp_results: false
     }
   }

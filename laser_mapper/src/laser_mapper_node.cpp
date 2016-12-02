@@ -14,7 +14,6 @@ int main(int argc, char **argv) {
   std::thread publish_tf_thread(&LaserMapper::publishTfThread, &mapper);
   std::thread segmatch_thread(&LaserMapper::segMatchThread, &mapper);
 
-
   try {
     ros::spin();
   }
