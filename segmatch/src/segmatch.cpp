@@ -102,8 +102,8 @@ void SegMatch::transferSourceToTarget() {
       it = target_queue_.begin();
       bool found = false;
       while (!found && it != target_queue_.end()) {
-        if (it->getValidSegmentByIndex(0u).track_id ==
-            segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
+        if (it->begin()->second.track_id ==
+            segmented_source_cloud_.begin()->second.track_id) {
           found = true;
         } else {
           ++it;
@@ -112,9 +112,9 @@ void SegMatch::transferSourceToTarget() {
 
       if (found) {
         // Check distance since last segmentation.
-        laser_slam::SE3 oldest_queue_pose = it->getValidSegmentByIndex(0u).T_w_linkpose;
+        laser_slam::SE3 oldest_queue_pose = it->begin()->second.T_w_linkpose;
         laser_slam::SE3 latest_pose =
-            segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
+            segmented_source_cloud_.begin()->second.T_w_linkpose;
         const double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
         if (distance > params_.segmentation_radius_m) {
           if (params_.filter_duplicate_segments) {
@@ -380,14 +380,17 @@ void SegMatch::getTargetSegmentsCentroids(PointICloud* segments_centroids) const
     permuted_indexes.push_back(i);
   }
   std::random_shuffle(permuted_indexes.begin(), permuted_indexes.end());
-  for (size_t i = 0u; i < segmented_target_cloud_.getNumberOfValidSegments(); ++i) {
+  unsigned int i = 0u;
+  for (std::unordered_map<Id, Segment>::const_iterator it = segmented_target_cloud_.begin();
+      it != segmented_target_cloud_.end(); ++it) {
     PointI centroid;
-    Segment segment = segmented_target_cloud_.getValidSegmentByIndex(i);
+    Segment segment = it->second;
     centroid.x = segment.centroid.x;
     centroid.y = segment.centroid.y;
     centroid.z = segment.centroid.z;
     centroid.intensity = permuted_indexes[i];
     cloud.points.push_back(centroid);
+    ++i;
   }
   cloud.width = 1;
   cloud.height = cloud.points.size();
@@ -404,14 +407,17 @@ void SegMatch::getSourceSegmentsCentroids(PointICloud* segments_centroids) const
     permuted_indexes.push_back(i);
   }
   std::random_shuffle(permuted_indexes.begin(), permuted_indexes.end());
-  for (size_t i = 0u; i < segmented_source_cloud_.getNumberOfValidSegments(); ++i) {
+  unsigned int i = 0u;
+  for (std::unordered_map<Id, Segment>::const_iterator it = segmented_source_cloud_.begin();
+      it != segmented_source_cloud_.end(); ++it) {
     PointI centroid;
-    Segment segment = segmented_source_cloud_.getValidSegmentByIndex(i);
+    Segment segment = it->second;
     centroid.x = segment.centroid.x;
     centroid.y = segment.centroid.y;
     centroid.z = segment.centroid.z;
     centroid.intensity = permuted_indexes[i];
     cloud.points.push_back(centroid);
+    ++i;
   }
   cloud.width = 1;
   cloud.height = cloud.points.size();
@@ -440,8 +446,9 @@ void SegMatch::filterBoundarySegmentsOfSourceCloud(const PclPoint& center) {
     const double squared_radius = params_.boundary_radius_m * params_.boundary_radius_m;
     // Get a list of segments with at least one point outside the boundary.
     std::vector<Id> boundary_segments_ids;
-    for (size_t i = 0u; i < segmented_source_cloud_.getNumberOfValidSegments(); ++i) {
-      Segment segment = segmented_source_cloud_.getValidSegmentByIndex(i);
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_source_cloud_.begin();
+        it != segmented_source_cloud_.end(); ++it) {
+      Segment segment = it->second;
       PointICloud segment_cloud = segment.point_cloud;
       // Loop over points until one is found outside of the boundary.
       for (size_t j = 0u; j < segment_cloud.size(); ++j) {
@@ -468,7 +475,17 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
     laser_slam::Clock clock;
     std::vector<Id> duplicate_segments_ids;
     std::vector<Id> target_segment_ids;
-    PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(&target_segment_ids);
+
+    // Get a cloud with segments centroids which are close to the cloud to be added.
+    PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(
+        cloud_to_be_added.begin()->second.T_w_linkpose,
+        params_.segmentation_radius_m * 3.0,
+        &target_segment_ids);
+
+    clock.takeTime();
+    LOG(INFO) << "Creating cloud for duplicates removal took " <<
+        clock.getRealTime() << " ms.";
+    clock.start();
 
     const unsigned int n_nearest_segments = 1u;
     if (target_segment_ids.size() > n_nearest_segments) {
@@ -478,12 +495,13 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
       pcl::copyPointCloud(centroid_cloud, *centroid_cloud_ptr);
       kdtree.setInputCloud(centroid_cloud_ptr);
 
-      for (size_t i = 0u; i < cloud_to_be_added.getNumberOfValidSegments(); ++i) {
+      for (std::unordered_map<Id, Segment>::const_iterator it = cloud_to_be_added.begin();
+          it != cloud_to_be_added.end(); ++it) {
         std::vector<int> nearest_neighbour_indice(n_nearest_segments);
         std::vector<float> nearest_neighbour_squared_distance(n_nearest_segments);
 
         // Find the nearest neighbours.
-        if (kdtree.nearestKSearch(cloud_to_be_added.getValidSegmentByIndex(i).centroid,
+        if (kdtree.nearestKSearch(it->second.centroid,
                                   n_nearest_segments, nearest_neighbour_indice,
                                   nearest_neighbour_squared_distance) <= 0) {
           LOG(ERROR) << "Nearest neighbour search failed.";
@@ -494,6 +512,11 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
         }
       }
     }
+
+    clock.takeTime();
+    LOG(INFO) << "Finding nn took " <<
+        clock.getRealTime() << " ms.";
+    clock.start();
 
     // Remove duplicates.
     size_t n_removals;
