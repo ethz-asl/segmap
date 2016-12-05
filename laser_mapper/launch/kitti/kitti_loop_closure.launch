@@ -32,8 +32,4 @@
     <!-- rosbag player node -->
   <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 0 --clock --pause $(arg bag_file)"/>	
  
-  <!-- octomap nodes with parameters from Luigi -->
-  <!--node name="octomap_mux" pkg="octomap_mux" type="octomap_mux_node" respawn="$(arg respawn_value)" output="screen">
-  </node-->   
-	
 </launch>
