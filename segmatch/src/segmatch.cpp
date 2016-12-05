@@ -482,11 +482,6 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
         params_.segmentation_radius_m * 3.0,
         &target_segment_ids);
 
-    clock.takeTime();
-    LOG(INFO) << "Creating cloud for duplicates removal took " <<
-        clock.getRealTime() << " ms.";
-    clock.start();
-
     const unsigned int n_nearest_segments = 1u;
     if (target_segment_ids.size() > n_nearest_segments) {
       // Set up nearest neighbour search.
@@ -512,11 +507,6 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
         }
       }
     }
-
-    clock.takeTime();
-    LOG(INFO) << "Finding nn took " <<
-        clock.getRealTime() << " ms.";
-    clock.start();
 
     // Remove duplicates.
     size_t n_removals;

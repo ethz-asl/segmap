@@ -139,7 +139,6 @@ class SegmentedCloud {
                                    double maximum_linkpose_distance,
                                    std::vector<Id>* segment_id_for_each_point_ptr=NULL) const;
 
-
   bool findNearestSegmentsToPoint(const PclPoint& point,
                                   unsigned int n_closest_segments,
                                   double maximum_centroid_distance_m,

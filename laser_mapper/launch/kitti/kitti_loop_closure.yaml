@@ -34,7 +34,7 @@ LaserMapper: {
   localize: false,
   close_loops: true,
   
-  distance_between_segmentations_m: 10.0,
+  distance_between_segmentations_m: 5.0,
 
   distance_to_lower_target_cloud_for_viz_m: 15.0,
   align_target_map_on_first_loop_closure: false,
