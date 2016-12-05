@@ -218,12 +218,9 @@ static void applyCylindricalFilter(const PclPoint& center, double radius_m,
       filtered_cloud.points.push_back(cloud->points[i]);
     }
   }
-
   filtered_cloud.width = 1;
   filtered_cloud.height = filtered_cloud.points.size();
 
-  ROS_INFO_STREAM("Applied cylindrical filter from " << cloud->size()
-                  << " points to " << filtered_cloud.size() << " points.");
   *cloud = filtered_cloud;
 }
 
@@ -413,16 +410,6 @@ static PclPoint se3ToPclPoint(const laser_slam::SE3& transform) {
   point.y = transform.getPosition()(1);
   point.z = transform.getPosition()(2);
   return point;
-}
-
-static double distanceBetweenTwoSE3(const SE3& pose1, const SE3& pose2) {
-  return std::sqrt(
-      (pose1.getPosition()(0) - pose2.getPosition()(0)) *
-      (pose1.getPosition()(0) - pose2.getPosition()(0)) +
-      (pose1.getPosition()(1) - pose2.getPosition()(1)) *
-      (pose1.getPosition()(1) - pose2.getPosition()(1)) +
-      (pose1.getPosition()(2) - pose2.getPosition()(2)) *
-      (pose1.getPosition()(2) - pose2.getPosition()(2)));
 }
 
 static void transformPointCloud(const SE3& transform, PointICloud* point_cloud) {

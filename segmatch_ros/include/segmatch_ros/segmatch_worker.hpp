@@ -1,6 +1,8 @@
 #ifndef SEGMATCH_ROS_SEGMATCH_WORKER_HPP_
 #define SEGMATCH_ROS_SEGMATCH_WORKER_HPP_
 
+#include <utility>
+
 #include <laser_slam/common.hpp>
 #include <segmatch/segmatch.hpp>
 
@@ -14,14 +16,18 @@ class SegMatchWorker {
   explicit SegMatchWorker();
   ~SegMatchWorker();
   
-  void init(ros::NodeHandle& nh, const SegMatchWorkerParams& params);
+  void init(ros::NodeHandle& nh, const SegMatchWorkerParams& params,
+            unsigned int num_tracks = 1u);
 
   // Process the source cloud and return true if a loop closure was found.
   bool processSourceCloud(const segmatch::PointICloud& source_cloud,
                           const laser_slam::Pose& latest_pose,
+                          unsigned int track_id = 0u,
                           laser_slam::RelativePose* loop_closure = NULL);
 
   void update(const laser_slam::Trajectory& trajectory);
+
+  void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
  private:
 
@@ -53,8 +59,8 @@ class SegMatchWorker {
 
   bool target_cloud_loaded_ = false;
 
-  laser_slam::Pose last_segmented_pose_;
-  bool last_segmented_pose_set_ = false;
+  typedef std::pair<laser_slam::Pose, unsigned int> PoseTrackIdPair;
+  std::vector<PoseTrackIdPair> last_segmented_poses_;
 
   bool first_localization_occured = false;
 
@@ -63,7 +69,7 @@ class SegMatchWorker {
   static constexpr float kLineScaleLoopClosures = 3.0;
 
   static constexpr unsigned int kPublisherQueueSize = 50u;
-}; // LaserMapper
+}; // SegMatchWorker
 
 } // namespace segmatch_ros
 

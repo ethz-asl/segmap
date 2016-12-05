@@ -20,12 +20,19 @@ SegMatch::~SegMatch() {
   segmenter_.reset();
 }
 
-void SegMatch::init(const SegMatchParams& params) {
+void SegMatch::init(const SegMatchParams& params,
+                    unsigned int num_tracks) {
   params_ = params;
   descriptors_ = std::unique_ptr<Descriptors>(new Descriptors(params.descriptors_params));
   segmenter_ = create_segmenter(params.segmenter_params);
   classifier_ = std::unique_ptr<OpenCvRandomForest>(
       new OpenCvRandomForest(params.classifier_params));
+
+  // Create containers for the segmentation poses.
+  CHECK_GT(num_tracks, 0u);
+  for (unsigned int i = 0u; i < num_tracks; ++i) {
+    segmentation_poses_.push_back(laser_slam::Trajectory());
+  }
 }
 
 void SegMatch::setParams(const SegMatchParams& params) {
@@ -37,9 +44,10 @@ void SegMatch::setParams(const SegMatchParams& params) {
 }
 
 void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
-                                          const laser_slam::Pose& latest_pose) {
+                                          const laser_slam::Pose& latest_pose,
+                                          const unsigned int track_id) {
   // Save the segmentation pose.
-  segmentation_poses_[latest_pose.time_ns] = latest_pose.T_w;
+  segmentation_poses_[track_id][latest_pose.time_ns] = latest_pose.T_w;
 
   // Apply a cylindrical filter on the input cloud.
   PointICloud filtered_cloud = source_cloud;
@@ -47,19 +55,16 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                          params_.segmentation_radius_m,
                          kCylinderHeight_m, &filtered_cloud);
 
-  // Segment the cloud.
+  // Segment the cloud and set segment information.
   segmenter_->segment(filtered_cloud, &segmented_source_cloud_);
-  LOG(INFO) << "Number of valid segments after segmentation: " <<
-      segmented_source_cloud_.getNumberOfValidSegments();
   segmented_source_cloud_.setTimeStampOfSegments(latest_pose.time_ns);
   segmented_source_cloud_.setLinkPoseOfSegments(latest_pose.T_w);
+  segmented_source_cloud_.setTrackId(track_id);
 
   // Filter the boundary segments.
   if (params_.filter_boundary_segments) {
     filterBoundarySegmentsOfSourceCloud(laserSlamPoseToPclPoint(latest_pose));
   }
-  LOG(INFO) << "Number of valid segments after filter_boundary_segments: " <<
-      segmented_source_cloud_.getNumberOfValidSegments();
 
   // Describe the cloud.
   descriptors_->describe(&segmented_source_cloud_);
@@ -76,6 +81,16 @@ void SegMatch::processAndSetAsTargetCloud(const PointICloud& target_cloud) {
 void SegMatch::transferSourceToTarget() {
   target_queue_.push_back(segmented_source_cloud_);
 
+  // Remove empty clouds from queue.
+  std::vector<SegmentedCloud>::iterator it = target_queue_.begin();
+  while(it != target_queue_.end()) {
+    if(it->empty()) {
+      it = target_queue_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   // Check whether the pose linked to the segments of the oldest cloud in the queue
   // has a sufficient distance to the latest pose.
   bool try_adding_latest_cloud = true;
@@ -83,20 +98,30 @@ void SegMatch::transferSourceToTarget() {
   while (try_adding_latest_cloud && num_cloud_transfered < kMaxNumberOfCloudToTransfer) {
     try_adding_latest_cloud = false;
     if (!target_queue_.empty()) {
-      SegmentedCloud cloud_to_add = target_queue_.front();
-      if (cloud_to_add.empty()) {
-        target_queue_.erase(target_queue_.begin());
-        ++num_cloud_transfered;
-        try_adding_latest_cloud = true;
-      } else {
-        laser_slam::SE3 oldest_queue_pose = cloud_to_add.getValidSegmentByIndex(0u).T_w_linkpose;
-        laser_slam::SE3 latest_pose = segmentation_poses_.rbegin()->second;
-        if (distanceBetweenTwoSE3(oldest_queue_pose, latest_pose) > params_.segmentation_radius_m) {
-          target_queue_.erase(target_queue_.begin());
+      // Get an iterator to the latest cloud with the same track_id.
+      it = target_queue_.begin();
+      bool found = false;
+      while (!found && it != target_queue_.end()) {
+        if (it->getValidSegmentByIndex(0u).track_id ==
+            segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
+          found = true;
+        } else {
+          ++it;
+        }
+      }
+
+      if (found) {
+        // Check distance since last segmentation.
+        laser_slam::SE3 oldest_queue_pose = it->getValidSegmentByIndex(0u).T_w_linkpose;
+        laser_slam::SE3 latest_pose =
+            segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
+        const double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
+        if (distance > params_.segmentation_radius_m) {
           if (params_.filter_duplicate_segments) {
-            filterDuplicateSegmentsOfTargetMap(cloud_to_add);
+            filterDuplicateSegmentsOfTargetMap(*it);
           }
-          segmented_target_cloud_.addSegmentedCloud(cloud_to_add);
+          segmented_target_cloud_.addSegmentedCloud(*it);
+          target_queue_.erase(it);
           ++num_cloud_transfered;
           try_adding_latest_cloud = true;
           LOG(INFO) << "Transfered a source cloud to the target cloud.";
@@ -104,8 +129,8 @@ void SegMatch::transferSourceToTarget() {
       }
     }
   }
+
   if (num_cloud_transfered > 0u) {
-    LOG(INFO) << "Updating the target inside the classifier.";
     classifier_->setTarget(segmented_target_cloud_);
   }
 }
@@ -150,13 +175,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
   Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
 
   if (!predicted_matches.empty()) {
-    LOG(INFO) << "Filtering the matches.";
     //TODO: use a (gc) filtering class for an extra layer of abstraction?
     // Build point clouds out of the centroids for geometric consistency grouping.
     pcl::CorrespondencesPtr correspondences(new pcl::Correspondences());
     PointCloudPtr first_cloud(new PointCloud());
     PointCloudPtr second_cloud(new PointCloud());
-    LOG(INFO) << "Creating clouds for geometric consistency.";
+
+    // Create clouds for geometric consistency.
     for (size_t i = 0u; i < predicted_matches.size(); ++i) {
       // First centroid.
       PclPoint first_centroid = predicted_matches.at(i).getCentroids().first;
@@ -170,7 +195,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
     if (!correspondences->empty()) {
       // Perform geometric consistency grouping.
-      LOG(INFO) << "Checking geometric consistency.";
       RotationsTranslations correspondence_transformations;
       Correspondences clustered_corrs;
       pcl::GeometricConsistencyGrouping<PclPoint, PclPoint> geometric_consistency_grouping;
@@ -184,11 +208,9 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       if (!clustered_corrs.empty()) {
         // Find largest cluster.
-        LOG(INFO) << "Extracting the largest cluster.";
         size_t largest_cluster_size = 0;
         size_t largest_cluster_index = 0;
         for (size_t i = 0u; i < clustered_corrs.size(); ++i) {
-          LOG(INFO) << "Cluster " << i << " has " << clustered_corrs[i].size() << "segments.";
           if (clustered_corrs[i].size() >= largest_cluster_size) {
             largest_cluster_size = clustered_corrs[i].size();
             largest_cluster_index = i;
@@ -259,12 +281,17 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       // For each segment, find the timestamp of the closest segmentation pose.
       std::vector<Time> source_segmentation_times;
       std::vector<Time> target_segmentation_times;
+      std::vector<Segment> source_segments;
+      std::vector<Segment> target_segments;
       for (const auto& match: filtered_matches) {
         Segment segment;
         CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
         source_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
+        source_segments.push_back(segment);
+
         CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
         target_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
+        target_segments.push_back(segment);
       }
 
       // Save the most occuring time stamps as timestamps for loop closure.
@@ -273,15 +300,26 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
 
-      SE3 T_w_a = segmentation_poses_.at(loop_closure->time_a_ns);
-      SE3 T_w_b = segmentation_poses_.at(loop_closure->time_b_ns);
+      // Get the track_id of segments created at that time.
+      bool found = false;
+      for (size_t i = 0u; i < source_segments.size(); ++i) {
+        if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
+          found = true;
+          loop_closure->track_id_b = source_segments[i].track_id;
+        }
+      }
+      CHECK(found);
+      found = false;
+      for (size_t i = 0u; i < target_segments.size(); ++i) {
+        if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
+          found = true;
+          loop_closure->track_id_a = target_segments[i].track_id;
+        }
+      }
+      CHECK(found);
 
-      // Compute the loop closure transformation.
-      // When applying the transformation to the source cloud, it will allign it with the
-      // target cloud.
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
-      SE3 T_a_b = T_w_a.inverse() * w_T_a_b * T_w_a * (T_w_b.inverse() * T_w_a).inverse();
-      loop_closure->T_a_b = T_a_b;
+      loop_closure->T_a_b = w_T_a_b;
 
       // Save the loop closure.
       loop_closures_.push_back(*loop_closure);
@@ -295,17 +333,19 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
   return !filtered_matches.empty();
 }
 
-void SegMatch::update(const laser_slam::Trajectory& trajectory) {
+void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
+  CHECK_EQ(trajectories.size(), segmentation_poses_.size());
   // Update the segmentation positions.
-  for (auto& pose: segmentation_poses_){
-    pose.second = trajectory.at(pose.first);
+  for (size_t i = 0u; i < trajectories.size(); ++i) {
+    for (auto& pose: segmentation_poses_[i]){
+      pose.second = trajectories.at(i).at(pose.first);
+    }
   }
-
   // Update the source, target and clouds in the buffer.
-  segmented_source_cloud_.updateSegments(trajectory);
-  segmented_target_cloud_.updateSegments(trajectory);
+  segmented_source_cloud_.updateSegments(trajectories);
+  segmented_target_cloud_.updateSegments(trajectories);
   for (auto& segmented_cloud: target_queue_) {
-    segmented_cloud.updateSegments(trajectory);
+    segmented_cloud.updateSegments(trajectories);
   }
 
   // Update the last filtered matches.
@@ -476,10 +516,11 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   }
   const Time max_time_ns = segment_time_ns + kMaxTimeDiffBetweenSegmentAndPose_ns;
 
-  // Create a point cloud of segmentation poses which fall within a time window.
+  // Create a point cloud of segmentation poses which fall within a time window
+  // for the track associated to the segment.
   PointCloud pose_cloud;
   std::vector<Time> pose_times;
-  for (const auto& pose: segmentation_poses_) {
+  for (const auto& pose: segmentation_poses_.at(segment.track_id)) {
     if (pose.first >= min_time_ns && pose.first <= max_time_ns) {
       pose_cloud.points.push_back(se3ToPclPoint(pose.second));
       pose_times.push_back(pose.first);
@@ -487,6 +528,7 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   }
   pose_cloud.width = 1;
   pose_cloud.height = pose_cloud.points.size();
+  CHECK_GT(pose_times.size(), 0u);
 
   // Find the nearest pose to the segment within that window.
   pcl::KdTreeFLANN<PclPoint> kd_tree;

@@ -31,10 +31,10 @@ LaserMapper: {
  
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: true,
-  close_loops: false,
+  localize: false,
+  close_loops: true,
   
-  distance_between_segmentations_m: 1.0,
+  distance_between_segmentations_m: 10.0,
 
   distance_to_lower_target_cloud_for_viz_m: 15.0,
   align_target_map_on_first_loop_closure: false,
@@ -70,7 +70,7 @@ LaserMapper: {
     },
 
     Classifier: {
-     threshold_to_accept_match: 0.7, #0.8
+     threshold_to_accept_match: 0.65,
      n_nearest_neighbours: 200,
      knn_feature_dim: 7,
      enable_two_stage_retrieval: true,
@@ -90,21 +90,21 @@ LaserMapper: {
   },
   
   OnlineEstimator: {
-    loop_closure_noise_model: [0.005, 0.005, 0.005, 0.0015, 0.0015, 0.0015],
-    add_m_estimator_on_loop_closures: true,
+    loop_closure_noise_model: [0.0005, 0.0005, 0.0005, 0.00015, 0.00015, 0.00015],
+    add_m_estimator_on_loop_closures: false,
     
     do_icp_step_on_loop_closures: true,
     loop_closures_sub_maps_radius: 3,
 
     LaserTrack: {
-      odometry_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15], 
+      odometry_noise_model: [0.5, 0.5, 0.5, 0.15, 0.15, 0.15],
       icp_noise_model: [0.05, 0.05, 0.05, 0.015, 0.015, 0.015],
       add_m_estimator_on_odom: false,
       add_m_estimator_on_icp: true,
-      
-      use_icp_factors: false,
+    
+      use_icp_factors: true, #Introducing ICP constraints will introduce a drift.
       nscan_to_match: 3,
-      nscan_in_sub_map: 20,
+      nscan_in_sub_map: 5,
       save_icp_results: false
     }
   }

@@ -11,11 +11,12 @@ SegMatchWorker::SegMatchWorker(){ }
 
 SegMatchWorker::~SegMatchWorker() { }
 
-void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& params) {
+void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& params,
+                          unsigned int num_tracks) {
   params_ = params;
 
   // Initialize SegMatch.
-  segmatch_.init(params_.segmatch_params);
+  segmatch_.init(params_.segmatch_params, num_tracks);
 
   // Setup publishers.
   source_representation_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
@@ -50,42 +51,60 @@ void SegMatchWorker::loadTargetCloud() {
 
 bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
                                         const laser_slam::Pose& latest_pose,
+                                        unsigned int track_id,
                                         RelativePose* loop_closure) {
   if(params_.close_loops) {
     CHECK_NOTNULL(loop_closure);
   }
   bool loop_closure_found = false;
+
   if ((params_.localize && target_cloud_loaded_) || params_.close_loops) {
     laser_slam::Clock clock;
 
     // Check that the robot drove enough since last segmentation.
-    if (!last_segmented_pose_set_ ||
-        distanceBetweenTwoSE3(last_segmented_pose_.T_w,
-                              latest_pose.T_w) > params_.distance_between_segmentations_m) {
-      last_segmented_pose_set_ = true;
-      last_segmented_pose_ = latest_pose;
+    bool robot_drove_enough = false;
+    if (last_segmented_poses_.empty()) {
+      last_segmented_poses_.push_back(PoseTrackIdPair(latest_pose, track_id));
+      robot_drove_enough = true;
+    } else {
+      bool last_segmented_pose_set = false;
+      for (auto& pose_track_id_pair: last_segmented_poses_) {
+        if (pose_track_id_pair.second == track_id) {
+          last_segmented_pose_set = true;
+          if (distanceBetweenTwoSE3(pose_track_id_pair.first.T_w, latest_pose.T_w) >
+          params_.distance_between_segmentations_m) {
+            robot_drove_enough = true;
+            pose_track_id_pair.first = latest_pose;
+          }
+        }
+      }
+      if (!last_segmented_pose_set) {
+        robot_drove_enough = true;
+        last_segmented_poses_.push_back(PoseTrackIdPair(latest_pose, track_id));
+      }
+    }
 
+    if (robot_drove_enough) {
       // Process the source cloud.
       clock.start();
-      segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose);
-      ROS_INFO_STREAM("Processing the source cloud took " << clock.takeRealTime() << " ms.");
+      segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
+      LOG(INFO) << "Processing the source cloud took " << clock.takeRealTime() << " ms.";
 
       // Find matches.
       clock.start();
       PairwiseMatches predicted_matches = segmatch_.findMatches();
-      ROS_INFO_STREAM("Finding matches took " << clock.takeRealTime() << " ms.");
+      LOG(INFO) << "Finding matches took " << clock.takeRealTime() << " ms.";
       if (!predicted_matches.empty()) {
-        ROS_INFO_STREAM("Number of candidates after full matching: " << predicted_matches.size() <<
-                        ".");
+        LOG(INFO) << "Number of candidates after full matching: " << predicted_matches.size() <<
+                        ".";
       }
 
       // Filter matches.
-      PairwiseMatches filtered_matches;
-
       clock.start();
+      PairwiseMatches filtered_matches;
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
                                                    loop_closure);
-      ROS_INFO_STREAM("Filtering matches took " << clock.takeRealTime() << " ms.");
+      LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
 
       // TODO move after optimizing and updating target map?
       if (params_.close_loops) {
@@ -119,8 +138,15 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
   return loop_closure_found;
 }
 
-void SegMatchWorker::update(const laser_slam::Trajectory& trajectory) {
-  segmatch_.update(trajectory);
+void SegMatchWorker::update(const Trajectory& trajectory) {
+  std::vector<Trajectory> trajectories;
+  trajectories.push_back(trajectory);
+  segmatch_.update(trajectories);
+  publish();
+}
+
+void SegMatchWorker::update(const std::vector<Trajectory>& trajectories) {
+  segmatch_.update(trajectories);
   publish();
 }
 
@@ -177,12 +203,14 @@ void SegMatchWorker::publishMatches() const {
 
 void SegMatchWorker::publishSegmentationPositions() const {
   PointCloud segmentation_positions_cloud;
-  Trajectory segmentation_poses;
+  std::vector<Trajectory> segmentation_poses;
   segmatch_.getSegmentationPoses(&segmentation_poses);
 
-  for (const auto& pose: segmentation_poses) {
-    segmentation_positions_cloud.points.push_back(
-        se3ToPclPoint(pose.second));
+  for (const auto& trajectory: segmentation_poses) {
+    for (const auto& pose: trajectory) {
+      segmentation_positions_cloud.points.push_back(
+          se3ToPclPoint(pose.second));
+    }
   }
 
   segmentation_positions_cloud.width = 1;
@@ -218,13 +246,15 @@ void SegMatchWorker::publishLoopClosures() const {
 
   std::vector<laser_slam::RelativePose> loop_closures;
   segmatch_.getLoopClosures(&loop_closures);
-  laser_slam::Trajectory segmentation_poses;
+  std::vector<laser_slam::Trajectory> segmentation_poses;
   segmatch_.getSegmentationPoses(&segmentation_poses);
 
   for (const auto& loop_closure: loop_closures) {
     PclPoint source_point, target_point;
-    source_point = se3ToPclPoint(segmentation_poses.at(loop_closure.time_a_ns));
-    target_point = se3ToPclPoint(segmentation_poses.at(loop_closure.time_b_ns));
+    source_point = se3ToPclPoint(
+        segmentation_poses.at(loop_closure.track_id_a).at(loop_closure.time_a_ns));
+    target_point = se3ToPclPoint(
+        segmentation_poses.at(loop_closure.track_id_b).at(loop_closure.time_b_ns));
     point_pairs.push_back(PointPair(source_point, target_point));
   }
 

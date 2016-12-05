@@ -5,15 +5,15 @@
   <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
   
   <!-- Bag file path -->  
-  <arg name="bag_file" value="$(find laser_mapper)/demonstration_files/kitti/2011_10_03_drive_27.bag"/>
+  <arg name="bag_file" value="$(find laser_mapper)/demonstration_files/kitti/2011_09_30_drive_18.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 	
   <!-- Rviz visualization config file path -->
-  <arg name="rviz_config_file" value="$(find laser_mapper)/demonstration_files/kitti/kitti_localization.rviz"/>
+  <arg name="rviz_config_file" value="$(find laser_mapper)/demonstration_files/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
-  <rosparam command="load" file="$(find laser_mapper)/launch/kitti/kitti_localization.yaml"/>
+  <rosparam command="load" file="$(find laser_mapper)/launch/kitti/kitti_loop_closure.yaml"/>
 
   <!-- rviz node -->
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
@@ -22,9 +22,6 @@
   <arg name="classifier" value="$(find laser_mapper)/demonstration_files/kitti/random_forest_eigen_25trees.xml"/>
   <rosparam param="/LaserMapper/SegMatchWorker/SegMatch/Classifier/classifier_filename" subst_value="True">$(arg classifier)</rosparam>
   
-  <!-- Target cloud -->
-  <arg name="target_cloud" value="$(find laser_mapper)/demonstration_files/kitti/drive27_target_map.pcd"/>
-  <rosparam param="/LaserMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
   
   <!-- laser_mapper node -->
   <include file="$(find laser_mapper)/launch/laser_mapper.launch">
@@ -33,6 +30,6 @@
   </include>
   
     <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 333 --clock --pause $(arg bag_file)"/>	
-
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 0 --clock --pause $(arg bag_file)"/>	
+ 
 </launch>

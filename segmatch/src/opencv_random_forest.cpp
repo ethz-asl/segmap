@@ -156,16 +156,19 @@ PairwiseMatches OpenCvRandomForest::findCandidates(const SegmentedCloud& source_
 
   if (params_.n_nearest_neighbours > 0 && params_.enable_two_stage_retrieval) {
     if (params_.apply_hard_threshold_on_feature_distance) {
-      LOG(INFO) << "Two stage retrieval with hard threshold.";
+      LOG(INFO) << "Two stage retrieval with hard threshold and " <<
+          target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
     } else {
-      LOG(INFO) << "Two stage retrieval with RF.";
+      LOG(INFO) << "Two stage retrieval with RF and " <<
+          target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
     }
   } else if (params_.n_nearest_neighbours > 0) {
-    LOG(INFO) << "Finding candidates with libnabo knn";
+    LOG(INFO) << "Finding candidates with libnabo knn and " <<
+        target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
   } else {
-    LOG(INFO) << "Finding candidates with RF";
+    LOG(INFO) << "Finding candidates with RF and " <<
+        target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
   }
-  LOG(INFO) << target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
 
   if (params_.n_nearest_neighbours > 0) {
     for (size_t i = 0u; i < source_cloud.getNumberOfValidSegments(); ++i) {
@@ -235,9 +238,6 @@ PairwiseMatches OpenCvRandomForest::findCandidates(const SegmentedCloud& source_
         Eigen::MatrixXd dF;
         computeFeaturesDistance(F1, F2, &dF);
         const unsigned int feature_dim_after_dist = dF.cols();
-
-        std::cout << "F1->cols() " << F1.cols() << " F1->rows() " << F1.rows() << std::endl;
-        std::cout << "dF->cols() " << dF.cols() << " dF->rows() " << dF.rows() << std::endl;
 
         for (size_t i = 0u; i < candidates_after_first_stage.size(); ++i) {
           PairwiseMatch candidate = candidates_after_first_stage[i];

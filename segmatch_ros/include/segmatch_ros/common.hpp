@@ -14,7 +14,6 @@
 #include <segmatch/segmented_cloud.hpp>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/PointCloud2.h>
 #include <tf/transform_listener.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
