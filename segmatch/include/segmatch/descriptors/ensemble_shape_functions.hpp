@@ -22,8 +22,9 @@ class EnsembleShapeFunctions : public Descriptor {
 
   virtual void describe(SegmentedCloud* segmented_cloud_ptr) {
     CHECK_NOTNULL(segmented_cloud_ptr);
-    for (size_t i = 0u; i < segmented_cloud_ptr->getNumberOfValidSegments(); ++i) {
-      describe(segmented_cloud_ptr->getValidSegmentPtrByIndex(i));
+    for (std::unordered_map<Id, Segment>::iterator it = segmented_cloud_ptr->begin();
+        it != segmented_cloud_ptr->end(); ++it) {
+      describe(&(it->second));
     }
   }
 
