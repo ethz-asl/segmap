@@ -105,7 +105,8 @@ LaserMapper: {
       use_icp_factors: false,
       nscan_to_match: 3,
       nscan_in_sub_map: 20,
-      save_icp_results: false
+      save_icp_results: false,
+      force_priors: false
     }
   }
 }
