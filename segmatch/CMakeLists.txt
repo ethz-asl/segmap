@@ -10,8 +10,10 @@ add_definitions(-std=c++11)
 cs_add_library(${PROJECT_NAME} 
   src/descriptors/descriptors.cpp
   src/descriptors/eigenvalue_based.cpp
+  src/descriptors/autoencoder.cpp
   src/descriptors/ensemble_shape_functions.cpp
   src/features.cpp
+  src/database.cpp
   src/opencv_random_forest.cpp
   src/segmatch.cpp
   src/segmented_cloud.cpp

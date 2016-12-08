@@ -27,6 +27,8 @@ Descriptors::Descriptors(const DescriptorsParameters& parameters) {
           new EigenvalueBasedDescriptor(parameters)));
     } else if (parameters.descriptor_types[i] == "EnsembleShapeFunctions") {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new EnsembleShapeFunctions(parameters)));
+    } else if (parameters.descriptor_types[i] == "Autoencoder") {
+      descriptors_.push_back(std::unique_ptr<Descriptor>(new AutoencoderDescriptor(parameters)));
     } else {
       CHECK(false) << "The descriptor '" << parameters.descriptor_types[i] <<
           "' was not implemented.";
