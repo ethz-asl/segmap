@@ -171,4 +171,4 @@ class SegMatch {
 
 } // namespace segmatch
 
-#endif // SEGMENT_MATCHER_SEGMENT_MATCHER_HPP_
+#endif // SEGMATCH_SEGMATCH_HPP_

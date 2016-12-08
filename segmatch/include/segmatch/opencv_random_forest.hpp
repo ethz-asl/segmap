@@ -65,4 +65,4 @@ class OpenCvRandomForest {
 
 } // namespace segmatch
 
-#endif // SEGMENT_MATCHER_OPENCV_RANDOM_FOREST_HPP_
+#endif // SEGMATCH_OPENCV_RANDOM_FOREST_HPP_
