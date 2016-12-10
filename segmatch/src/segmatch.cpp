@@ -292,8 +292,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
       loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
 
-      CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
-
       // Get the track_id of segments created at that time.
       bool found = false;
       for (size_t i = 0u; i < source_segments.size(); ++i) {
@@ -311,6 +309,10 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
         }
       }
       CHECK(found);
+
+      if (loop_closure->track_id_a == loop_closure->track_id_b) {
+        CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
+      }
 
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
       loop_closure->T_a_b = w_T_a_b;
