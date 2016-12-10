@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 
 namespace segmatch {
+namespace database {
 
 bool IdMatches::findMatches(const Id id, std::vector<Id>* matches) const {
   CHECK_NOTNULL(matches)->clear();
@@ -96,10 +97,6 @@ bool IdMatches::findId(const Id id, Position* position_ptr) const {
   }
   return false;
 }
-
-} // namespace segmatch
-
-using namespace segmatch;
 
 const std::string kDatabaseDirectory = "/tmp/segmatch/";
 const std::string kSegmentsFilename = "segments_database.csv";
@@ -387,3 +384,6 @@ bool import_matches(const std::string& filename, IdMatches* matches_ptr) {
     return false;
   }
 }
+
+} // namespace database
+} // namespace segmatch

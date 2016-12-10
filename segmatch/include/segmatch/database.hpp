@@ -6,6 +6,7 @@
 #include <segmatch/segmented_cloud.hpp>
 
 namespace segmatch {
+namespace database {
 
 // TODO: Replace IdMatches?
 /// \brief A structure for storing a position within a 2D table.
@@ -36,29 +37,32 @@ class IdMatches {
   std::vector<std::vector<Id> > id_match_list_;
 }; // class IdMatches
 
-} // namespace segmatch
 
-bool export_session_data_to_database(const segmatch::SegmentedCloud& segmented_cloud,
-                                     const segmatch::IdMatches& id_matches);
-bool import_session_data_from_database(segmatch::SegmentedCloud* segmented_cloud_ptr,
-                                       segmatch::IdMatches* id_matches_ptr);
+
+bool export_session_data_to_database(const SegmentedCloud& segmented_cloud,
+                                     const IdMatches& id_matches);
+bool import_session_data_from_database(SegmentedCloud* segmented_cloud_ptr,
+                                       IdMatches* id_matches_ptr);
 
 bool ensure_directory_exists(const std::string& directory);
 bool ensure_directory_exists_for_filename(const std::string& filename);
 
 bool export_segments(const std::string& filename,
-                     const segmatch::SegmentedCloud& segmented_cloud);
+                     const SegmentedCloud& segmented_cloud);
 bool export_features(const std::string& filename,
-                     const segmatch::SegmentedCloud& segmented_cloud);
+                     const SegmentedCloud& segmented_cloud);
 bool export_features_and_centroids(const std::string& filename,
-                                   const segmatch::SegmentedCloud& segmented_cloud);
-bool export_matches(const std::string& filename, const segmatch::IdMatches& matches);
+                                   const SegmentedCloud& segmented_cloud);
+bool export_matches(const std::string& filename, const IdMatches& matches);
 
 bool import_segments(const std::string& filename,
-                     segmatch::SegmentedCloud* segmented_cloud_ptr);
+                     SegmentedCloud* segmented_cloud_ptr);
 bool import_features(const std::string& filename,
-                     segmatch::SegmentedCloud* segmented_cloud_ptr,
+                     SegmentedCloud* segmented_cloud_ptr,
                      const std::string& behavior_when_segment_has_features="abort");
-bool import_matches(const std::string& filename, segmatch::IdMatches* matches_ptr);
+bool import_matches(const std::string& filename, IdMatches* matches_ptr);
+
+} // namespace database
+} // namespace segmatch
 
 #endif // SEGMATCH_DATABASE_HPP_
