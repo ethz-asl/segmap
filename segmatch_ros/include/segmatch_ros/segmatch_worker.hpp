@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <laser_slam/common.hpp>
+#include <segmatch/database.hpp>
 #include <segmatch/segmatch.hpp>
 #include <std_srvs/Empty.h>
 

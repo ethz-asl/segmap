@@ -1,6 +1,5 @@
 #include "segmatch_ros/segmatch_worker.hpp"
 
-#include <segmatch/database.hpp>
 #include <laser_slam/common.hpp>
 
 namespace segmatch_ros {
