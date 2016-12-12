@@ -8,7 +8,7 @@
 namespace segmatch {
 namespace database {
 
-bool IdMatches::findMatches(const Id id, std::vector<Id>* matches) const {
+bool UniqueIdMatches::findMatches(const Id id, std::vector<Id>* matches) const {
   CHECK_NOTNULL(matches)->clear();
   Position position;
   if (findId(id, &position)) {
@@ -20,7 +20,7 @@ bool IdMatches::findMatches(const Id id, std::vector<Id>* matches) const {
   return false;
 }
 
-bool IdMatches::areIdsMatching(const Id id1, const Id id2) const {
+bool UniqueIdMatches::areIdsMatching(const Id id1, const Id id2) const {
   Position position1;
   Position position2;
   if (findId(id1, &position1) && findId(id2, &position2)) {
@@ -29,7 +29,7 @@ bool IdMatches::areIdsMatching(const Id id1, const Id id2) const {
   return false;
 }
 
-void IdMatches::addMatch(const Id id1, const Id id2) {
+void UniqueIdMatches::addMatch(const Id id1, const Id id2) {
   CHECK_NE(id1, id2) << "No point in adding match between identical ids.";
   Position position1;
   Position position2;
@@ -67,11 +67,11 @@ void IdMatches::addMatch(const Id id1, const Id id2) {
   }
 }
 
-void IdMatches::clear() {
+void UniqueIdMatches::clear() {
   id_match_list_.clear();
 }
 
-std::string IdMatches::asString() const {
+std::string UniqueIdMatches::asString() const {
   std::stringstream result;
   for (size_t i = 0u; i < id_match_list_.size(); ++i) {
     for (size_t j = 0u; j < id_match_list_.at(i).size(); ++j) {
@@ -82,7 +82,7 @@ std::string IdMatches::asString() const {
   return result.str();
 }
 
-bool IdMatches::findId(const Id id, Position* position_ptr) const {
+bool UniqueIdMatches::findId(const Id id, Position* position_ptr) const {
   for (size_t i = 0u; i < id_match_list_.size(); ++i) {
     for (size_t j = 0u; j < id_match_list_.at(i).size(); ++j) {
       if (id == id_match_list_.at(i).at(j)) {
@@ -104,14 +104,14 @@ const std::string kFeaturesFilename = "features_database.csv";
 const std::string kMatchesFilename = "matches_database.csv";
 
 bool export_session_data_to_database(const SegmentedCloud& segmented_cloud,
-                                     const IdMatches& id_matches) {
+                                     const UniqueIdMatches& id_matches) {
   return export_segments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud) &&
       export_features(kDatabaseDirectory + kFeaturesFilename, segmented_cloud) &&
       export_matches(kDatabaseDirectory + kMatchesFilename, id_matches);
 }
 
 bool import_session_data_from_database(SegmentedCloud* segmented_cloud_ptr,
-                                       IdMatches* id_matches_ptr) {
+                                       UniqueIdMatches* id_matches_ptr) {
   return import_segments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud_ptr) &&
       import_features(kDatabaseDirectory + kFeaturesFilename, segmented_cloud_ptr) &&
       import_matches(kDatabaseDirectory + kMatchesFilename, id_matches_ptr);
@@ -227,7 +227,7 @@ bool export_features_and_centroids(const std::string& filename,
   }
 }
 
-bool export_matches(const std::string& filename, const IdMatches& matches) {
+bool export_matches(const std::string& filename, const UniqueIdMatches& matches) {
   ensure_directory_exists_for_filename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
@@ -352,10 +352,10 @@ bool import_features(const std::string& filename, SegmentedCloud* segmented_clou
   }
 }
 
-bool import_matches(const std::string& filename, IdMatches* matches_ptr) {
+bool import_matches(const std::string& filename, UniqueIdMatches* matches_ptr) {
   CHECK_NOTNULL(matches_ptr);
   if (!matches_ptr->empty()) {
-    LOG(ERROR) << "Should not import matches into non-empty IdMatches object.";
+    LOG(ERROR) << "Should not import matches into non-empty UniqueIdMatches object.";
     return false;
   }
   std::ifstream input_file;
@@ -375,7 +375,7 @@ bool import_matches(const std::string& filename, IdMatches* matches_ptr) {
       matches_vector.push_back(match_group);
       ++matches_count;
     }
-    *matches_ptr = IdMatches(matches_vector);
+    *matches_ptr = UniqueIdMatches(matches_vector);
     input_file.close();
     LOG(INFO) << "Imported " << matches_count << " matches from file " << filename;
     return true;

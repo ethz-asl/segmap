@@ -1,5 +1,6 @@
 #include "segmatch_ros/segmatch_worker.hpp"
 
+#include <segmatch/database.hpp>
 #include <laser_slam/common.hpp>
 
 namespace segmatch_ros {
@@ -33,6 +34,10 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_segments_centroids", kPublisherQueueSize);
   source_segments_centroids_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
       "/segmatch/source_segments_centroids", kPublisherQueueSize);
+  if (params_.export_segments_and_matches) {
+    export_run_service_ = nh.advertiseService("export_run",
+                                              &SegMatchWorker::exportRunServiceCall, this);
+  }
 
   if (params_.localize) {
     loadTargetCloud();
@@ -120,6 +125,17 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
             LOG(INFO) << "Aligning target map.";
             segmatch_.alignTargetMap();
             publishTargetRepresentation();
+          }
+        }
+      }
+
+      // Store segments and matches in database if desired, for later export.
+      if (params_.export_segments_and_matches) {
+        segments_database_ += segmatch_->getSourceAsSegmentedCloud();
+        if (loop_closure_found) {
+          for (size_t i = 0u; i < filtered_matches.size(); ++i) {
+            matches_database_.addMatch(filtered_matches.at(i).ids_.first,
+                                       filtered_matches.at(i).ids_.second);
           }
         }
       }
@@ -261,6 +277,17 @@ void SegMatchWorker::publishLoopClosures() const {
   // Query the segmentation_poses_ at that time.
   publishLineSet(point_pairs, params_.world_frame, kLineScaleLoopClosures,
                  Color(0.0, 0.0, 1.0), loop_closures_pub_);
+}
+
+bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
+                                         std_srvs::Empty::Response& res) {
+  // Get current date.
+  const boost::posix_time::ptime time_as_ptime = ros::WallTime::now().toBoost();
+  std::string acquisition_time = to_iso_extended_string(time_as_ptime);
+  export_features("/tmp/online_matcher/run_" + acquisition_time + "_features.csv", segments_database_);
+  export_segments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv", segments_database_);
+  export_matches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv", matches_database_);
+  return true;
 }
 
 } // namespace segmatch_ros
