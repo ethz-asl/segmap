@@ -91,43 +91,14 @@ void SegMatch::transferSourceToTarget() {
     }
   }
 
-  // Check whether the pose linked to the segments of the oldest cloud in the queue
-  // has a sufficient distance to the latest pose.
-  bool try_adding_latest_cloud = true;
   unsigned int num_cloud_transfered = 0u;
-  while (try_adding_latest_cloud && num_cloud_transfered < kMaxNumberOfCloudToTransfer) {
-    try_adding_latest_cloud = false;
-    if (!target_queue_.empty()) {
-      // Get an iterator to the latest cloud with the same track_id.
-      it = target_queue_.begin();
-      bool found = false;
-      while (!found && it != target_queue_.end()) {
-        if (it->begin()->second.track_id ==
-            segmented_source_cloud_.begin()->second.track_id) {
-          found = true;
-        } else {
-          ++it;
-        }
-      }
-
-      if (found) {
-        // Check distance since last segmentation.
-        laser_slam::SE3 oldest_queue_pose = it->begin()->second.T_w_linkpose;
-        laser_slam::SE3 latest_pose =
-            segmented_source_cloud_.begin()->second.T_w_linkpose;
-        const double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
-        if (distance > params_.segmentation_radius_m) {
-          if (params_.filter_duplicate_segments) {
-            filterDuplicateSegmentsOfTargetMap(*it);
-          }
-          segmented_target_cloud_.addSegmentedCloud(*it);
-          target_queue_.erase(it);
-          ++num_cloud_transfered;
-          try_adding_latest_cloud = true;
-          LOG(INFO) << "Transfered a source cloud to the target cloud.";
-        }
-      }
+  if (!target_queue_.empty()) {
+    if (params_.filter_duplicate_segments) {
+      filterDuplicateSegmentsOfTargetMap(target_queue_.at(0u));
     }
+    segmented_target_cloud_.addSegmentedCloud(target_queue_.at(0u));
+    target_queue_.erase(target_queue_.begin());
+    ++num_cloud_transfered;
   }
 
   if (num_cloud_transfered > 0u) {
@@ -205,6 +176,29 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       geometric_consistency_grouping.setSceneCloud(second_cloud);
       geometric_consistency_grouping.setModelSceneCorrespondences(correspondences);
       geometric_consistency_grouping.recognize(correspondence_transformations, clustered_corrs);
+
+      // Filter the matches by segment timestamps.
+      Correspondences time_filtered_clustered_corrs;
+      for (const auto& cluster: clustered_corrs) {
+        pcl::Correspondences time_filtered_cluster;
+        for (const auto& match: cluster) {
+          PairwiseMatch pairwise_match = predicted_matches.at(match.index_query);
+          Segment source_segment, target_segment;
+          CHECK(segmented_source_cloud_.findValidSegmentById(pairwise_match.ids_.first,
+                                                             &source_segment));
+          CHECK(segmented_target_cloud_.findValidSegmentById(pairwise_match.ids_.second,
+                                                             &target_segment));
+
+          if (source_segment.track_id != target_segment.track_id ||
+              std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
+              std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
+              kMinTimeBetweenSegmentForMatches_ns) {
+            time_filtered_cluster.push_back(match);
+          }
+        }
+        time_filtered_clustered_corrs.push_back(time_filtered_cluster);
+      }
+      clustered_corrs = time_filtered_clustered_corrs;
 
       if (!clustered_corrs.empty()) {
         // Find largest cluster.
@@ -298,8 +292,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
       loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
 
-      CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
-
       // Get the track_id of segments created at that time.
       bool found = false;
       for (size_t i = 0u; i < source_segments.size(); ++i) {
@@ -317,6 +309,10 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
         }
       }
       CHECK(found);
+
+      if (loop_closure->track_id_a == loop_closure->track_id_b) {
+        CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
+      }
 
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
       loop_closure->T_a_b = w_T_a_b;
