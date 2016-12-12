@@ -130,7 +130,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
 
       // Store segments and matches in database if desired, for later export.
       if (params_.export_segments_and_matches) {
-        segments_database_ += segmatch_->getSourceAsSegmentedCloud();
+        segments_database_ += segmatch_.getSourceAsSegmentedCloud();
         if (loop_closure_found) {
           for (size_t i = 0u; i < filtered_matches.size(); ++i) {
             matches_database_.addMatch(filtered_matches.at(i).ids_.first,
@@ -283,9 +283,12 @@ bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
   // Get current date.
   const boost::posix_time::ptime time_as_ptime = ros::WallTime::now().toBoost();
   std::string acquisition_time = to_iso_extended_string(time_as_ptime);
-  export_features("/tmp/online_matcher/run_" + acquisition_time + "_features.csv", segments_database_);
-  export_segments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv", segments_database_);
-  export_matches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv", matches_database_);
+  database::export_features("/tmp/online_matcher/run_" + acquisition_time + "_features.csv",
+                            segments_database_);
+  database::export_segments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv",
+                            segments_database_);
+  database::export_matches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
+                           matches_database_);
   return true;
 }
 
