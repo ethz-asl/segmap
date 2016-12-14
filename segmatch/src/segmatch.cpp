@@ -559,6 +559,18 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
 
 void SegMatch::alignTargetMap() {
   segmented_target_cloud_.transform(last_transformation_.inverse());
+
+  // Overwrite the old target.
+  classifier_->setTarget(segmented_target_cloud_);
+
+  // Update the last filtered matches.
+  for (auto& match: last_filtered_matches_) {
+    Segment segment;
+    CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
+    match.centroids_.first = segment.centroid;
+    CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
+    match.centroids_.second = segment.centroid;
+  }
 }
 
 } // namespace segmatch

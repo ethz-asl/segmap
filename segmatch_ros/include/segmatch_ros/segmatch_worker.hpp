@@ -67,7 +67,7 @@ class SegMatchWorker {
   typedef std::pair<laser_slam::Pose, unsigned int> PoseTrackIdPair;
   std::vector<PoseTrackIdPair> last_segmented_poses_;
 
-  bool first_localization_occured = false;
+  bool first_localization_occured_ = false;
 
   segmatch::SegmentedCloud segments_database_;
   segmatch::database::UniqueIdMatches matches_database_;
