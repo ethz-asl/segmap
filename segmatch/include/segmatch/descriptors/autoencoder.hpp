@@ -23,7 +23,7 @@ class AutoencoderDescriptor : public Descriptor {
       LOG(FATAL) << "Could not execute autoencoder command";
     }
     char buff[512];
-    while (fgets(buff, sizeof(buff), script_process_pipe_)!=NULL) {
+    while (fgets(buff, sizeof(buff), script_process_pipe_) != NULL) {
       LOG(INFO) << buff;
       if (std::string(buff) == "__INIT_COMPLETE__\n") {
         break;

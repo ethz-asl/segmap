@@ -283,11 +283,11 @@ bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
   // Get current date.
   const boost::posix_time::ptime time_as_ptime = ros::WallTime::now().toBoost();
   std::string acquisition_time = to_iso_extended_string(time_as_ptime);
-  database::export_features("/tmp/online_matcher/run_" + acquisition_time + "_features.csv",
+  database::exportFeatures("/tmp/online_matcher/run_" + acquisition_time + "_features.csv",
                             segments_database_);
-  database::export_segments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv",
+  database::exportSegments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv",
                             segments_database_);
-  database::export_matches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
+  database::exportMatches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
                            matches_database_);
   return true;
 }

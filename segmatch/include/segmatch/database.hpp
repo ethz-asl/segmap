@@ -38,28 +38,26 @@ class UniqueIdMatches {
 
 
 
-bool export_session_data_to_database(const SegmentedCloud& segmented_cloud,
-                                     const UniqueIdMatches& id_matches);
-bool import_session_data_from_database(SegmentedCloud* segmented_cloud_ptr,
-                                       UniqueIdMatches* id_matches_ptr);
+bool exportSessionDataToDatabase(const SegmentedCloud& segmented_cloud,
+                                 const UniqueIdMatches& id_matches);
+bool importSessionDataFromDatabase(SegmentedCloud* segmented_cloud_ptr,
+                                   UniqueIdMatches* id_matches_ptr);
 
-bool ensure_directory_exists(const std::string& directory);
-bool ensure_directory_exists_for_filename(const std::string& filename);
+bool ensureDirectoryExists(const std::string& directory);
+bool ensureDirectoryExistsForFilename(const std::string& filename);
 
-bool export_segments(const std::string& filename,
-                     const SegmentedCloud& segmented_cloud);
-bool export_features(const std::string& filename,
-                     const SegmentedCloud& segmented_cloud);
-bool export_features_and_centroids(const std::string& filename,
-                                   const SegmentedCloud& segmented_cloud);
-bool export_matches(const std::string& filename, const UniqueIdMatches& matches);
+bool exportSegments(const std::string& filename,
+                    const SegmentedCloud& segmented_cloud);
+bool exportFeatures(const std::string& filename,
+                    const SegmentedCloud& segmented_cloud);
+bool exportMatches(const std::string& filename, const UniqueIdMatches& matches);
 
-bool import_segments(const std::string& filename,
-                     SegmentedCloud* segmented_cloud_ptr);
-bool import_features(const std::string& filename,
-                     SegmentedCloud* segmented_cloud_ptr,
-                     const std::string& behavior_when_segment_has_features="abort");
-bool import_matches(const std::string& filename, UniqueIdMatches* matches_ptr);
+bool importSegments(const std::string& filename,
+                    SegmentedCloud* segmented_cloud_ptr);
+bool importFeatures(const std::string& filename,
+                    SegmentedCloud* segmented_cloud_ptr,
+                    const std::string& behavior_when_segment_has_features="abort");
+bool importMatches(const std::string& filename, UniqueIdMatches* matches_ptr);
 
 } // namespace database
 } // namespace segmatch
