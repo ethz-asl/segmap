@@ -34,7 +34,7 @@ LaserMapper: {
   localize: false,
   close_loops: true,
   
-  distance_between_segmentations_m: 5.0,
+  distance_between_segmentations_m: 15.0,
 
   distance_to_lower_target_cloud_for_viz_m: 15.0,
   align_target_map_on_first_loop_closure: false,
@@ -76,9 +76,9 @@ LaserMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 200,
-     knn_feature_dim: 7,
-     enable_two_stage_retrieval: true,
+     n_nearest_neighbours: 3,
+     knn_feature_dim: 18,
+     enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 1,
      
