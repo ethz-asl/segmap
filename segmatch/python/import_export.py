@@ -15,7 +15,7 @@ def load_segments(folder=database_folder, filename="segments_database.csv"):
   ids    = extracted_data[:,0].astype(int)
   points = extracted_data[:,1:]
   id_set = set(ids)
-  id_changes = np.where(np.diff(ids) > 0)[0] + 1
+  id_changes = np.where(np.abs(np.diff(ids)) > 0)[0] + 1
   segments = np.split(points, id_changes)
 #   segments = [ np.array(points[ids == i,:]) for i in id_set]
 

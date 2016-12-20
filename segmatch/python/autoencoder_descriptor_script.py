@@ -107,10 +107,9 @@ try:
         print(predict_end - predict_start)
         print("  Overhead out - ", end='')
         print(overhead_out_end - overhead_out_start)
-except:
+except KeyboardInterrupt:
   print("Autoencoder descriptor script interrupted")
-
-
-os.unlink(segments_fifo_path)
-os.unlink(features_fifo_path)
+finally:
+  os.unlink(segments_fifo_path)
+  os.unlink(features_fifo_path)
 

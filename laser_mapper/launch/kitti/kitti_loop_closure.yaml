@@ -66,7 +66,12 @@ LaserMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["EigenvalueBased"], # "EnsembleShapeFunctions"
+      descriptor_types: ["Autoencoder"],
+      autoencoder_python_env: "/home/daniel/anaconda2/envs/ml3/bin/python",
+      autoencoder_script_path: "/home/daniel/Documents/catkin_ws/src/segmatch/segmatch/python/autoencoder_descriptor_script.py",
+      autoencoder_model_path: "/home/daniel/Desktop/autoencoder/",
+      autoencoder_temp_folder_path: "/tmp/",
+      autoencoder_latent_space_dimension: 15
     },
 
     Classifier: {
