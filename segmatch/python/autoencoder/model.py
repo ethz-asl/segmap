@@ -388,12 +388,12 @@ class Autoencoder(object):
       dict_[self.dropout_placeholder] = self.MP.DROPOUT if dropout is None else dropout
     else:
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
-    if twin_input != None:
-      if self.twin_placeholder == None: raise ValueError('Twin Graph has not been initialized. See make_twin_graph()')
+    if twin_input is not None:
+      if self.twin_placeholder is None: raise ValueError('Twin Graph has not been initialized. See make_twin_graph()')
       dict_[self.twin_placeholder] = twin_input
     # Graph nodes to target
-    cost = self.cost if twin_input == None else self.twin_cost
-    opt = self.optimizer if twin_input == None else self.twin_optimizer
+    cost = self.cost if twin_input is None else self.twin_cost
+    opt = self.optimizer if twin_input is None else self.twin_optimizer
     # compute
     if cost_only:
       cost = self.sess.run(cost,

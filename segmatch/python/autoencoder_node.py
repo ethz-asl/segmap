@@ -51,11 +51,11 @@ if len(argv) > 1:
 # In[ ]:
 
 if not RUN_AS_PY_SCRIPT:
-  get_ipython().magic(u'load_ext autoreload')
-  get_ipython().magic(u'autoreload 2')
+  get_ipython().magic('load_ext autoreload')
+  get_ipython().magic('autoreload 2')
   from IPython.display import clear_output
   if PLOTTING_SUPPORT:
-    get_ipython().magic(u'matplotlib notebook')
+    get_ipython().magic('matplotlib notebook')
     from matplotlib import pyplot as plt
 
 
@@ -139,6 +139,9 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "--twins":
         TRAIN_TWINS = True
         print("Training twins.")
+      elif arg == "-LEARNING_RATE":
+        MP.LEARNING_RATE = float(argv.pop(0))
+        print("LEARNING_RATE set to " + str(MP.LEARNING_RATE))
       elif arg == "-LATENT_SHAPE":
         MP.LATENT_SHAPE = [int(argv.pop(0))]
         print("LATENT_SHAPE set to " + str(MP.LATENT_SHAPE))
@@ -242,12 +245,13 @@ if RESTORE_MODEL:
     vae.saver.restore(vae.sess, SAVE_PATH)
     print("Model restored.")
     print(MP.CONVOLUTION_LAYERS)
-  except:
+  except Exception as err:
     print("Could not load model: ", end="")
     try:
       stored_MP = pickle.load(open(SAVE_DIR+MP_FILENAME, 'rb'))
       print("ERROR: mismatch between model params.")
       print("Stored model: "); print(stored_MP); print("New model: "); print(MP)
+      raise err
     except:
       print("no model folder.")
 
@@ -274,6 +278,8 @@ if not TRAIN_TWINS:
   from voxelize import voxelize
   train_vox, _ = voxelize(train,VOXEL_SIDE)
   val_vox, _   = voxelize(val  ,VOXEL_SIDE)
+  train_twins_vox = None
+  val_twins_vox   = None
 
   if train_vox[0].shape != MP.INPUT_SHAPE:
     print("Reshaping")
@@ -424,7 +430,7 @@ print("Training ended.")
 if PLOTTING_SUPPORT:
   # Plot a few random samples
   import matplotlib.pyplot as plt
-  get_ipython().magic(u'matplotlib notebook')
+  get_ipython().magic('matplotlib notebook')
   plt.ion()
   n_samples = 5
   import random

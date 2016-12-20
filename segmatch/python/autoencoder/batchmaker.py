@@ -26,14 +26,14 @@ class Batchmaker:
         assert not self.is_depleted()
         # Create a single batch
         batch_input_values  =  np.zeros([self.examples_per_batch] + self.input_shape)
-        batch_twin_values = None if self.twin_data == None else np.zeros(batch_input_values.shape)
+        batch_twin_values = None if self.twin_data is None else np.zeros(batch_input_values.shape)
         for i_example in range(self.examples_per_batch):
           # Create training example at index 'pos' in input_data.
           pos = self.remaining_example_indices.pop(0)
           #   input.
           batch_input_values[i_example] = np.reshape(self.input_data[pos], self.input_shape)
           #   twin.
-          if self.twin_data != None: batch_twin_values[i_example] = np.reshape(self.twin_data[pos], self.input_shape)
+          if self.twin_data is not None: batch_twin_values[i_example] = np.reshape(self.twin_data[pos], self.input_shape)
 
         self.batches_consumed_counter += 1
 
