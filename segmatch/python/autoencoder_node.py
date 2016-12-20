@@ -51,11 +51,11 @@ if len(argv) > 1:
 # In[ ]:
 
 if not RUN_AS_PY_SCRIPT:
-  get_ipython().magic('load_ext autoreload')
-  get_ipython().magic('autoreload 2')
+  get_ipython().magic(u'load_ext autoreload')
+  get_ipython().magic(u'autoreload 2')
   from IPython.display import clear_output
   if PLOTTING_SUPPORT:
-    get_ipython().magic('matplotlib notebook')
+    get_ipython().magic(u'matplotlib notebook')
     from matplotlib import pyplot as plt
 
 
@@ -72,13 +72,10 @@ N_ROTATION_ANGLES = 12
 ROTATION_OFFSET = 0
 VAL_EVERY_N_STEPS = 1
 VAL_STEP_TOLERANCE = 3
+TRAIN_TWINS = False
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
-MP.HIDDEN_LAYERS = [{'shape': [400]}, {'shape': [400]}]
-MP.COERCED_LATENT_DIMS = []
-MP.DROPOUT = 0.8
-MP.LEARNING_RATE = 0.00001
 
 HOME_DIR = os.path.expanduser('~')
 DATA_DIR = "./database/"
@@ -119,7 +116,7 @@ if SET_MARMOT_PARAMS:
     
 if not RUN_AS_PY_SCRIPT:
     #MP.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1, 10], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
-    #MP.CONVOLUTION_LAYERS = []
+    MP.CONVOLUTION_LAYERS = []
     #MP.LATENT_SHAPE = [2]
     N_ROTATION_ANGLES = 6
     CREATE_VISUALS = True
@@ -139,6 +136,9 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "--noconv":
         MP.CONVOLUTION_LAYERS = []
         print("CONVOLUTION LAYERS REMOVED")
+      elif arg == "--twins":
+        TRAIN_TWINS = True
+        print("Training twins.")
       elif arg == "-LATENT_SHAPE":
         MP.LATENT_SHAPE = [int(argv.pop(0))]
         print("LATENT_SHAPE set to " + str(MP.LATENT_SHAPE))
@@ -226,6 +226,7 @@ if not RUN_AS_PY_SCRIPT:
 # In[ ]:
 
 vae = model.Autoencoder(MP)
+if TRAIN_TWINS: vae.build_twin_graph()
 
 
 # In[ ]:
@@ -261,40 +262,38 @@ val = segments[:split_at]
 train = segments[split_at:]
 
 
-# Rotate the segments several times
-
 # In[ ]:
 
-print("Rotating segments")
-from voxelize import create_rotations
-train = create_rotations(train, N_ROTATION_ANGLES, ROTATION_OFFSET)
-val = create_rotations(val, 12, ROTATION_OFFSET)
+if not TRAIN_TWINS:
+  print("Rotating segments")
+  from voxelize import create_rotations
+  train = create_rotations(train, N_ROTATION_ANGLES, ROTATION_OFFSET)
+  val = create_rotations(val, 12, ROTATION_OFFSET)
 
+  print("Voxelizing training data")
+  from voxelize import voxelize
+  train_vox, _ = voxelize(train,VOXEL_SIDE)
+  val_vox, _   = voxelize(val  ,VOXEL_SIDE)
 
-# Voxelize the training (original + rotated), val, and segment data.
+  if train_vox[0].shape != MP.INPUT_SHAPE:
+    print("Reshaping")
+    train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
+    val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
 
-# In[ ]:
+  del train # Save some memory
+else:
+  from voxelize import create_twins
+  val, val_twins = create_twins(val)
+  train, train_twins = create_twins(train)
 
-print("Voxelizing training data")
-from voxelize import voxelize
-train_vox, train_scales = voxelize(train,VOXEL_SIDE)
-val_vox, val_scales   = voxelize(val ,VOXEL_SIDE)
-
-if train_vox[0].shape != MP.INPUT_SHAPE:
-  print("Reshaping")
-  train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
-  val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
-
-if len(MP.COERCED_LATENT_DIMS) == 0:
-  print("Discarding scales")
-  train_scales=None
-  val_scales=None
-else:    
-  train_scales = [np.sort(scale)[::-1] for scale in train_scales]
-  val_scales = [np.sort(scale)[::-1] for scale in val_scales]
-  print("Sorting scales")
-
-del train # Save some memory
+  print("Voxelizing training data")
+  from voxelize import voxelize
+  train_vox, _ = voxelize(train,VOXEL_SIDE)
+  val_vox, _   = voxelize(val ,VOXEL_SIDE)
+  train_twins_vox, _ = voxelize(train_twins,VOXEL_SIDE)
+  val_twins_vox, _   = voxelize(val_twins  ,VOXEL_SIDE)
+ 
+  del train_twins
 
 
 # In[ ]:
@@ -326,16 +325,26 @@ except:
     
 # single step
 for step in range(MAX_STEPS):
+  if TRAIN_TWINS:
+      val, val_twins = create_twins(val)
+      train, train_twins = create_twins(train)
+      print("Voxelizing training data")
+      from voxelize import voxelize
+      train_vox, _ = voxelize(train,VOXEL_SIDE)
+      val_vox, _   = voxelize(val ,VOXEL_SIDE)
+      train_twins_vox, _ = voxelize(train_twins,VOXEL_SIDE)
+      val_twins_vox, _   = voxelize(val_twins  ,VOXEL_SIDE)
+      del train_twins
   # Validation
-  val_batchmaker = Batchmaker(val_vox, val_scales, BATCH_SIZE, MP)
+  val_batchmaker = Batchmaker(val_vox, val_twins_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
     total_val_cost = 0
     while True:
       if val_batchmaker.is_depleted():
         break
       else:
-        batch_input_values, batch_target_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, batch_target_values)
+        batch_input_values, batch_twin_values = val_batchmaker.next_batch()
+        cost_value = vae.cost_on_single_batch(batch_input_values, batch_twin_values)
         total_val_cost += cost_value
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
@@ -383,16 +392,16 @@ for step in range(MAX_STEPS):
   zero = timer() - timer()
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
   total_step_cost = 0
-  training_batchmaker = Batchmaker(train_vox, train_scales, BATCH_SIZE, MP)
+  training_batchmaker = Batchmaker(train_vox, train_twins_vox, BATCH_SIZE, MP)
   while True:
     if training_batchmaker.is_depleted():
       break
     else:
       t_a = timer()  
-      batch_input_values, batch_target_values = training_batchmaker.next_batch()
+      batch_input_values, batch_twin_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, batch_target_values)
+      cost_value = vae.train_on_single_batch(batch_input_values, batch_twin_values)
       total_step_cost += cost_value
       t_c = timer()
       if PLOTTING_SUPPORT:
@@ -415,7 +424,7 @@ print("Training ended.")
 if PLOTTING_SUPPORT:
   # Plot a few random samples
   import matplotlib.pyplot as plt
-  get_ipython().magic('matplotlib notebook')
+  get_ipython().magic(u'matplotlib notebook')
   plt.ion()
   n_samples = 5
   import random
@@ -541,15 +550,18 @@ if not RUN_AS_PY_SCRIPT:
     y = [values[1] for values, class_ in zip(F2, C) if class_ == name]
     plt.scatter(x, y, c=c_, alpha=0.8,  lw = 0)
   box = plt.gca().get_position()
-  plt.gca().set_position([box.x0, box.y0, box.width * 0.6, box.height])
-  if len(classes) > 10: ncol = 2
+  plt.gca().set_position([box.x0, box.y0, box.width * 0.8, box.height])
+  ncol = 2 if len(classes_set) > 10 else 1
   plt.legend(classes_set, loc='center left', bbox_to_anchor=(1, 0.5), ncol=ncol)
+  plt.title('T-SNE')
+  plt.xlabel('x_dim')
+  plt.ylabel('y_dim')
   plt.show()
   try:
     plt.gcf().savefig(dir_+"t-sne.png")
   except:
     print("not saved.")
-  if F is features_nn:
+  if len(matches) > 0:
     print("Adding matches")
     # Dim all points
     plt.cla()
@@ -558,6 +570,9 @@ if not RUN_AS_PY_SCRIPT:
       y = [values[1] for values, class_ in zip(F2, C) if class_ == name]
       plt.scatter(x, y, c=c_, alpha=0.2,  lw = 0)
     plt.legend(classes_set, loc='center left', bbox_to_anchor=(1, 0.5), ncol=ncol)
+    plt.title('T-SNE')
+    plt.xlabel('x_dim')
+    plt.ylabel('y_dim')
     # Bring out matched points
     matched_ids = [id_ for match in matches for id_ in match]
     for c_, name in zip(cycle(cnames), classes_set):
@@ -815,4 +830,40 @@ if CREATE_VISUALS:
   from visuals import visuals_of_matches
   visuals_of_matches(matches, segments, ids, features=features_nn)
   clear_output()
+
+
+# ## Save or Convert Model
+
+# In[ ]:
+
+CONVERT_VARIABLE_NAMES = False
+name_to_var_dict = {}
+if CONVERT_VARIABLE_NAMES:
+  for var in vae.variables:
+    # Modify a few names
+    if 'LatentLayerWeights/' in var.name:
+      name = var.name.replace('LatentLayerWeights/', '')
+    elif 'ReconstructionLayerWeights/' in var.name:
+      name = var.name.replace('ReconstructionLayerWeights/', '')
+    # Leave other names unchanged
+    else:
+      name = var.name
+    name_to_var_dict[name] = var
+  temp_saver = tf.train.Saver(name_to_var_dict)
+  temp_saver.restore(vae.sess, SAVE_PATH)
+name_to_var_dict
+
+
+# In[ ]:
+
+# Save model and params
+if False:
+  vae.saver.save(vae.sess, SAVE_PATH)
+  with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
+    pickle.dump(MP, file, protocol=2)
+
+
+# In[ ]:
+
+
 
