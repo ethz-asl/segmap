@@ -8,7 +8,7 @@ class ModelParams:
                                {'type': 'conv3d', 'filter': [5, 5, 5, 10, 100], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
     self.HIDDEN_LAYERS = [{'shape': [400]}, {'shape': [400]}]
     self.LATENT_SHAPE = [15]
-    self.COERCED_LATENT_DIMS = [{'name': 'big_scale'}, {'name': 'med_scale'}, {'name': 'sml_scale'}]
+    self.COERCED_LATENT_DIMS = 3
     self.LEARNING_RATE = 0.0001
     self.CLIP_GRADIENTS = 0
     self.DROPOUT = 0.8 # Keep-prob
@@ -54,10 +54,7 @@ class Autoencoder(object):
       if self.MP.DROPOUT is not None:
         default_dropout = tf.constant(1, dtype=self.MP.FLOAT_TYPE)
         self.dropout_placeholder = tf.placeholder_with_default(default_dropout, (), name="dropout_prob")
-      self.latent_placeholders = [tf.placeholder(self.MP.FLOAT_TYPE, 
-                                                 shape=[preset_batch_size],
-                                                 name=COERCED_DIM['name']+"_latent_placeholder")
-                                  for COERCED_DIM in self.MP.COERCED_LATENT_DIMS]
+      self.twin_placeholder = None
     # Encoder
     previous_layer = self.input_placeholder
     previous_layer_shape = self.MP.INPUT_SHAPE # Excludes batch dim (which should be at pos 0)
@@ -132,12 +129,13 @@ class Autoencoder(object):
     # Latent space
     with tf.name_scope('ZMeanLayer') as scope:
         layer_shape = self.MP.LATENT_SHAPE
-        weights = tf.get_variable("weights_z_mean", dtype=self.MP.FLOAT_TYPE, 
-                                  shape=previous_layer_shape + layer_shape,
-                                  initializer=tf.contrib.layers.xavier_initializer())
-        biases  = tf.get_variable("biases_z_mean" , dtype=self.MP.FLOAT_TYPE,
-                                  shape=layer_shape,
-                                  initializer=tf.constant_initializer(0))
+        with tf.variable_scope('LatentLayerWeights') as varscope:
+          weights = tf.get_variable("weights_z_mean", dtype=self.MP.FLOAT_TYPE, 
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_z_mean" , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
         self.variables.append(weights)
         self.variables.append(biases)
         self.z_mean = tf.add(n_dimensional_weightmul(previous_layer,
@@ -147,12 +145,13 @@ class Autoencoder(object):
                              biases, name='softplus') # name should be 'add'
     with tf.name_scope('ZLogSigmaSquaredLayer') as scope:
         layer_shape = self.MP.LATENT_SHAPE
-        weights = tf.get_variable("weights_z_log_sig2", dtype=self.MP.FLOAT_TYPE, 
-                                  shape=previous_layer_shape + layer_shape,
-                                  initializer=tf.contrib.layers.xavier_initializer())
-        biases  = tf.get_variable("biases_z_log_sig2" , dtype=self.MP.FLOAT_TYPE,
-                                  shape=layer_shape,
-                                  initializer=tf.constant_initializer(0))
+        with tf.variable_scope('LatentLayerWeights') as varscope:
+          weights = tf.get_variable("weights_z_log_sig2", dtype=self.MP.FLOAT_TYPE, 
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_z_log_sig2" , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
         self.variables.append(weights)
         self.variables.append(biases)
         self.z_log_sigma_squared = tf.add(n_dimensional_weightmul(previous_layer,
@@ -198,12 +197,13 @@ class Autoencoder(object):
     # Post fully-connected layer
     with tf.name_scope('Reconstruction') as scope:
       layer_shape = [np.prod(self.shape_before_flattening)]
-      weights = tf.get_variable("weights_reconstruction", dtype=self.MP.FLOAT_TYPE, 
-                                shape=previous_layer_shape + layer_shape,
-                                initializer=tf.contrib.layers.xavier_initializer())
-      biases  = tf.get_variable("biases_reconstruction" , dtype=self.MP.FLOAT_TYPE,
-                                shape=layer_shape,
-                                initializer=tf.constant_initializer(0))
+      with tf.variable_scope('ReconstructionLayerWeights') as varscope:
+        weights = tf.get_variable("weights_reconstruction", dtype=self.MP.FLOAT_TYPE, 
+                                  shape=previous_layer_shape + layer_shape,
+                                  initializer=tf.contrib.layers.xavier_initializer())
+        biases  = tf.get_variable("biases_reconstruction" , dtype=self.MP.FLOAT_TYPE,
+                                  shape=layer_shape,
+                                  initializer=tf.constant_initializer(0))
       self.variables.append(weights)
       self.variables.append(biases)
       previous_layer = tf.nn.sigmoid(tf.add(n_dimensional_weightmul(previous_layer,
@@ -257,41 +257,119 @@ class Autoencoder(object):
                                            - tf.square(self.z_mean)
                                            - tf.exp(self.z_log_sigma_squared),
                                            list(range(1,len(self.MP.LATENT_SHAPE)+1)))
-      with tf.name_scope('CoercionLoss') as sub_scope:
-        # Coerced Latent Values
-        if len(self.MP.LATENT_SHAPE) != 1:
-          print("Latent space of shape !=1 is not currently supported.")
-          print("Here, it would cause the coerced_z_samples to have more than 1 value per batch example")
-          raise NotImplementedError
-        with tf.name_scope('ZValuesToCoerce') as scope:
-          self.coerced_z_samples = [self.z_sample[:,i] for i, _ in enumerate(self.MP.COERCED_LATENT_DIMS)]
-        # Latent space coercion (TODO: how to calculate loss on sigma uncertainty?)
-        coercion_loss = tf.zeros(tf.shape(latent_loss), dtype=self.MP.FLOAT_TYPE)
-        for target, z_sample, DIM in zip(self.latent_placeholders,
-                                         self.coerced_z_samples,
-                                         self.MP.COERCED_LATENT_DIMS):
-          with tf.name_scope(DIM['name']+'Loss') as sub_sub_scope:
-            coercion_loss = (coercion_loss +
-                             tf.square(target - z_sample))
       # Average sum of costs over batch.
-      self.cost = tf.reduce_mean(reconstruction_loss + latent_loss + coercion_loss, name="cost")
+      self.cost = tf.reduce_mean(reconstruction_loss + latent_loss, name="cost")
     # Optimizer (ADAM)
     with tf.name_scope('Optimizer') as scope:
       self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
       if self.MP.CLIP_GRADIENTS > 0:
-        adam = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE)
-        gvs = adam.compute_gradients(self.cost)
-        capped_gvs = [(tf.clip_by_norm(grad, self.MP.CLIP_GRADIENTS), var) for grad, var in gvs]
-        self.optimizer = adam.apply_gradients(capped_gvs)
+          raise NotImplementedError
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
     self.sess = tf.Session()
     tf.initialize_all_variables().run(session=self.sess)
     # Saver
-    variable_names = {}
-    for var in self.variables:
-      variable_names[var.name] = var
-    self.saver = tf.train.Saver(variable_names)
+    self.saver = tf.train.Saver(self.variables)
+
+  def build_twin_graph(self):
+    preset_batch_size = None
+    # Graph input
+    with tf.name_scope('Twin_Placeholders') as scope:
+      self.twin_placeholder = tf.placeholder(self.MP.FLOAT_TYPE,
+                                             shape=[preset_batch_size] + self.MP.INPUT_SHAPE,
+                                             name="twin")
+    # Encoder
+    previous_layer = self.twin_placeholder
+    previous_layer_shape = self.MP.INPUT_SHAPE # Excludes batch dim (which should be at pos 0)
+    # Convolutional Layers
+    for i, LAYER in enumerate(self.MP.CONVOLUTION_LAYERS):
+      with tf.name_scope('Twin_ConvLayer'+str(i)) as scope:
+        filter_shape = LAYER['filter']
+        stride = LAYER['stride'] if 'stride' in LAYER else 1
+        strides = [1, stride, stride, stride, 1]
+        padding = LAYER['padding'] if 'padding' in LAYER else "SAME"
+        with tf.variable_scope('ConvLayer'+str(i)+'Weights', reuse=True) as varscope:
+          weights = tf.get_variable("weights_conv_"+str(i), dtype=self.MP.FLOAT_TYPE,
+                                    shape=filter_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_conv_"+str(i) , dtype=self.MP.FLOAT_TYPE,
+                                    shape=[filter_shape[-1]],
+                                    initializer=tf.constant_initializer(0))
+        layer_output = tf.nn.conv3d(previous_layer, weights, strides, padding)
+        layer_output = tf.nn.bias_add(layer_output, biases)
+        layer_shape = previous_layer_shape[:]
+        for i, (prev_dim, filt_dim) in enumerate(zip(previous_layer_shape[:3], filter_shape[:3])):
+          pad = np.floor(filt_dim/2) if padding == "SAME" else 0
+          layer_shape[i] = int(((prev_dim + 2*pad - filt_dim)/stride)+1)
+        layer_shape[-1] = filter_shape[-1]
+        # Downsampling
+        if 'downsampling' in LAYER:
+          DOWNSAMPLING = LAYER['downsampling']
+          if DOWNSAMPLING['type'] != 'max_pool3d': raise NotImplementedError
+          if self.MP.FLOAT_TYPE != tf.float32: raise TypeError('max_pool3d only supports float32')
+          k = DOWNSAMPLING['k'] if 'k' in DOWNSAMPLING else 2
+          ksize   = [1, k, k, k, 1]
+          strides = [1, k, k, k, 1]
+          padding = DOWNSAMPLING['padding'] if 'padding' in DOWNSAMPLING else "VALID"
+          layer_output = tf.nn.max_pool3d(layer_output, ksize, strides, padding)
+          pad = np.floor(k/2) if padding == "SAME" else 0
+          layer_shape = [int(((dim + 2*pad - k)/k)+1) for dim in layer_shape[:3]] + layer_shape[3:]
+        # set up next loop
+        previous_layer = layer_output
+        previous_layer_shape = layer_shape
+    # Flatten output
+    previous_layer_shape = [np.prod(previous_layer_shape)]
+    previous_layer = tf.reshape(previous_layer, shape=[-1]+previous_layer_shape, name="flatten")
+    # Fully connected Layers
+    for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS):
+      with tf.name_scope('Twin_EncoderLayer'+str(i)) as scope:
+        layer_shape = LAYER['shape']
+        with tf.variable_scope('EncoderLayer'+str(i)+'Weights', reuse=True) as varscope:
+          weights = tf.get_variable("weights_encoder_"+str(i), dtype=self.MP.FLOAT_TYPE,
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_encoder_"+str(i) , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
+        layer_output = tf.nn.softplus(tf.add(n_dimensional_weightmul(previous_layer,
+                                                                     weights,
+                                                                     previous_layer_shape,
+                                                                     layer_shape),
+                                             biases),
+                                      name='softplus')
+        if self.MP.DROPOUT is not None:
+          layer_output = tf.nn.dropout(layer_output, self.dropout_placeholder)
+        # set up next loop
+        previous_layer = layer_output
+        previous_layer_shape = layer_shape
+    # Latent space
+    with tf.name_scope('Twin_ZMeanLayer') as scope:
+        layer_shape = self.MP.LATENT_SHAPE
+        with tf.variable_scope('LatentLayerWeights', reuse=True) as varscope:
+          weights = tf.get_variable("weights_z_mean", dtype=self.MP.FLOAT_TYPE, 
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_z_mean" , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
+        self.twin_z_mean = tf.add(n_dimensional_weightmul(previous_layer,
+                                                     weights,
+                                                     previous_layer_shape,
+                                                     layer_shape),
+                             biases)
+    # Loss
+    with tf.name_scope('Twin_Loss') as scope:
+      # Latent space coercion (TODO: how to calculate loss on sigma uncertainty?)
+      coercion_loss = tf.reduce_sum(tf.square(self.twin_z_mean[self.MP.COERCED_LATENT_DIMS:] -
+          self.z_mean[self.MP.COERCED_LATENT_DIMS:]),
+                                    list(range(1,len(self.MP.LATENT_SHAPE)+1)))
+      # Average sum of costs over batch.
+      self.twin_cost = self.cost + tf.reduce_mean(coercion_loss, name="cost")
+    # Optimizer (ADAM)
+    with tf.name_scope('Twin_Optimizer') as scope:
+      self.twin_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.twin_cost)
+    tf.initialize_all_variables().run(session=self.sess)
+
 
   ## Example functions for different ways to call the autoencoder graph.
   def encode(self, batch_input):
@@ -303,30 +381,29 @@ class Autoencoder(object):
   def encode_decode(self, batch_input):
     return self.sess.run(self.output,
                          feed_dict={self.input_placeholder: batch_input})
-  def train_on_single_batch(self, batch_input, batch_latent_targets=[], cost_only=False, dropout=None):
+  def train_on_single_batch(self, batch_input, twin_input=None, cost_only=False, dropout=None):
     # feed placeholders
     dict_ = {self.input_placeholder: batch_input}
     if self.MP.DROPOUT is not None:
       dict_[self.dropout_placeholder] = self.MP.DROPOUT if dropout is None else dropout
     else:
-      if dropout is not None:
-        raise ValueError('This model does not implement dropout yet a value was specified')
-    if len(self.MP.COERCED_LATENT_DIMS) != len(batch_latent_targets):
-      print(self.MP.COERCED_LATENT_DIMS)
-      print(batch_latent_targets)
-      raise ValueError('latent_dim_targets are missing, but required')
-    for placeholder, target in zip(self.latent_placeholders, batch_latent_targets):
-      dict_[placeholder] = target
+      if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
+    if twin_input != None:
+      if self.twin_placeholder == None: raise ValueError('Twin Graph has not been initialized. See make_twin_graph()')
+      dict_[self.twin_placeholder] = twin_input
+    # Graph nodes to target
+    cost = self.cost if twin_input == None else self.twin_cost
+    opt = self.optimizer if twin_input == None else self.twin_optimizer
     # compute
     if cost_only:
-      cost = self.sess.run(self.cost,
+      cost = self.sess.run(cost,
                            feed_dict=dict_)
     else:
-      cost, _, _ = self.sess.run((self.cost, self.optimizer, self.catch_nans),
+      cost, _, _ = self.sess.run((cost, opt, self.catch_nans),
                                  feed_dict=dict_)
     return cost
-  def cost_on_single_batch(self, batch_input, batch_latent_targets=[]):
-    return self.train_on_single_batch(batch_input, batch_latent_targets, cost_only=True, dropout=1.0)
+  def cost_on_single_batch(self, batch_input, twin_input=None):
+    return self.train_on_single_batch(batch_input, twin_input=twin_input, cost_only=True, dropout=1.0)
 
   def batch_encode(self, batch_input, batch_size=200, verbose=True):
     return batch_generic_func(self.encode, batch_input, batch_size, verbose)

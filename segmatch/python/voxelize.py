@@ -31,7 +31,7 @@ def voxelize( segments, size ):
 
 def create_rotations(segments, n_angles=10,
                      offset_by_fraction_of_single_angle=0,
-                     classes=[]):
+                     classes=[], silent=False):
   offset = offset_by_fraction_of_single_angle * (2*np.pi/n_angles)
   angles = np.linspace(2*np.pi/n_angles, 2*np.pi, n_angles) - offset
   rotated_segments = []
@@ -44,10 +44,11 @@ def create_rotations(segments, n_angles=10,
     if classes:
       rotated_classes = rotated_classes + classes
 
-  print("  Created " + str(len(rotated_segments)) + " rotated segments", end="")
-  print(" (" + str(len(segments)) + " segments * " + str(n_angles) + " rotation angles)")
+  if not silent:
+    print("  Created " + str(len(rotated_segments)) + " rotated segments", end="")
+    print(" (" + str(len(segments)) + " segments * " + str(n_angles) + " rotation angles)")
   if classes:
-    print("  Listed classes for rotated segments.")
+    if not silent: print("  Listed classes for rotated segments.")
     return rotated_segments, rotated_classes
   return rotated_segments
 
@@ -59,3 +60,13 @@ def unvoxelize(vox):
 
 def recenter_segment(segment):
   return segment - np.mean(segment, axis=0)
+
+def create_twins(segments):
+  angles = np.random.random((len(segments),2))
+  twins_a = []; twins_b = []
+  for offsets, segment in zip(angles, segments):
+    twin_a = create_rotations([segment], n_angles=1, offset_by_fraction_of_single_angle=offsets[0], silent=True)[0]
+    twin_b = create_rotations([segment], n_angles=1, offset_by_fraction_of_single_angle=offsets[1], silent=True)[0]
+    twins_a.append(twin_a)
+    twins_b.append(twin_b)
+  return twins_a, twins_b
