@@ -52,6 +52,7 @@ class SegMatchWorker {
   ros::Publisher source_representation_pub_;
   ros::Publisher target_representation_pub_;
   ros::Publisher matches_pub_;
+  ros::Publisher predicted_matches_pub_;
   ros::Publisher loop_closures_pub_;
   ros::Publisher segmentation_positions_pub_;
   ros::Publisher target_segments_centroids_pub_;

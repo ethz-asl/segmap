@@ -128,6 +128,7 @@ class SegMatch {
   };
 
   segmatch::PairwiseMatches  getFilteredMatches() const { return last_filtered_matches_; };
+  segmatch::PairwiseMatches  getPredictedMatches() const { return last_predicted_matches_; };
 
   void getLoopClosures(std::vector<laser_slam::RelativePose>* loop_closures) const;
 
@@ -156,6 +157,7 @@ class SegMatch {
   std::vector<laser_slam::Trajectory> segmentation_poses_;
 
   PairwiseMatches last_filtered_matches_;
+  PairwiseMatches last_predicted_matches_;
 
   std::vector<laser_slam::RelativePose> loop_closures_;
 
