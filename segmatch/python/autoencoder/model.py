@@ -6,7 +6,7 @@ class ModelParams:
     self.INPUT_SHAPE = [24,24,24,1]
     self.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1,  10], 'downsampling': {'type': 'max_pool3d', 'k': 2}},
                                {'type': 'conv3d', 'filter': [5, 5, 5, 10, 100], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
-    self.HIDDEN_LAYERS = [{'shape': [400]}, {'shape': [400]}]
+    self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}, {'shape': [400]}]
     self.LATENT_SHAPE = [15]
     self.COERCED_LATENT_DIMS = 3
     self.LEARNING_RATE = 0.0001
@@ -360,8 +360,8 @@ class Autoencoder(object):
     # Loss
     with tf.name_scope('Twin_Loss') as scope:
       # Latent space coercion (TODO: how to calculate loss on sigma uncertainty?)
-      coercion_loss = tf.reduce_sum(tf.square(self.twin_z_mean[self.MP.COERCED_LATENT_DIMS:] -
-          self.z_mean[self.MP.COERCED_LATENT_DIMS:]),
+      coercion_loss = tf.reduce_sum(tf.square(self.twin_z_mean[:,self.MP.COERCED_LATENT_DIMS:] -
+          self.z_mean[:,self.MP.COERCED_LATENT_DIMS:]),
                                     list(range(1,len(self.MP.LATENT_SHAPE)+1)))
       # Average sum of costs over batch.
       self.twin_cost = self.cost + tf.reduce_mean(coercion_loss, name="cost")
