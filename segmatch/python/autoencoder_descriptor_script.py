@@ -77,6 +77,7 @@ try:
     ## COMPUTE FEATURES ##
     ######################
     ae_features, ae_log_sigma_sq = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in segments_vox])
+    ae_features[:,:vae.MP.COERCED_LATENT_DIMS] = 0
     ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
     sc_features = [sorted(xyz_scale) for xyz_scale in xyz_scale_features]
     sc_fnames = ['scale_1', 'scale_2', 'scale_3']
