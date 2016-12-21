@@ -145,9 +145,9 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "-LATENT_SHAPE":
         MP.LATENT_SHAPE = [int(argv.pop(0))]
         print("LATENT_SHAPE set to " + str(MP.LATENT_SHAPE))
-      elif arg == "-CLIP_GRADIENTS":
-        MP.CLIP_GRADIENTS = float(argv.pop(0))
-        print("CLIP_GRADIENTS set to " + str(MP.CLIP_GRADIENTS))
+      elif arg == "-VAL_STEP_TOLERANCE":
+        VAL_STEP_TOLERANCE = int(argv.pop(0))
+        print("VAL_STEP_TOLERANCE set to " + str(VAL_STEP_TOLERANCE))
       elif arg == "-N_ROTATION_ANGLES":
         N_ROTATION_ANGLES = int(argv.pop(0))
         print("N_ROTATION_ANGLES set to " + str(N_ROTATION_ANGLES))
