@@ -115,6 +115,7 @@ class Autoencoder(object):
                                     initializer=tf.constant_initializer(0))
         self.variables.append(weights)
         self.variables.append(biases)
+        variable_summaries(weights)
         layer_output = tf.nn.softplus(tf.add(n_dimensional_weightmul(previous_layer,
                                                                      weights,
                                                                      previous_layer_shape,
@@ -189,6 +190,7 @@ class Autoencoder(object):
                                                                      layer_shape),
                                              biases),
                                       name='softplus')
+        variable_summaries(weights)
         if self.MP.DROPOUT is not None:
           layer_output = tf.nn.dropout(layer_output, self.dropout_placeholder)
         # set up next loop
@@ -267,6 +269,7 @@ class Autoencoder(object):
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
     self.sess = tf.Session()
+    self.merged = tf.summary.merge_all()
     tf.initialize_all_variables().run(session=self.sess)
     # Saver
     self.saver = tf.train.Saver(self.variables)
@@ -360,7 +363,7 @@ class Autoencoder(object):
     # Loss
     with tf.name_scope('Twin_Loss') as scope:
       # Latent space coercion (TODO: how to calculate loss on sigma uncertainty?)
-      coercion_loss = tf.reduce_sum(tf.sqrt(tf.square(self.twin_z_mean[:,self.MP.COERCED_LATENT_DIMS:] -
+      coercion_loss = 100*tf.reduce_sum(tf.sqrt(tf.square(self.twin_z_mean[:,self.MP.COERCED_LATENT_DIMS:] -
           self.z_mean[:,self.MP.COERCED_LATENT_DIMS:])),
                                     list(range(1,len(self.MP.LATENT_SHAPE)+1)))
       # Average sum of costs over batch.
@@ -381,7 +384,7 @@ class Autoencoder(object):
   def encode_decode(self, batch_input):
     return self.sess.run(self.output,
                          feed_dict={self.input_placeholder: batch_input})
-  def train_on_single_batch(self, batch_input, twin_input=None, cost_only=False, dropout=None):
+  def train_on_single_batch(self, batch_input, twin_input=None, cost_only=False, dropout=None, summary_writer=None):
     # feed placeholders
     dict_ = {self.input_placeholder: batch_input}
     if self.MP.DROPOUT is not None:
@@ -399,8 +402,9 @@ class Autoencoder(object):
       cost = self.sess.run(cost,
                            feed_dict=dict_)
     else:
-      cost, _, _ = self.sess.run((cost, opt, self.catch_nans),
-                                 feed_dict=dict_)
+      cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged),
+                                          feed_dict=dict_)
+      if summary_writer is not None: summary_writer.add_summary(summary)
     return cost
   def cost_on_single_batch(self, batch_input, twin_input=None):
     return self.train_on_single_batch(batch_input, twin_input=twin_input, cost_only=True, dropout=1.0)
@@ -437,3 +441,15 @@ def batch_generic_func(function, batch_input, batch_size=100, verbose=False):
     b += batch_size
     if verbose: print("Example " + str(min(a,len(batch_input))) + "/" + str(len(batch_input)))
   return output
+
+def variable_summaries(var):
+  """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+  with tf.name_scope('summaries'):
+    mean = tf.reduce_mean(var)
+    tf.summary.scalar('mean', mean)
+    with tf.name_scope('stddev'):
+      stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+    tf.summary.scalar('stddev', stddev)
+    tf.summary.scalar('max', tf.reduce_max(var))
+    tf.summary.scalar('min', tf.reduce_min(var))
+    tf.summary.histogram('histogram', var)

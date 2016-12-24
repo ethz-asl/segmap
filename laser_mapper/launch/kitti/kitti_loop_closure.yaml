@@ -71,9 +71,9 @@ LaserMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 200,
+     n_nearest_neighbours: 5,
      knn_feature_dim: 7,
-     enable_two_stage_retrieval: true,
+     enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 1,
      
