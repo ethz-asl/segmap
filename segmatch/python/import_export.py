@@ -11,16 +11,16 @@ def load_segments(folder=database_folder, filename="segments_database.csv"):
   # extract and store point data
   from pandas import read_csv
   extracted_data = read_csv(folder+filename, delimiter=' ').as_matrix()
-#   extracted_data = np.loadtxt(folder+filename, delimiter=" ")
-  ids    = extracted_data[:,0].astype(int)
+  point_ids = extracted_data[:,0].astype(int)
   points = extracted_data[:,1:]
-  id_set = set(ids)
-  id_changes = np.where(np.abs(np.diff(ids)) > 0)[0] + 1
+  id_changes = np.where(np.abs(np.diff(point_ids)) > 0)[0] + 1
   segments = np.split(points, id_changes)
-#   segments = [ np.array(points[ids == i,:]) for i in id_set]
+  ids = [seg[0] for seg in np.split(point_ids, id_changes)]
+  if len(set(ids)) != len(ids):
+    raise ValueError("Id collision when importing segments. Two segments with same id exist in file.")
 
   print("  Found " + str(len(segments)) + " segments")
-  return segments, list(id_set)
+  return segments, ids
 
 
 def load_features(folder=database_folder, filename="features_database.csv"):
