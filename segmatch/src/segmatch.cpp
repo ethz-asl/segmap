@@ -205,11 +205,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
         size_t largest_cluster_size = 0;
         size_t largest_cluster_index = 0;
         for (size_t i = 0u; i < clustered_corrs.size(); ++i) {
+          LOG(INFO) << "Cluster " << i << " has " << clustered_corrs[i].size() << "segments.";
           if (clustered_corrs[i].size() >= largest_cluster_size) {
             largest_cluster_size = clustered_corrs[i].size();
             largest_cluster_index = i;
           }
         }
+        LOG(INFO) << "Largest cluster: " << largest_cluster_size << " matches.";
 
         // Catch the cases when PCL returns clusters smaller than the minimum cluster size.
         if (largest_cluster_size >= params_.geometric_consistency_params.min_cluster_size) {
@@ -323,6 +325,7 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
     // Save a copy of the fitered matches.
     last_filtered_matches_ = filtered_matches;
+    last_predicted_matches_ = predicted_matches;
   }
 
 
@@ -346,6 +349,13 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
 
   // Update the last filtered matches.
   for (auto& match: last_filtered_matches_) {
+    Segment segment;
+    CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
+    match.centroids_.first = segment.centroid;
+    CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
+    match.centroids_.second = segment.centroid;
+  }
+  for (auto& match: last_predicted_matches_) {
     Segment segment;
     CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
     match.centroids_.first = segment.centroid;

@@ -25,6 +25,8 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_representation", kPublisherQueueSize);
   matches_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/segment_matches", kPublisherQueueSize);
+  predicted_matches_pub_ = nh.advertise<visualization_msgs::Marker>(
+      "/segmatch/predicted_segment_matches", kPublisherQueueSize);
   loop_closures_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/loop_closures", kPublisherQueueSize);
   segmentation_positions_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
@@ -33,6 +35,10 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_segments_centroids", kPublisherQueueSize);
   source_segments_centroids_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
       "/segmatch/source_segments_centroids", kPublisherQueueSize);
+  if (params_.export_segments_and_matches) {
+    export_run_service_ = nh.advertiseService("export_run",
+                                              &SegMatchWorker::exportRunServiceCall, this);
+  }
 
   if (params_.localize) {
     loadTargetCloud();
@@ -105,6 +111,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
                                                    loop_closure);
       LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
+      LOG(INFO) << "Number of matches after filtering: " << filtered_matches.size() << ".";
 
       // TODO move after optimizing and updating target map?
       if (params_.close_loops) {
@@ -120,6 +127,17 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
             LOG(INFO) << "Aligning target map.";
             segmatch_.alignTargetMap();
             publishTargetRepresentation();
+          }
+        }
+      }
+
+      // Store segments and matches in database if desired, for later export.
+      if (params_.export_segments_and_matches) {
+        segments_database_ += segmatch_.getSourceAsSegmentedCloud();
+        if (loop_closure_found) {
+          for (size_t i = 0u; i < filtered_matches.size(); ++i) {
+            matches_database_.addMatch(filtered_matches.at(i).ids_.first,
+                                       filtered_matches.at(i).ids_.second);
           }
         }
       }
@@ -199,6 +217,16 @@ void SegMatchWorker::publishMatches() const {
   }
   publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
                  Color(0.0, 1.0, 0.0), matches_pub_);
+  const PairwiseMatches predicted_matches = segmatch_.getPredictedMatches();
+  point_pairs.clear();
+  for (size_t i = 0u; i < predicted_matches.size(); ++i) {
+    PclPoint target_segment_centroid = predicted_matches[i].getCentroids().second;
+    target_segment_centroid.z -= params_.distance_to_lower_target_cloud_for_viz_m;
+    point_pairs.push_back(
+        PointPair(predicted_matches[i].getCentroids().first, target_segment_centroid));
+  }
+  publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
+                 Color(0.7, 0.7, 0.7), predicted_matches_pub_);
 }
 
 void SegMatchWorker::publishSegmentationPositions() const {
@@ -261,6 +289,20 @@ void SegMatchWorker::publishLoopClosures() const {
   // Query the segmentation_poses_ at that time.
   publishLineSet(point_pairs, params_.world_frame, kLineScaleLoopClosures,
                  Color(0.0, 0.0, 1.0), loop_closures_pub_);
+}
+
+bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
+                                         std_srvs::Empty::Response& res) {
+  // Get current date.
+  const boost::posix_time::ptime time_as_ptime = ros::WallTime::now().toBoost();
+  std::string acquisition_time = to_iso_extended_string(time_as_ptime);
+  database::exportFeatures("/tmp/online_matcher/run_" + acquisition_time + "_features.csv",
+                            segments_database_);
+  database::exportSegments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv",
+                            segments_database_);
+  database::exportMatches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
+                           matches_database_);
+  return true;
 }
 
 } // namespace segmatch_ros

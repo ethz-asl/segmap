@@ -187,6 +187,12 @@ bool SegmentedCloud::findValidSegmentById(const Id segment_id, Segment* result) 
   }
 }
 
+bool SegmentedCloud::findValidSegmentPtrById(const Id segment_id, Segment** result) {
+  if (!findValidSegmentById(segment_id, NULL)) { return false; }
+  if (result != NULL) { *result = CHECK_NOTNULL(&valid_segments_.at(segment_id)); }
+  return true;
+}
+
 void SegmentedCloud::deleteSegmentsById(const std::vector<Id>& ids, size_t* n_removals) {
   if (n_removals != NULL) {
     *n_removals = 0;

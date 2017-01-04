@@ -4,7 +4,9 @@
 #include <utility>
 
 #include <laser_slam/common.hpp>
+#include <segmatch/database.hpp>
 #include <segmatch/segmatch.hpp>
+#include <std_srvs/Empty.h>
 
 #include "segmatch_ros/common.hpp"
 
@@ -41,6 +43,7 @@ class SegMatchWorker {
   void publishLoopClosures() const;
   void publishTargetSegmentsCentroids() const;
   void publishSourceSegmentsCentroids() const;
+  bool exportRunServiceCall(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
   // Parameters.
   SegMatchWorkerParams params_;
@@ -49,10 +52,13 @@ class SegMatchWorker {
   ros::Publisher source_representation_pub_;
   ros::Publisher target_representation_pub_;
   ros::Publisher matches_pub_;
+  ros::Publisher predicted_matches_pub_;
   ros::Publisher loop_closures_pub_;
   ros::Publisher segmentation_positions_pub_;
   ros::Publisher target_segments_centroids_pub_;
   ros::Publisher source_segments_centroids_pub_;
+
+  ros::ServiceServer export_run_service_;
 
   // SegMatch object.
   segmatch::SegMatch segmatch_;
@@ -63,6 +69,9 @@ class SegMatchWorker {
   std::vector<PoseTrackIdPair> last_segmented_poses_;
 
   bool first_localization_occured = false;
+
+  segmatch::SegmentedCloud segments_database_;
+  segmatch::database::UniqueIdMatches matches_database_;
 
   // Publishing parameters.
   static constexpr float kLineScaleSegmentMatches = 0.3;

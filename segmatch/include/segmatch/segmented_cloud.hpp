@@ -107,6 +107,7 @@ class SegmentedCloud {
   size_t getNumberOfValidSegments() const;
   bool empty() const { return getNumberOfValidSegments() == 0; }
   bool findValidSegmentById(const Id segment_id, Segment* result) const;
+  bool findValidSegmentPtrById(const Id segment_id, Segment** result);
   void deleteSegmentsById(const std::vector<Id>& ids, size_t* n_removals=NULL);
   bool computeSegmentOverlaps(const SegmentedCloud& target_segmented_cloud,
                               const float overlap_radius,
