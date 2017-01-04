@@ -120,6 +120,7 @@ if not RUN_AS_PY_SCRIPT:
     #MP.LATENT_SHAPE = [2]
     N_ROTATION_ANGLES = 6
     CREATE_VISUALS = True
+    TRAIN_TWINS = True
 
 
 # In[ ]:
@@ -160,6 +161,7 @@ if RUN_AS_PY_SCRIPT:
         print("MP.FLOAT_TYPE set to " + str(MP.FLOAT_TYPE))
       else:
         print("Unknown argument: " + arg)
+        raise NotImplementedError
 
 
 # In[ ]:
@@ -234,6 +236,7 @@ if TRAIN_TWINS: vae.build_twin_graph()
 
 # In[ ]:
 
+summary_writer = None
 if TENSORBOARD_DIR != None:
   summary_writer = tf.train.SummaryWriter(TENSORBOARD_DIR, vae.sess.graph)
 
@@ -407,7 +410,7 @@ for step in range(MAX_STEPS):
       batch_input_values, batch_twin_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, batch_twin_values)
+      cost_value = vae.train_on_single_batch(batch_input_values, batch_twin_values, summary_writer=summary_writer)
       total_step_cost += cost_value
       t_c = timer()
       if PLOTTING_SUPPORT:
