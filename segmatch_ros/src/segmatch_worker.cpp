@@ -342,8 +342,9 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
   }
 
   // Export segmented cloud.
+  SegmentedCloud original_target_segments = segmatch_.getTargetAsSegmentedCloud();
   database::exportFeatures(descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename,
-                           segmatch_.getTargetAsSegmentedCloud());
+                           original_target_segments);
 
   // Wait for script to describe segments.
   while (fgets(buff, sizeof(buff), script_process_pipe)!=NULL) {
@@ -361,6 +362,15 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
   LOG(INFO) << "Done.";
 
   pclose(script_process_pipe);
+
+  // Move reconstructions to their centroid locations.
+  for (std::unordered_map<Id, Segment>::iterator it = original_target_segments.begin();
+      it != original_target_segments.end(); ++it) {
+    PclPoint centroid = it->second.centroid;
+    Segment* segment_ptr;
+    CHECK(reconstructed_target_segments.findValidSegmentPtrById(it->first, &segment_ptr));
+    translateCloud(Translation(centroid.x, centroid.y, centroid.z), &(segment_ptr->point_cloud));
+  }
 
   // Publish reconstruction
   PointICloud reconstructed_target_representation;

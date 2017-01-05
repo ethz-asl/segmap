@@ -15,7 +15,8 @@ model_path = sys.argv[1]
 segments_fifo_path = sys.argv[2]
 features_fifo_path = sys.argv[3]
 latent_space_dim = int(sys.argv[4])
-RC_CONFIDENCE = 0.1
+RC_CONFIDENCE = 0.2
+voxel_side = 24
 
 import os
 try:
@@ -50,12 +51,13 @@ os.mkfifo(segments_fifo_path)
 os.mkfifo(features_fifo_path)
 
 try:
-  while True:
+  if True:
     ## LOAD DATA ##
     ###############
     print("Waiting for features...")
     from import_export import load_features
     features, feature_names, ids = load_features(folder="", filename=features_fifo_path)
+    features = np.array(features)
     ae_features = features[:,:-3]
     sc_features = features[:,-3:]
 
@@ -65,26 +67,18 @@ try:
     if PROFILING:
         from timeit import default_timer as timer
         total_start = timer()
-        vox_start = timer()
-
-    # Voxelize
-    voxel_side = 24
-    voxel_size = voxel_side * voxel_side * voxel_side
-    from voxelize import voxelize
-    segments_vox, xyz_scale_features = voxelize(segments,voxel_side)
-
-    if PROFILING:
-        vox_end = timer()
-        predict_start = timer()
+        reconstr_start = timer()
 
     ## RECONSTRUCT SEGMENTS ##
     ##########################
-    segments_vox = vae.batch_decode(features)
+    segments_vox = vae.batch_decode(ae_features)
+    segments_vox = [np.reshape(vox, [voxel_side, voxel_side, voxel_side]) for vox in segments_vox]
+    from voxelize import unvoxelize
     segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
     segments = [segment*scale for (segment, scale) in zip(segments, sc_features)]
 
     if PROFILING:
-        predict_end = timer()
+        reconstr_end = timer()
         overhead_out_start = timer()
 
     print("__RCST_COMPLETE__")
@@ -101,10 +95,8 @@ try:
         print("Timings:")
         print("  Total - ", end='')
         print(total_end - total_start)
-        print("  Voxelization - ", end='')
-        print(vox_end - vox_start)
-        print("  Predict - ", end='')
-        print(predict_end - predict_start)
+        print("  Reconstruction - ", end='')
+        print(reconstr_end - reconstr_start)
         print("  Overhead out - ", end='')
         print(overhead_out_end - overhead_out_start)
 except KeyboardInterrupt:
