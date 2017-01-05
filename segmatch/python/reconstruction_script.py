@@ -15,6 +15,7 @@ model_path = sys.argv[1]
 segments_fifo_path = sys.argv[2]
 features_fifo_path = sys.argv[3]
 latent_space_dim = int(sys.argv[4])
+RC_CONFIDENCE = 0.1
 
 import os
 try:
@@ -52,9 +53,11 @@ try:
   while True:
     ## LOAD DATA ##
     ###############
-    print("Waiting for segments...")
-    from import_export import load_segments
-    segments, ids = load_segments(folder="", filename=segments_fifo_path)
+    print("Waiting for features...")
+    from import_export import load_features
+    features, feature_names, ids = load_features(folder="", filename=features_fifo_path)
+    ae_features = features[:,:-3]
+    sc_features = features[:,-3:]
 
     ## PROFILING ##
     ###############
@@ -74,27 +77,23 @@ try:
         vox_end = timer()
         predict_start = timer()
 
-    ## COMPUTE FEATURES ##
-    ######################
-    ae_features, ae_log_sigma_sq = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in segments_vox])
-    ae_features[:,:vae.MP.COERCED_LATENT_DIMS] = 0
-    ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
-    sc_features = [sorted(xyz_scale) for xyz_scale in xyz_scale_features]
-    sc_fnames = ['scale_1', 'scale_2', 'scale_3']
-    features = [list(ae) + list(sc) for ae, sc in zip(ae_features, sc_features)]
-    fnames = ae_fnames + sc_fnames
+    ## RECONSTRUCT SEGMENTS ##
+    ##########################
+    segments_vox = vae.batch_decode(features)
+    segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
+    segments = [segment*scale for (segment, scale) in zip(segments, sc_features)]
 
     if PROFILING:
         predict_end = timer()
         overhead_out_start = timer()
 
-    print("__DESC_COMPLETE__")
+    print("__RCST_COMPLETE__")
 
     ## OUTPUT DATA TO FILES ##
     ##########################
-    print("Writing features")
-    from import_export import write_features
-    write_features(ids, features, fnames, folder="", filename=features_fifo_path)
+    print("Writing segments")
+    from import_export import write_segments
+    write_segments(ids, segments, folder="", filename=segments_fifo_path)
 
     if PROFILING:
         overhead_out_end = timer()

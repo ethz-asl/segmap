@@ -44,6 +44,8 @@ class SegMatchWorker {
   void publishTargetSegmentsCentroids() const;
   void publishSourceSegmentsCentroids() const;
   bool exportRunServiceCall(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+  bool reconstructSegmentsServiceCall(std_srvs::Empty::Request& req,
+                                      std_srvs::Empty::Response& res);
 
   // Parameters.
   SegMatchWorkerParams params_;
@@ -57,8 +59,10 @@ class SegMatchWorker {
   ros::Publisher segmentation_positions_pub_;
   ros::Publisher target_segments_centroids_pub_;
   ros::Publisher source_segments_centroids_pub_;
+  ros::Publisher reconstruction_pub_;
 
   ros::ServiceServer export_run_service_;
+  ros::ServiceServer reconstruct_segments_service_;
 
   // SegMatch object.
   segmatch::SegMatch segmatch_;
