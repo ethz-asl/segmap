@@ -58,8 +58,10 @@ try:
     from import_export import load_features
     features, feature_names, ids = load_features(folder="", filename=features_fifo_path)
     features = np.array(features)
-    ae_features = features[:,:-3]
-    sc_features = features[:,-3:]
+    print(feature_names)
+    ae_features = features[:,:-6]
+    sc_features = features[:,-6:]
+    xyz_scales  = sc_features[:,3:]
 
     ## PROFILING ##
     ###############
@@ -75,7 +77,7 @@ try:
     segments_vox = [np.reshape(vox, [voxel_side, voxel_side, voxel_side]) for vox in segments_vox]
     from voxelize import unvoxelize
     segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
-    segments = [segment*scale for (segment, scale) in zip(segments, sc_features)]
+    segments = [segment*scale for (segment, scale) in zip(segments, xyz_scales)]
 
     if PROFILING:
         reconstr_end = timer()

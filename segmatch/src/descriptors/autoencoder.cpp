@@ -21,7 +21,7 @@ void AutoencoderDescriptor::describe(const Segment& segment, Features* features)
 void AutoencoderDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   // TODO: get rid of kDimension.
-  const unsigned int scale_feature_dimension = 3u;
+  const unsigned int scale_feature_dimension = 6u;
   CHECK(kDimension == params_.autoencoder_latent_space_dimension +
         scale_feature_dimension) << "kDimension != params.";
 

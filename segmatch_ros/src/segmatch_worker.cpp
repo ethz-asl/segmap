@@ -317,8 +317,8 @@ bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
 
 bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& req,
                                                     std_srvs::Empty::Response& res) {
-  const std::string kSegmentsFilename = "autoencoder_segments.txt";
-  const std::string kFeaturesFilename = "autoencoder_features.txt";
+  const std::string kSegmentsFilename = "autoencoder_reconstructor_segments.txt";
+  const std::string kFeaturesFilename = "autoencoder_reconstructor_features.txt";
   FILE* script_process_pipe;
   DescriptorsParameters descriptors_params = params_.segmatch_params.descriptors_params;
   const std::string command = descriptors_params.autoencoder_python_env + " -u " +
@@ -326,7 +326,7 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
       descriptors_params.autoencoder_model_path + " " +
       descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename + " " +
       descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename + " " +
-      std::to_string(descriptors_params.autoencoder_latent_space_dimension);
+      std::to_string(descriptors_params.autoencoder_latent_space_dimension) + " 2>&1";
 
   LOG(INFO) << "Executing command: $" << command;
   if (!(script_process_pipe = popen(command.c_str(), "r"))) {
@@ -342,12 +342,14 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
   }
 
   // Export segmented cloud.
+  LOG(INFO) << "Exporting autoencoder features.";
   SegmentedCloud original_target_segments = segmatch_.getTargetAsSegmentedCloud();
   database::exportFeatures(descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename,
                            original_target_segments);
+  LOG(INFO) << "Done.";
 
   // Wait for script to describe segments.
-  while (fgets(buff, sizeof(buff), script_process_pipe)!=NULL) {
+  while (fgets(buff, sizeof(buff), script_process_pipe) != NULL) {
     LOG(INFO) << buff;
     if (std::string(buff) == "__RCST_COMPLETE__\n") {
       break;
@@ -356,7 +358,7 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
 
   SegmentedCloud reconstructed_target_segments;
   // Import the autoencoder features from file.
-  LOG(INFO) << "Importing autoencoder segments";
+  LOG(INFO) << "Importing autoencoder segments.";
   CHECK(database::importSegments(descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename,
                                  &reconstructed_target_segments));
   LOG(INFO) << "Done.";

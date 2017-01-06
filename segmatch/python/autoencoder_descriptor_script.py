@@ -79,9 +79,8 @@ try:
     ae_features, ae_log_sigma_sq = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in segments_vox])
     ae_features[:,:vae.MP.COERCED_LATENT_DIMS] = 0
     ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
-#     sc_features = [sorted(xyz_scale) for xyz_scale in xyz_scale_features] # TODO: sort this in C++
-    sc_features = xyz_scale_features
-    sc_fnames = ['scale_1', 'scale_2', 'scale_3']
+    sc_features = [sorted(xyz_scale) + list(xyz_scale) for xyz_scale in xyz_scale_features] # TODO: sort this in C++
+    sc_fnames = ['scale_sml', 'scale_med', 'scale_lrg', 'scale_x', 'scale_y', 'scale_z']
     features = [list(ae) + list(sc) for ae, sc in zip(ae_features, sc_features)]
     fnames = ae_fnames + sc_fnames
 

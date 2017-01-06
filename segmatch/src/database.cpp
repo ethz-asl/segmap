@@ -290,12 +290,14 @@ bool importFeatures(const std::string& filename, SegmentedCloud* segmented_cloud
       } else {
         // Read features.
         Features features;
+        Feature feature;
         std::string name;
         while(line_as_stream >> name) {
           FeatureValueType value;
           line_as_stream >> value;
-          features.push_back(Feature(name, value));
+          feature.push_back(FeatureValue(name, value));
         }
+        features.push_back(feature);
         // Check wether segment already has features.
         if (!segment_ptr->features.empty()) {
           if (behavior_when_segment_has_features == "concatenate") {
