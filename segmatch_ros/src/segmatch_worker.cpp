@@ -366,7 +366,7 @@ bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& re
   pclose(script_process_pipe);
 
   // Move reconstructions to their centroid locations.
-  for (std::unordered_map<Id, Segment>::iterator it = original_target_segments.begin();
+  for (std::unordered_map<Id, Segment>::const_iterator it = original_target_segments.begin();
       it != original_target_segments.end(); ++it) {
     PclPoint centroid = it->second.centroid;
     Segment* segment_ptr;

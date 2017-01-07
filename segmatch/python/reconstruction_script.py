@@ -44,11 +44,11 @@ try:
 except:
   raise ValueError("Could not load model.")
 
-print("__INIT_COMPLETE__")
-
-
+# Make FIFOs
 os.mkfifo(segments_fifo_path)
 os.mkfifo(features_fifo_path)
+
+print("__INIT_COMPLETE__")
 
 try:
   if True:
