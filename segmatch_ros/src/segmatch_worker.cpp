@@ -39,6 +39,16 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
     export_run_service_ = nh.advertiseService("export_run",
                                               &SegMatchWorker::exportRunServiceCall, this);
   }
+  if (std::find(params_.segmatch_params.descriptors_params.descriptor_types.begin(),
+                params_.segmatch_params.descriptors_params.descriptor_types.end(), 
+                "Autoencoder") != 
+      params_.segmatch_params.descriptors_params.descriptor_types.end() && 
+      params_.autoencoder_reconstructor_script_path != "") {
+    reconstruct_segments_service_ = nh.advertiseService(
+        "reconstruct_segments", &SegMatchWorker::reconstructSegmentsServiceCall, this);
+    reconstruction_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
+        "/segmatch/reconstruction", kPublisherQueueSize);
+  }
 
   if (params_.localize) {
     loadTargetCloud();
@@ -302,6 +312,78 @@ bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
                             segments_database_);
   database::exportMatches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
                            matches_database_);
+  return true;
+}
+
+bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& req,
+                                                    std_srvs::Empty::Response& res) {
+  const std::string kSegmentsFilename = "autoencoder_reconstructor_segments.txt";
+  const std::string kFeaturesFilename = "autoencoder_reconstructor_features.txt";
+  FILE* script_process_pipe;
+  DescriptorsParameters descriptors_params = params_.segmatch_params.descriptors_params;
+  const std::string command = descriptors_params.autoencoder_python_env + " -u " +
+      params_.autoencoder_reconstructor_script_path + " " +
+      descriptors_params.autoencoder_model_path + " " +
+      descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename + " " +
+      descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename + " " +
+      std::to_string(descriptors_params.autoencoder_latent_space_dimension) + " 2>&1";
+
+  LOG(INFO) << "Executing command: $" << command;
+  if (!(script_process_pipe = popen(command.c_str(), "r"))) {
+    LOG(FATAL) << "Could not execute autoencoder reconstruction command";
+  }
+
+  char buff[512];
+  while (fgets(buff, sizeof(buff), script_process_pipe) != NULL) {
+    LOG(INFO) << buff;
+    if (std::string(buff) == "__INIT_COMPLETE__\n") {
+      break;
+    }
+  }
+
+  // Export segmented cloud.
+  LOG(INFO) << "Exporting autoencoder features.";
+  SegmentedCloud original_target_segments = segmatch_.getTargetAsSegmentedCloud();
+  database::exportFeatures(descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename,
+                           original_target_segments);
+  LOG(INFO) << "Done.";
+
+  // Wait for script to describe segments.
+  while (fgets(buff, sizeof(buff), script_process_pipe) != NULL) {
+    LOG(INFO) << buff;
+    if (std::string(buff) == "__RCST_COMPLETE__\n") {
+      break;
+    }
+  }
+
+  SegmentedCloud reconstructed_target_segments;
+  // Import the autoencoder features from file.
+  LOG(INFO) << "Importing autoencoder segments.";
+  CHECK(database::importSegments(descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename,
+                                 &reconstructed_target_segments));
+  LOG(INFO) << "Done.";
+
+  pclose(script_process_pipe);
+
+  // Move reconstructions to their centroid locations.
+  for (std::unordered_map<Id, Segment>::const_iterator it = original_target_segments.begin();
+      it != original_target_segments.end(); ++it) {
+    PclPoint centroid = it->second.centroid;
+    Segment* segment_ptr;
+    CHECK(reconstructed_target_segments.findValidSegmentPtrById(it->first, &segment_ptr));
+    translateCloud(Translation(centroid.x, centroid.y, centroid.z), &(segment_ptr->point_cloud));
+  }
+
+  // Publish reconstruction
+  PointICloud reconstructed_target_representation;
+  segmentedCloudToCloud(reconstructed_target_segments, &reconstructed_target_representation);
+  translateCloud(Translation(0.0, 0.0, -2*params_.distance_to_lower_target_cloud_for_viz_m),
+                 &reconstructed_target_representation);
+  sensor_msgs::PointCloud2 reconstructed_target_representation_as_message;
+  convert_to_point_cloud_2_msg(reconstructed_target_representation, params_.world_frame,
+                               &reconstructed_target_representation_as_message);
+  reconstruction_pub_.publish(reconstructed_target_representation_as_message);
+
   return true;
 }
 

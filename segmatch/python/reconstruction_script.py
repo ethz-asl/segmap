@@ -15,6 +15,8 @@ model_path = sys.argv[1]
 segments_fifo_path = sys.argv[2]
 features_fifo_path = sys.argv[3]
 latent_space_dim = int(sys.argv[4])
+RC_CONFIDENCE = 0.2
+voxel_side = 24
 
 import os
 try:
@@ -42,19 +44,24 @@ try:
 except:
   raise ValueError("Could not load model.")
 
-print("__INIT_COMPLETE__")
-
-
+# Make FIFOs
 os.mkfifo(segments_fifo_path)
 os.mkfifo(features_fifo_path)
 
+print("__INIT_COMPLETE__")
+
 try:
-  while True:
+  if True:
     ## LOAD DATA ##
     ###############
-    print("Waiting for segments...")
-    from import_export import load_segments
-    segments, ids = load_segments(folder="", filename=segments_fifo_path)
+    print("Waiting for features...")
+    from import_export import load_features
+    features, feature_names, ids = load_features(folder="", filename=features_fifo_path)
+    features = np.array(features)
+    print(feature_names)
+    ae_features = features[:,:-6]
+    sc_features = features[:,-6:]
+    xyz_scales  = sc_features[:,3:]
 
     ## PROFILING ##
     ###############
@@ -62,39 +69,27 @@ try:
     if PROFILING:
         from timeit import default_timer as timer
         total_start = timer()
-        vox_start = timer()
+        reconstr_start = timer()
 
-    # Voxelize
-    voxel_side = 24
-    voxel_size = voxel_side * voxel_side * voxel_side
-    from voxelize import voxelize
-    segments_vox, xyz_scale_features = voxelize(segments,voxel_side)
-
-    if PROFILING:
-        vox_end = timer()
-        predict_start = timer()
-
-    ## COMPUTE FEATURES ##
-    ######################
-    ae_features, ae_log_sigma_sq = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in segments_vox])
-    ae_features[:,:vae.MP.COERCED_LATENT_DIMS] = 0
-    ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
-    sc_features = [sorted(xyz_scale) + list(xyz_scale) for xyz_scale in xyz_scale_features]
-    sc_fnames = ['scale_sml', 'scale_med', 'scale_lrg', 'scale_x', 'scale_y', 'scale_z']
-    features = [list(ae) + list(sc) for ae, sc in zip(ae_features, sc_features)]
-    fnames = ae_fnames + sc_fnames
+    ## RECONSTRUCT SEGMENTS ##
+    ##########################
+    segments_vox = vae.batch_decode(ae_features)
+    segments_vox = [np.reshape(vox, [voxel_side, voxel_side, voxel_side]) for vox in segments_vox]
+    from voxelize import unvoxelize
+    segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
+    segments = [segment*scale for (segment, scale) in zip(segments, xyz_scales)]
 
     if PROFILING:
-        predict_end = timer()
+        reconstr_end = timer()
         overhead_out_start = timer()
 
-    print("__DESC_COMPLETE__")
+    print("__RCST_COMPLETE__")
 
     ## OUTPUT DATA TO FILES ##
     ##########################
-    print("Writing features")
-    from import_export import write_features
-    write_features(ids, features, fnames, folder="", filename=features_fifo_path)
+    print("Writing segments")
+    from import_export import write_segments
+    write_segments(ids, segments, folder="", filename=segments_fifo_path)
 
     if PROFILING:
         overhead_out_end = timer()
@@ -102,10 +97,8 @@ try:
         print("Timings:")
         print("  Total - ", end='')
         print(total_end - total_start)
-        print("  Voxelization - ", end='')
-        print(vox_end - vox_start)
-        print("  Predict - ", end='')
-        print(predict_end - predict_start)
+        print("  Reconstruction - ", end='')
+        print(reconstr_end - reconstr_start)
         print("  Overhead out - ", end='')
         print(overhead_out_end - overhead_out_start)
 except KeyboardInterrupt:

@@ -56,6 +56,9 @@ def unvoxelize(vox):
   result = np.array(np.where(vox > 0)).T.astype(float)
   if len(result) == 0:
     result = [np.array([0,0,0])]
+  # Center points around 0, and scale down
+  result = result - (np.array(vox.shape) / 2)
+  result = result / np.array(vox.shape)
   return np.array(result)
 
 def recenter_segment(segment):

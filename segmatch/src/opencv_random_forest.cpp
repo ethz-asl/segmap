@@ -184,7 +184,8 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
     for (std::unordered_map<Id, Segment>::const_iterator it_source = source_cloud.begin();
         it_source != source_cloud.end(); ++it_source) {
       Segment source_segment = it_source->second;
-      Eigen::MatrixXd features_source = source_segment.features.asEigenMatrix();
+      Eigen::MatrixXd features_source = 
+          source_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
 
       VectorXf q;
       if (params_.normalize_eigen_for_knn) {
@@ -296,13 +297,13 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
     for (std::unordered_map<Id, Segment>::const_iterator it_source = source_cloud.begin();
         it_source != source_cloud.end(); ++it_source) {
       Segment source_segment = it_source->second;
-      Eigen::MatrixXd features_source = source_segment.features.asEigenMatrix();
+      Eigen::MatrixXd features_source = source_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
 
       for (std::unordered_map<Id, Segment>::const_iterator it_target = target_cloud_.begin();
           it_target != source_cloud.end(); ++it_target) {
         Segment target_segment = it_target->second;
         Eigen::MatrixXd features_target =
-            target_segment.features.asEigenMatrix();
+            target_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
 
         Eigen::MatrixXd diff_features;
         computeFeaturesDistance(features_source, features_target,
@@ -452,11 +453,11 @@ void OpenCvRandomForest::setTarget(const SegmentedCloud& target_cloud) {
       it != target_cloud.end(); ++it) {
     Segment target_segment = it->second;
     target_matrix_.block(i, 0, 1, params_.knn_feature_dim) = target_segment
-        .features.asEigenMatrix().block(0, 0, 1, params_.knn_feature_dim)
+        .features.rotationInvariantFeaturesOnly().asEigenMatrix().block(0, 0, 1, params_.knn_feature_dim)
         .cast<float>();
     target_segment_ids_.push_back(target_segment.segment_id);
     target_segment_centroids_.push_back(target_segment.centroid);
-    target_segment_features_.push_back(target_segment.features.asEigenMatrix());
+    target_segment_features_.push_back(target_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix());
     ++i;
   }
 

@@ -50,7 +50,7 @@ class AutoencoderDescriptor : public Descriptor {
 
  private:
   // TODO: the dimension is unknown.
-  static constexpr unsigned int kDimension = 18u;
+  static constexpr unsigned int kDimension = 21u;
 
   DescriptorsParameters params_;
 
