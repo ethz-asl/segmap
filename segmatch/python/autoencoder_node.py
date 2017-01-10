@@ -120,6 +120,7 @@ if not RUN_AS_PY_SCRIPT:
     MP.CONVOLUTION_LAYERS = []
     #MP.LATENT_SHAPE = [2]
     CREATE_VISUALS = True
+    TENSORBOARD_DIR = None
 
 
 # In[ ]:
@@ -222,13 +223,14 @@ if not RUN_AS_PY_SCRIPT:
     MP = stored_MP
   except FileNotFoundError:
     print("No stored model found. Creating a new model.")
+if TENSORBOARD_DIR is None:
+    MP.DISABLE_SUMMARY = True
+    print("Summary disabled.")
 
 
 # In[ ]:
 
-vae = model.Autoencoder(MP)
-if ADVERSARIAL: vae.build_adversarial_graph()
-if MUTUAL_INFO: vae.build_mutual_info_graph()
+vae = model.Autoencoder(MP, adversarial=ADVERSARIAL, mutual_info=MUTUAL_INFO)
 
 
 # In[ ]:
@@ -274,13 +276,7 @@ if not ROTATE_SEGMENTS_EVERY_STEP:
   train_vox, _ = voxelize(train,VOXEL_SIDE)
   val_vox, _   = voxelize(val  ,VOXEL_SIDE)
 
-
   del train # Save some memory
-
-if train_vox[0].shape != MP.INPUT_SHAPE:
-  print("Reshaping")
-  train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
-  val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
 
 
 # In[ ]:
@@ -313,6 +309,7 @@ except:
 # single step
 for step in range(MAX_STEPS):
   if ROTATE_SEGMENTS_EVERY_STEP:
+      from voxelize import create_rotations
       offset = np.random.random()*np.pi*2
       val = create_rotations(val, n_angles=1, offset_by_fraction_of_single_angle=offset)
       train = create_rotations(train, n_angles=1, offset_by_fraction_of_single_angle=offset)
@@ -328,7 +325,7 @@ for step in range(MAX_STEPS):
         break
       else:
         batch_input_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL)
+        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
         total_val_cost += cost_value
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)

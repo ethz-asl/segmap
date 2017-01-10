@@ -14,6 +14,7 @@ class ModelParams:
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
     self.DISABLE_SUMMARY = False
+    self.INFO_REG_COEFF = 0.5
   def __str__(self):
     return str(self.__dict__)
   def __eq__(self, other): 
@@ -46,7 +47,7 @@ def gaussian_log_likelihood(sample, mean, log_sigma_squared):
     return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + 1e-10) - 0.5 * tf.square(epsilon), reduction_indices=1)
 
 class Autoencoder(object):
-  def __init__(self, model_params):
+  def __init__(self, model_params, adversarial=False, mutual_info=False):
     self.MP = model_params
 
     tf.reset_default_graph()
@@ -272,6 +273,9 @@ class Autoencoder(object):
       self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
       if self.MP.CLIP_GRADIENTS > 0:
           raise NotImplementedError
+    # Extra graph
+    if adversarial: self.build_adversarial_graph()
+    if mutual_info: self.build_mutual_info_graph()
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
     self.sess = tf.Session()
@@ -282,6 +286,7 @@ class Autoencoder(object):
 
 
   def build_adversarial_graph(self):
+    print("Building adversarial graph.")
     # TODO: apply discriminator to both, loss = 0.5 Dlossreal + 0.5 Dlossfake
     preset_batch_size = None
     # Discriminator
@@ -365,7 +370,7 @@ class Autoencoder(object):
                                                                    previous_layer_shape,
                                                                    layer_shape),
                                            biases)
-        self.discriminator_output = tf.nn.softplus(self.discriminator_output)
+        self.discriminator_output = tf.nn.sigmoid(self.discriminator_output)
     # Loss
     with tf.name_scope('Adversarial_Loss') as scope:
       self.discriminator_loss = tf.reduce_mean(y * -tf.log(self.discriminator_output + 1e-10) +
@@ -377,11 +382,13 @@ class Autoencoder(object):
           self.merged = tf.summary.merge_all()
     # Optimizer (ADAM)
     with tf.name_scope('Adversarial_Optimizers') as scope:
-      self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
-      self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
-    tf.initialize_all_variables().run(session=self.sess)
+      with tf.name_scope('Generator_Optimizer') as sub_scope:
+        self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
+      with tf.name_scope('Discriminator_Optimizer') as sub_scope:
+        self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
 
   def build_mutual_info_graph(self):
+    print("Building mutual information graph.")
     preset_batch_size = None
     # Encoder
     previous_layer = self.output
@@ -478,13 +485,13 @@ class Autoencoder(object):
                                             biases)[:,:self.MP.COERCED_LATENT_DIMS]
     # Loss
     with tf.name_scope('MutualInfo_Loss') as scope:
-      c_sample = self.z_sample[:,self.MP.COERCED_LATENT_DIMS]
-      c_mean_prior = self.z_mean[:,self.MP.COERCED_LATENT_DIMS]
-      c_log_sigma_squared_prior = self.z_log_sigma_squared[:,self.MP.COERCED_LATENT_DIMS]
+      c_sample = self.z_sample[:,:self.MP.COERCED_LATENT_DIMS]
+      c_mean_prior = self.z_mean[:,:self.MP.COERCED_LATENT_DIMS]
+      c_log_sigma_squared_prior = self.z_log_sigma_squared[:,:self.MP.COERCED_LATENT_DIMS]
       self.mutual_information_loss = tf.reduce_mean(gaussian_log_likelihood(c_sample, self.q_z_mean, self.q_z_log_sigma_squared) -
-                                                    gaussian_log_likelihood(c_sample, self.c_mean_prior, self.c_log_sigma_squared_prior))
-      self.discriminator_loss -= self.info_reg_coeff * cont_mi_est
-      self.generator_loss -= self.info_reg_coeff * cont_mi_est
+                                                    gaussian_log_likelihood(c_sample, c_mean_prior, c_log_sigma_squared_prior))
+      self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
+      self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
       if not self.MP.DISABLE_SUMMARY:
           tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
           tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
@@ -493,7 +500,6 @@ class Autoencoder(object):
     with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
       self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
       self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
-    tf.initialize_all_variables().run(session=self.sess)
 
   def variable_summaries(self, var):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
@@ -532,15 +538,15 @@ class Autoencoder(object):
     if adversarial: opt = opt + [self.generator_optimizer, self.discriminator_optimizer]
     # compute
     if cost_only:
-      cost = self.sess.run(cost,
+      cost, summary, _ = self.sess.run((cost, self.merged, self.catch_nans),
                            feed_dict=dict_)
     else:
       cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged),
                                           feed_dict=dict_)
-      if summary_writer is not None: summary_writer.add_summary(summary)
+    if summary_writer is not None: summary_writer.add_summary(summary)
     return sum(cost)
-  def cost_on_single_batch(self, batch_input, adversarial=False):
-    return self.train_on_single_batch(batch_input, adversarial=adversarial, cost_only=True, dropout=1.0)
+  def cost_on_single_batch(self, batch_input, adversarial=False, summary_writer=None):
+    return self.train_on_single_batch(batch_input, adversarial=adversarial, cost_only=True, dropout=1.0, summary_writer=summary_writer)
 
   def batch_encode(self, batch_input, batch_size=200, verbose=True):
     return batch_generic_func(self.encode, batch_input, batch_size, verbose)
