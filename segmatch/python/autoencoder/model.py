@@ -40,7 +40,7 @@ def n_dimensional_weightmul(L, W, L_shape, Lout_shape, first_dim_of_l_is_batch=T
   einsum_string = 'b'+l_subscripts+','+l_subscripts+lout_subscripts+'->'+'b'+lout_subscripts
   return tf.einsum(einsum_string,L,W)
 
-def gaussian_log_likelihood(self, sample, mean, log_sigma_squared):
+def gaussian_log_likelihood(sample, mean, log_sigma_squared):
     stddev = tf.exp(tf.sqrt(log_sigma_squared))
     epsilon = (sample - mean) / (stddev + 1e-10)
     return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + 1e-10) - 0.5 * tf.square(epsilon), reduction_indices=1)
@@ -280,7 +280,108 @@ class Autoencoder(object):
     # Saver
     self.saver = tf.train.Saver(self.variables)
 
-  def build_info_graph(self):
+
+  def build_adversarial_graph(self):
+    # TODO: apply discriminator to both, loss = 0.5 Dlossreal + 0.5 Dlossfake
+    preset_batch_size = None
+    # Discriminator
+    # y is a float of value either 0. or 1. representing wether the input is real (1. if real, 0. if fake)
+    y = tf.cast(tf.random_uniform([1], minval=0, maxval=2, dtype=tf.int32), self.MP.FLOAT_TYPE)
+    previous_layer = self.input_placeholder * y + self.output * (1-y)
+    previous_layer_shape = self.MP.INPUT_SHAPE # Excludes batch dim (which should be at pos 0)
+    # Convolutional Layers
+    for i, LAYER in enumerate(self.MP.CONVOLUTION_LAYERS):
+      with tf.name_scope('Discriminator_ConvLayer'+str(i)) as scope:
+        filter_shape = LAYER['filter']
+        stride = LAYER['stride'] if 'stride' in LAYER else 1
+        strides = [1, stride, stride, stride, 1]
+        padding = LAYER['padding'] if 'padding' in LAYER else "SAME"
+        with tf.variable_scope('ConvLayer'+str(i)+'Weights', reuse=True) as varscope:
+          weights = tf.get_variable("weights_conv_"+str(i), dtype=self.MP.FLOAT_TYPE,
+                                    shape=filter_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_conv_"+str(i) , dtype=self.MP.FLOAT_TYPE,
+                                    shape=[filter_shape[-1]],
+                                    initializer=tf.constant_initializer(0))
+        layer_output = tf.nn.conv3d(previous_layer, weights, strides, padding)
+        layer_output = tf.nn.bias_add(layer_output, biases)
+        layer_shape = previous_layer_shape[:]
+        for i, (prev_dim, filt_dim) in enumerate(zip(previous_layer_shape[:3], filter_shape[:3])):
+          pad = np.floor(filt_dim/2) if padding == "SAME" else 0
+          layer_shape[i] = int(((prev_dim + 2*pad - filt_dim)/stride)+1)
+        layer_shape[-1] = filter_shape[-1]
+        # Downsampling
+        if 'downsampling' in LAYER:
+          DOWNSAMPLING = LAYER['downsampling']
+          if DOWNSAMPLING['type'] != 'max_pool3d': raise NotImplementedError
+          if self.MP.FLOAT_TYPE != tf.float32: raise TypeError('max_pool3d only supports float32')
+          k = DOWNSAMPLING['k'] if 'k' in DOWNSAMPLING else 2
+          ksize   = [1, k, k, k, 1]
+          strides = [1, k, k, k, 1]
+          padding = DOWNSAMPLING['padding'] if 'padding' in DOWNSAMPLING else "VALID"
+          layer_output = tf.nn.max_pool3d(layer_output, ksize, strides, padding)
+          pad = np.floor(k/2) if padding == "SAME" else 0
+          layer_shape = [int(((dim + 2*pad - k)/k)+1) for dim in layer_shape[:3]] + layer_shape[3:]
+        # set up next loop
+        previous_layer = layer_output
+        previous_layer_shape = layer_shape
+    # Flatten output
+    previous_layer_shape = [np.prod(previous_layer_shape)]
+    previous_layer = tf.reshape(previous_layer, shape=[-1]+previous_layer_shape, name="flatten")
+    # Fully connected Layers
+    for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS):
+      with tf.name_scope('Discriminator_EncoderLayer'+str(i)) as scope:
+        layer_shape = LAYER['shape']
+        with tf.variable_scope('DiscriminatorFCLayer'+str(i)+'Weights', reuse=False) as varscope:
+          weights = tf.get_variable("weights_discriminator_fc_"+str(i), dtype=self.MP.FLOAT_TYPE,
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_discriminator_fc_"+str(i) , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
+        layer_output = tf.nn.softplus(tf.add(n_dimensional_weightmul(previous_layer,
+                                                                     weights,
+                                                                     previous_layer_shape,
+                                                                     layer_shape),
+                                             biases),
+                                      name='softplus')
+        if self.MP.DROPOUT is not None:
+          layer_output = tf.nn.dropout(layer_output, self.dropout_placeholder)
+        # set up next loop
+        previous_layer = layer_output
+        previous_layer_shape = layer_shape
+    # Latent space
+    with tf.name_scope('Discriminator_output') as scope:
+        layer_shape = [1]
+        with tf.variable_scope('DiscriminatorOutputWeights', reuse=False) as varscope:
+          weights = tf.get_variable("weights_discriminator_output", dtype=self.MP.FLOAT_TYPE, 
+                                    shape=previous_layer_shape + layer_shape,
+                                    initializer=tf.contrib.layers.xavier_initializer())
+          biases  = tf.get_variable("biases_discriminator_output" , dtype=self.MP.FLOAT_TYPE,
+                                    shape=layer_shape,
+                                    initializer=tf.constant_initializer(0))
+        self.discriminator_output = tf.add(n_dimensional_weightmul(previous_layer,
+                                                                   weights,
+                                                                   previous_layer_shape,
+                                                                   layer_shape),
+                                           biases)
+        self.discriminator_output = tf.nn.softplus(self.discriminator_output)
+    # Loss
+    with tf.name_scope('Adversarial_Loss') as scope:
+      self.discriminator_loss = tf.reduce_mean(y * -tf.log(self.discriminator_output + 1e-10) +
+                                               (1.0 - y) * -tf.log(1.0 - self.discriminator_output + 1e-10))
+      self.generator_loss = tf.reduce_mean((1.0 - y) * -tf.log(self.discriminator_output + 1e-10))
+      if not self.MP.DISABLE_SUMMARY:
+          tf.summary.scalar('generator_loss', self.generator_loss)
+          tf.summary.scalar('discriminator_loss', self.discriminator_loss)
+          self.merged = tf.summary.merge_all()
+    # Optimizer (ADAM)
+    with tf.name_scope('Adversarial_Optimizers') as scope:
+      self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
+      self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
+    tf.initialize_all_variables().run(session=self.sess)
+
+  def build_mutual_info_graph(self):
     preset_batch_size = None
     # Encoder
     previous_layer = self.output
@@ -394,109 +495,9 @@ class Autoencoder(object):
       self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
     tf.initialize_all_variables().run(session=self.sess)
 
-  def build_discriminator_graph(self):
-    # TODO: apply discriminator to both, loss = 0.5 Dlossreal + 0.5 Dlossfake
-    preset_batch_size = None
-    # Discriminator
-    # y is a float of value either 0. or 1. representing wether the input is real (1. if real, 0. if fake)
-    y = tf.cast(tf.random_uniform([1], minval=0, maxval=2, dtype=tf.int32), MP.FLOAT_TYPE)
-    previous_layer = self.input_placeholder * y + self.output * (1-y)
-    previous_layer_shape = self.MP.INPUT_SHAPE # Excludes batch dim (which should be at pos 0)
-    # Convolutional Layers
-    for i, LAYER in enumerate(self.MP.CONVOLUTION_LAYERS):
-      with tf.name_scope('Discriminator_ConvLayer'+str(i)) as scope:
-        filter_shape = LAYER['filter']
-        stride = LAYER['stride'] if 'stride' in LAYER else 1
-        strides = [1, stride, stride, stride, 1]
-        padding = LAYER['padding'] if 'padding' in LAYER else "SAME"
-        with tf.variable_scope('ConvLayer'+str(i)+'Weights', reuse=True) as varscope:
-          weights = tf.get_variable("weights_conv_"+str(i), dtype=self.MP.FLOAT_TYPE,
-                                    shape=filter_shape,
-                                    initializer=tf.contrib.layers.xavier_initializer())
-          biases  = tf.get_variable("biases_conv_"+str(i) , dtype=self.MP.FLOAT_TYPE,
-                                    shape=[filter_shape[-1]],
-                                    initializer=tf.constant_initializer(0))
-        layer_output = tf.nn.conv3d(previous_layer, weights, strides, padding)
-        layer_output = tf.nn.bias_add(layer_output, biases)
-        layer_shape = previous_layer_shape[:]
-        for i, (prev_dim, filt_dim) in enumerate(zip(previous_layer_shape[:3], filter_shape[:3])):
-          pad = np.floor(filt_dim/2) if padding == "SAME" else 0
-          layer_shape[i] = int(((prev_dim + 2*pad - filt_dim)/stride)+1)
-        layer_shape[-1] = filter_shape[-1]
-        # Downsampling
-        if 'downsampling' in LAYER:
-          DOWNSAMPLING = LAYER['downsampling']
-          if DOWNSAMPLING['type'] != 'max_pool3d': raise NotImplementedError
-          if self.MP.FLOAT_TYPE != tf.float32: raise TypeError('max_pool3d only supports float32')
-          k = DOWNSAMPLING['k'] if 'k' in DOWNSAMPLING else 2
-          ksize   = [1, k, k, k, 1]
-          strides = [1, k, k, k, 1]
-          padding = DOWNSAMPLING['padding'] if 'padding' in DOWNSAMPLING else "VALID"
-          layer_output = tf.nn.max_pool3d(layer_output, ksize, strides, padding)
-          pad = np.floor(k/2) if padding == "SAME" else 0
-          layer_shape = [int(((dim + 2*pad - k)/k)+1) for dim in layer_shape[:3]] + layer_shape[3:]
-        # set up next loop
-        previous_layer = layer_output
-        previous_layer_shape = layer_shape
-    # Flatten output
-    previous_layer_shape = [np.prod(previous_layer_shape)]
-    previous_layer = tf.reshape(previous_layer, shape=[-1]+previous_layer_shape, name="flatten")
-    # Fully connected Layers
-    for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS):
-      with tf.name_scope('Discriminator_EncoderLayer'+str(i)) as scope:
-        layer_shape = LAYER['shape']
-        with tf.variable_scope('DiscriminatorFCLayer'+str(i)+'Weights', reuse=False) as varscope:
-          weights = tf.get_variable("weights_discriminator_fc_"+str(i), dtype=self.MP.FLOAT_TYPE,
-                                    shape=previous_layer_shape + layer_shape,
-                                    initializer=tf.contrib.layers.xavier_initializer())
-          biases  = tf.get_variable("biases_discriminator_fc_"+str(i) , dtype=self.MP.FLOAT_TYPE,
-                                    shape=layer_shape,
-                                    initializer=tf.constant_initializer(0))
-        layer_output = tf.nn.softplus(tf.add(n_dimensional_weightmul(previous_layer,
-                                                                     weights,
-                                                                     previous_layer_shape,
-                                                                     layer_shape),
-                                             biases),
-                                      name='softplus')
-        if self.MP.DROPOUT is not None:
-          layer_output = tf.nn.dropout(layer_output, self.dropout_placeholder)
-        # set up next loop
-        previous_layer = layer_output
-        previous_layer_shape = layer_shape
-    # Latent space
-    with tf.name_scope('Discriminator_output') as scope:
-        layer_shape = [1]
-        with tf.variable_scope('DiscriminatorOutputWeights', reuse=False) as varscope:
-          weights = tf.get_variable("weights_discriminator_output", dtype=self.MP.FLOAT_TYPE, 
-                                    shape=previous_layer_shape + layer_shape,
-                                    initializer=tf.contrib.layers.xavier_initializer())
-          biases  = tf.get_variable("biases_discriminator_output" , dtype=self.MP.FLOAT_TYPE,
-                                    shape=layer_shape,
-                                    initializer=tf.constant_initializer(0))
-        self.discriminator_output = tf.add(n_dimensional_weightmul(previous_layer,
-                                                                   weights,
-                                                                   previous_layer_shape,
-                                                                   layer_shape),
-                                           biases)
-        self.discriminator_output = tf.nn.softplus(self.discriminator_output)
-    # Loss
-    with tf.name_scope('Adversarial_Loss') as scope:
-      self.discriminator_loss = tf.reduce_mean(y * -tf.log(self.discriminator_output + 1e-10) +
-                                               (1.0 - y) * -tf.log(1.0 - self.discriminator_output + 1e-10))
-      self.generator_loss = tf.reduce_mean((1.0 - y) * -tf.log(self.discriminator_output + 1e-10))
-      if not self.MP.DISABLE_SUMMARY:
-          tf.summary.scalar('generator_loss', self.generator_loss)
-          tf.summary.scalar('discriminator_loss', self.discriminator_loss)
-          self.merged = tf.summary.merge_all()
-    # Optimizer (ADAM)
-    with tf.name_scope('Adversarial_Optimizers') as scope:
-      self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
-      self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
-    tf.initialize_all_variables().run(session=self.sess)
-
   def variable_summaries(self, var):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
-    if not DISABLE_SUMMARY:
+    if not self.MP.DISABLE_SUMMARY:
       with tf.name_scope('summaries'):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean)

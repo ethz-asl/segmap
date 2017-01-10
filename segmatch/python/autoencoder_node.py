@@ -72,7 +72,9 @@ N_ROTATION_ANGLES = 12
 ROTATION_OFFSET = 0
 VAL_EVERY_N_STEPS = 1
 VAL_STEP_TOLERANCE = 3
-TRAIN_TWINS = False
+ROTATE_SEGMENTS_EVERY_STEP = True
+ADVERSARIAL = True
+MUTUAL_INFO = True
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
@@ -112,15 +114,12 @@ if SET_MARMOT_PARAMS:
     
     MAX_STEPS = 1000000
     VAL_STEP_TOLERANCE = 10
-    N_ROTATION_ANGLES = 36
     
 if not RUN_AS_PY_SCRIPT:
     #MP.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1, 10], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
     MP.CONVOLUTION_LAYERS = []
     #MP.LATENT_SHAPE = [2]
-    N_ROTATION_ANGLES = 6
     CREATE_VISUALS = True
-    TRAIN_TWINS = True
 
 
 # In[ ]:
@@ -137,9 +136,9 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "--noconv":
         MP.CONVOLUTION_LAYERS = []
         print("CONVOLUTION LAYERS REMOVED")
-      elif arg == "--twins":
-        TRAIN_TWINS = True
-        print("Training twins.")
+      elif arg == "--no_rotation":
+        ROTATE_SEGMENTS_EVERY_STEP = False
+        print("Disabling segment rotation.")
       elif arg == "-LEARNING_RATE":
         MP.LEARNING_RATE = float(argv.pop(0))
         print("LEARNING_RATE set to " + str(MP.LEARNING_RATE))
@@ -149,9 +148,6 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "-VAL_STEP_TOLERANCE":
         VAL_STEP_TOLERANCE = int(argv.pop(0))
         print("VAL_STEP_TOLERANCE set to " + str(VAL_STEP_TOLERANCE))
-      elif arg == "-N_ROTATION_ANGLES":
-        N_ROTATION_ANGLES = int(argv.pop(0))
-        print("N_ROTATION_ANGLES set to " + str(N_ROTATION_ANGLES))
       elif arg == "-ROTATION_OFFSET":
         frac = list(map(float, argv.pop(0).split('/'))) + [1.0]
         ROTATION_OFFSET = frac[0]/frac[1]
@@ -231,7 +227,8 @@ if not RUN_AS_PY_SCRIPT:
 # In[ ]:
 
 vae = model.Autoencoder(MP)
-if TRAIN_TWINS: vae.build_twin_graph()
+if ADVERSARIAL: vae.build_adversarial_graph()
+if MUTUAL_INFO: vae.build_mutual_info_graph()
 
 
 # In[ ]:
@@ -271,38 +268,19 @@ train = segments[split_at:]
 
 # In[ ]:
 
-if not TRAIN_TWINS:
-  print("Rotating segments")
-  from voxelize import create_rotations
-  train = create_rotations(train, N_ROTATION_ANGLES, ROTATION_OFFSET)
-  val = create_rotations(val, 12, ROTATION_OFFSET)
-
+if not ROTATE_SEGMENTS_EVERY_STEP:
   print("Voxelizing training data")
   from voxelize import voxelize
   train_vox, _ = voxelize(train,VOXEL_SIDE)
   val_vox, _   = voxelize(val  ,VOXEL_SIDE)
-  train_twins_vox = None
-  val_twins_vox   = None
 
-  if train_vox[0].shape != MP.INPUT_SHAPE:
-    print("Reshaping")
-    train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
-    val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
 
   del train # Save some memory
-else:
-  from voxelize import create_twins
-  val, val_twins = create_twins(val)
-  train, train_twins = create_twins(train)
 
-  print("Voxelizing training data")
-  from voxelize import voxelize
-  train_vox, _ = voxelize(train,VOXEL_SIDE)
-  val_vox, _   = voxelize(val ,VOXEL_SIDE)
-  train_twins_vox, _ = voxelize(train_twins,VOXEL_SIDE)
-  val_twins_vox, _   = voxelize(val_twins  ,VOXEL_SIDE)
- 
-  del train_twins
+if train_vox[0].shape != MP.INPUT_SHAPE:
+  print("Reshaping")
+  train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
+  val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
 
 
 # In[ ]:
@@ -334,26 +312,23 @@ except:
     
 # single step
 for step in range(MAX_STEPS):
-  if TRAIN_TWINS:
-      val, val_twins = create_twins(val)
-      train, train_twins = create_twins(train)
+  if ROTATE_SEGMENTS_EVERY_STEP:
+      offset = np.random.random()*np.pi*2
+      val = create_rotations(val, n_angles=1, offset_by_fraction_of_single_angle=offset)
+      train = create_rotations(train, n_angles=1, offset_by_fraction_of_single_angle=offset)
       print("Voxelizing training data")
       from voxelize import voxelize
       train_vox, _ = voxelize(train,VOXEL_SIDE)
-      val_vox, _   = voxelize(val ,VOXEL_SIDE)
-      train_twins_vox, _ = voxelize(train_twins,VOXEL_SIDE)
-      val_twins_vox, _   = voxelize(val_twins  ,VOXEL_SIDE)
-      del train_twins
-  # Validation
-  val_batchmaker = Batchmaker(val_vox, val_twins_vox, BATCH_SIZE, MP)
+      val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
+  val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
     total_val_cost = 0
     while True:
       if val_batchmaker.is_depleted():
         break
       else:
-        batch_input_values, batch_twin_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, batch_twin_values)
+        batch_input_values = val_batchmaker.next_batch()
+        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL)
         total_val_cost += cost_value
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
@@ -401,16 +376,16 @@ for step in range(MAX_STEPS):
   zero = timer() - timer()
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
   total_step_cost = 0
-  training_batchmaker = Batchmaker(train_vox, train_twins_vox, BATCH_SIZE, MP)
+  training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
   while True:
     if training_batchmaker.is_depleted():
       break
     else:
       t_a = timer()  
-      batch_input_values, batch_twin_values = training_batchmaker.next_batch()
+      batch_input_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, batch_twin_values, summary_writer=summary_writer)
+      cost_value = vae.train_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
       total_step_cost += cost_value
       t_c = timer()
       if PLOTTING_SUPPORT:

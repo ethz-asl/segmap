@@ -1,9 +1,8 @@
 import numpy as np
 
 class Batchmaker:
-    def __init__(self, input_data, twin_data, examples_per_batch, model_params, shuffle_examples=True):
+    def __init__(self, input_data, examples_per_batch, model_params, shuffle_examples=True):
         self.input_data = input_data
-        self.twin_data = twin_data
         self.input_shape = model_params.INPUT_SHAPE
         # examples per batch
         if examples_per_batch is "max":
@@ -26,18 +25,15 @@ class Batchmaker:
         assert not self.is_depleted()
         # Create a single batch
         batch_input_values  =  np.zeros([self.examples_per_batch] + self.input_shape)
-        batch_twin_values = None if self.twin_data is None else np.zeros(batch_input_values.shape)
         for i_example in range(self.examples_per_batch):
           # Create training example at index 'pos' in input_data.
           pos = self.remaining_example_indices.pop(0)
           #   input.
           batch_input_values[i_example] = np.reshape(self.input_data[pos], self.input_shape)
-          #   twin.
-          if self.twin_data is not None: batch_twin_values[i_example] = np.reshape(self.twin_data[pos], self.input_shape)
 
         self.batches_consumed_counter += 1
 
-        return batch_input_values, batch_twin_values
+        return batch_input_values
 
     def is_depleted(self):
         return len(self.remaining_example_indices) < self.examples_per_batch
