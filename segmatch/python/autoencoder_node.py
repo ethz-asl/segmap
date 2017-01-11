@@ -295,9 +295,10 @@ print("Using " + str(process.memory_info().rss/(1024.0*1024.0)) + "mB of memory"
 # In[ ]:
 
 from timeit import default_timer as timer
+from dynamic_average import Average
 from autoencoder.batchmaker import Batchmaker, progress_bar
 
-total_step_cost = None
+avg_step_cost = None
 step_cost_log = []
 val_steps_since_last_improvement = 0
 step_start = timer()
@@ -322,17 +323,17 @@ for step in range(MAX_STEPS):
       print("Done rotating segments.")
   val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
-    total_val_cost = None
+    avg_val_cost = Average()
     while True:
       if val_batchmaker.is_depleted():
         break
       else:
         batch_input_values = val_batchmaker.next_batch()
         cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
-        total_val_cost = cost_value + total_val_cost if total_val_cost is not None else cost_value
+        avg_val_cost.add(cost_value)
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
-    print("Validation cost: "+str(total_val_cost)+"  (Training cost: "+str(total_step_cost)+")", end="")
+    print("Validation cost: "+str(avg_val_cost)+"  (Training cost: "+str(avg_step_cost)+")", end="")
     try:
       print(" Step Time: " + str(step_end-step_start))
       if DETAILED_STEP_TIMES:
@@ -340,7 +341,7 @@ for step in range(MAX_STEPS):
     except: 
         print(" ")
     
-    val_cost_log.append(total_val_cost)
+    val_cost_log.append(avg_val_cost.values)
     
     # Training Monitor
     if len(val_cost_log) > 1:
@@ -375,7 +376,7 @@ for step in range(MAX_STEPS):
   step_start = timer()
   zero = timer() - timer()
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
-  total_step_cost = None
+  avg_step_cost = Average()
   training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
   train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
   for train_target in itertools.cycle(train_order):
@@ -390,7 +391,7 @@ for step in range(MAX_STEPS):
       t_b = timer()
       # Train over 1 batch.
       cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, adversarial=ADVERSARIAL, summary_writer=summary_writer)
-      total_step_cost = total_step_cost + cost_value if total_step_cost is not None else cost_value
+      avg_step_cost.add(cost_value)
       t_c = timer()
       if PLOTTING_SUPPORT:
         progress_bar(training_batchmaker)
@@ -398,7 +399,7 @@ for step in range(MAX_STEPS):
       step_times['batchmaking'] += t_b - t_a
       step_times['training']    += t_c - t_b
       step_times['plotting']    += t_d - t_c
-  step_cost_log.append(total_step_cost)
+  step_cost_log.append(avg_step_cost.values)
   step_end = timer()
 
 
