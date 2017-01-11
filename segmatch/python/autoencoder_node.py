@@ -7,6 +7,8 @@ from __future__ import print_function
 
 import numpy as np
 
+import itertools
+
 import tensorflow as tf
 from autoencoder import model
 import pickle
@@ -75,6 +77,8 @@ VAL_STEP_TOLERANCE = 3
 ROTATE_SEGMENTS_EVERY_STEP = True
 ADVERSARIAL = True
 MUTUAL_INFO = True
+G_THRESHOLD = 0.80
+D_THRESHOLD = 0.45
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
@@ -118,7 +122,6 @@ if SET_MARMOT_PARAMS:
 if not RUN_AS_PY_SCRIPT:
     MP.CONVOLUTION_LAYERS = []
     CREATE_VISUALS = True
-    MP.FLOAT_TYPE = tf.float64
 
 
 # In[ ]:
@@ -296,7 +299,6 @@ from autoencoder.batchmaker import Batchmaker, progress_bar
 
 total_step_cost = None
 step_cost_log = []
-total_val_cost = 0
 val_steps_since_last_improvement = 0
 step_start = timer()
 
@@ -320,14 +322,14 @@ for step in range(MAX_STEPS):
       print("Done rotating segments.")
   val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
-    total_val_cost = 0
+    total_val_cost = None
     while True:
       if val_batchmaker.is_depleted():
         break
       else:
         batch_input_values = val_batchmaker.next_batch()
         cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
-        total_val_cost += cost_value
+        total_val_cost = cost_value + total_val_cost if total_val_cost is not None else cost_value
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
     print("Validation cost: "+str(total_val_cost)+"  (Training cost: "+str(total_step_cost)+")", end="")
@@ -352,7 +354,7 @@ for step in range(MAX_STEPS):
               pickle.dump(MP, file, protocol=2)
         np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
         # Save if cost has improved. Otherwise increment counter.
-        if val_cost_log[-1] <  min(val_cost_log[:-1]):
+        if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0)).any():
             val_steps_since_last_improvement = 0
             # save model to disk
             print("Saving ... ", end='')
@@ -373,9 +375,13 @@ for step in range(MAX_STEPS):
   step_start = timer()
   zero = timer() - timer()
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
-  total_step_cost = 0
+  total_step_cost = None
   training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
-  while True:
+  train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+  for train_target in itertools.cycle(train_order):
+    if train_target is vae.discriminator_optimizer:
+      if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
+        continue
     if training_batchmaker.is_depleted():
       break
     else:
@@ -383,8 +389,8 @@ for step in range(MAX_STEPS):
       batch_input_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
-      total_step_cost += cost_value
+      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, adversarial=ADVERSARIAL, summary_writer=summary_writer)
+      total_step_cost = total_step_cost + cost_value if total_step_cost is not None else cost_value
       t_c = timer()
       if PLOTTING_SUPPORT:
         progress_bar(training_batchmaker)

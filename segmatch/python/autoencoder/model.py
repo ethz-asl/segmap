@@ -365,7 +365,7 @@ class Autoencoder(object):
   def encode_decode(self, batch_input):
     return self.sess.run(self.output,
                          feed_dict={self.input_placeholder: batch_input})
-  def train_on_single_batch(self, batch_input, adversarial=False, cost_only=False, dropout=None, summary_writer=None):
+  def train_on_single_batch(self, batch_input, train_target=None, adversarial=False, cost_only=False, dropout=None, summary_writer=None):
     # feed placeholders
     dict_ = {self.input_placeholder: batch_input}
     if self.MP.DROPOUT is not None:
@@ -375,19 +375,14 @@ class Autoencoder(object):
     # Graph nodes to target
     cost = [self.cost]
     if adversarial: cost = cost + [self.generator_loss, self.discriminator_loss]
-    opt = [self.optimizer]
-    if adversarial: opt = opt + [self.generator_optimizer, self.discriminator_optimizer]
+    opt = train_target if train_target is not None else self.optimizer
     # compute
-    if cost_only:
-      cost, summary, _ = self.sess.run((cost, self.merged, self.catch_nans),
-                           feed_dict=dict_)
-    else:
-      cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged),
-                                          feed_dict=dict_)
+    cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)
-    return sum(cost)
+    return np.array(cost)
   def cost_on_single_batch(self, batch_input, adversarial=False, summary_writer=None):
-    return self.train_on_single_batch(batch_input, adversarial=adversarial, cost_only=True, dropout=1.0, summary_writer=summary_writer)
+    return self.train_on_single_batch(batch_input, train_target=tf.constant(0), adversarial=adversarial,
+                                      dropout=1.0, summary_writer=summary_writer)
 
   def batch_encode(self, batch_input, batch_size=200, verbose=True):
     return batch_generic_func(self.encode, batch_input, batch_size, verbose)
