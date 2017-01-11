@@ -221,9 +221,9 @@ if not RUN_AS_PY_SCRIPT:
     MP = stored_MP
   except FileNotFoundError:
     print("No stored model found. Creating a new model.")
-if TENSORBOARD_DIR is None:
-    MP.DISABLE_SUMMARY = True
-    print("Summary disabled.")
+temp = MP.DISABLE_SUMMARY
+MP.DISABLE_SUMMARY = True if TENSORBOARD_DIR is None else False
+if MP.DISABLE_SUMMARY != temp: print("Summary", "enabled" if not MP.DISABLE_SUMMARY else "disabled")
 
 
 # In[ ]:
@@ -317,6 +317,7 @@ for step in range(MAX_STEPS):
       from voxelize import voxelize
       train_vox, _ = voxelize(train,VOXEL_SIDE)
       val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
+      print("Done rotating segments.")
   val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
     total_val_cost = 0
