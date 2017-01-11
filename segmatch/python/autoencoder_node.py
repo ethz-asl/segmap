@@ -116,11 +116,9 @@ if SET_MARMOT_PARAMS:
     VAL_STEP_TOLERANCE = 10
     
 if not RUN_AS_PY_SCRIPT:
-    #MP.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1, 10], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
     MP.CONVOLUTION_LAYERS = []
-    #MP.LATENT_SHAPE = [2]
     CREATE_VISUALS = True
-    TENSORBOARD_DIR = None
+    MP.FLOAT_TYPE = tf.float64
 
 
 # In[ ]:
@@ -238,6 +236,7 @@ vae = model.Autoencoder(MP, adversarial=ADVERSARIAL, mutual_info=MUTUAL_INFO)
 summary_writer = None
 if TENSORBOARD_DIR != None:
   summary_writer = tf.train.SummaryWriter(TENSORBOARD_DIR, vae.sess.graph)
+  print("Graph written to log.")
 
 
 # In[ ]:

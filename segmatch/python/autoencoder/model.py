@@ -6,10 +6,10 @@ class ModelParams:
     self.INPUT_SHAPE = [24,24,24,1]
     self.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1,  10], 'downsampling': {'type': 'max_pool3d', 'k': 2}},
                                {'type': 'conv3d', 'filter': [5, 5, 5, 10, 100], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
-    self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}, {'shape': [400]}]
+    self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}]
     self.LATENT_SHAPE = [15]
     self.COERCED_LATENT_DIMS = 1
-    self.LEARNING_RATE = 0.0001
+    self.LEARNING_RATE = 0.000001
     self.CLIP_GRADIENTS = 0
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
@@ -42,7 +42,7 @@ def n_dimensional_weightmul(L, W, L_shape, Lout_shape, first_dim_of_l_is_batch=T
   return tf.einsum(einsum_string,L,W)
 
 def gaussian_log_likelihood(sample, mean, log_sigma_squared):
-    stddev = tf.exp(tf.sqrt(log_sigma_squared))
+    stddev = tf.sqrt(tf.exp(log_sigma_squared))
     epsilon = (sample - mean) / (stddev + 1e-10)
     return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + 1e-10) - 0.5 * tf.square(epsilon), reduction_indices=1)
 
@@ -379,7 +379,6 @@ class Autoencoder(object):
       if not self.MP.DISABLE_SUMMARY:
           tf.summary.scalar('generator_loss', self.generator_loss)
           tf.summary.scalar('discriminator_loss', self.discriminator_loss)
-          self.merged = tf.summary.merge_all()
     # Optimizer (ADAM)
     with tf.name_scope('Adversarial_Optimizers') as scope:
       with tf.name_scope('Generator_Optimizer') as sub_scope:
@@ -488,15 +487,15 @@ class Autoencoder(object):
       c_sample = self.z_sample[:,:self.MP.COERCED_LATENT_DIMS]
       c_mean_prior = self.z_mean[:,:self.MP.COERCED_LATENT_DIMS]
       c_log_sigma_squared_prior = self.z_log_sigma_squared[:,:self.MP.COERCED_LATENT_DIMS]
-      self.mutual_information_loss = tf.reduce_mean(gaussian_log_likelihood(c_sample, self.q_z_mean, self.q_z_log_sigma_squared) -
-                                                    gaussian_log_likelihood(c_sample, c_mean_prior, c_log_sigma_squared_prior))
+      log_li_q_c_given_x = gaussian_log_likelihood(c_sample, self.q_z_mean, self.q_z_log_sigma_squared)
+      log_li_q_c = gaussian_log_likelihood(c_sample, c_mean_prior, c_log_sigma_squared_prior)
+      self.mutual_information_loss = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
       self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
       self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
       if not self.MP.DISABLE_SUMMARY:
           tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
           tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
           tf.summary.scalar('MI_loss', self.mutual_information_loss)
-          self.merged = tf.summary.merge_all()
     with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
       self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
       self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
