@@ -22,6 +22,8 @@ class ModelParams:
   def __ne__(self, other):
     return not self.__eq__(other)
 
+TINY = 1e-8
+
 def n_dimensional_weightmul(L, W, L_shape, Lout_shape, first_dim_of_l_is_batch=True):
   """ Equivalent to matmul(W,L)
       but works for L with larger shapes than 1
@@ -43,8 +45,8 @@ def n_dimensional_weightmul(L, W, L_shape, Lout_shape, first_dim_of_l_is_batch=T
 
 def gaussian_log_likelihood(sample, mean, log_sigma_squared):
     stddev = tf.sqrt(tf.exp(log_sigma_squared))
-    epsilon = (sample - mean) / (stddev + 1e-10)
-    return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + 1e-10) - 0.5 * tf.square(epsilon), reduction_indices=1)
+    epsilon = (sample - mean) / (stddev + TINY)
+    return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + TINY) - 0.5 * tf.square(epsilon), reduction_indices=1)
 
 class Autoencoder(object):
   def __init__(self, model_params, adversarial=False, mutual_info=False):
@@ -122,8 +124,8 @@ class Autoencoder(object):
       with tf.name_scope('ReconstructionLoss') as sub_scope:
         # Cross entropy loss of output probabilities vs. input certainties.
         reconstruction_loss = \
-            -tf.reduce_sum(self.input_placeholder * tf.log(1e-10 + self.output, name="log1")
-                           + (1-self.input_placeholder) * tf.log(1e-10 + (1 - self.output), name="log2"),
+            -tf.reduce_sum(self.input_placeholder * tf.log(TINY + self.output, name="log1")
+                           + (1-self.input_placeholder) * tf.log(TINY + (1 - self.output), name="log2"),
                            list(range(1,len(self.MP.INPUT_SHAPE)+1)))
       with tf.name_scope('LatentLoss') as sub_scope:
         # Kullback Leibler divergence between latent normal distribution and ideal.
@@ -195,9 +197,9 @@ class Autoencoder(object):
                                                               reuse=True, activation=tf.nn.sigmoid)
       # Loss
       with tf.name_scope('Adversarial_Loss') as scope:
-        self.discriminator_loss = tf.reduce_mean(0.5 * -tf.log(self.discriminator_output_real + 1e-10) +
-                                                 0.5 * -tf.log(1.0 - self.discriminator_output_fake + 1e-10))
-        self.generator_loss = tf.reduce_mean(-tf.log(self.discriminator_output_fake + 1e-10))
+        self.discriminator_loss = tf.reduce_mean(0.5 * -tf.log(self.discriminator_output_real + TINY) +
+                                                 0.5 * -tf.log((1.0 - self.discriminator_output_fake) + TINY))
+        self.generator_loss = tf.reduce_mean(-tf.log(self.discriminator_output_fake + TINY))
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss', self.generator_loss)
             tf.summary.scalar('discriminator_loss', self.discriminator_loss)
