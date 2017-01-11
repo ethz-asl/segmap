@@ -199,7 +199,7 @@ class Autoencoder(object):
       # Loss
       with tf.name_scope('Adversarial_Loss') as scope:
         self.discriminator_loss = tf.reduce_mean(0.5 * -tf.log(self.discriminator_output_real + TINY) +
-                                                 0.5 * -tf.log((1.0 - self.discriminator_output_fake) + TINY))
+                                                 0.5 * -tf.log(tf.maximum((1.0 - self.discriminator_output_fake), 0.) + TINY, name="logDfake"))
         self.generator_loss = tf.reduce_mean(-tf.log(self.discriminator_output_fake + TINY))
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss', self.generator_loss)
