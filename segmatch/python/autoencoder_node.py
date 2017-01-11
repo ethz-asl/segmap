@@ -248,6 +248,7 @@ if RESTORE_MODEL:
     print(MP.CONVOLUTION_LAYERS)
   except Exception as err:
     print("Could not load model: ", end="")
+    print(err)
     try:
       stored_MP = pickle.load(open(SAVE_DIR+MP_FILENAME, 'rb'))
       print("ERROR: mismatch between model params.")
