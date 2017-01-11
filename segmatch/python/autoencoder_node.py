@@ -574,7 +574,7 @@ if not RUN_AS_PY_SCRIPT:
 
 # In[ ]:
 
-RC_CONFIDENCE = 0.2
+RC_CONFIDENCE = 0.1
 ONEVIEW = True
 
 
@@ -598,6 +598,38 @@ if not RUN_AS_PY_SCRIPT:
     one_to_one_matches = [[id1, id2] for id1, id2 in zip(I_, reconstruction_ids)]
     visuals_of_matches(one_to_one_matches, S_+reconstruction, I_+reconstruction_ids, directory=dir_, oneview=ONEVIEW)
     clear_output()
+
+
+# In[ ]:
+
+# Exploring influence of first dimension on generated segments
+dim_ = 0
+if CREATE_VISUALS:
+  # Use a pre-existing segment as starting point
+  dir_ = "/tmp/online_matcher/visuals/gen_rotations/"
+  class_name = "car"
+  id_ = np.random.choice([id_ for id_, class_ in zip(ids, classes) if class_ == class_name])
+  class_segments = [np.array(segments)[ids.index(id_)]]
+  from voxelize import voxelize
+  class_segments_vox, class_voxel_scale = voxelize(class_segments, VOXEL_SIDE)
+  code, _ = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in class_segments_vox])
+  code = code[0]
+  
+  values = [code[dim_]] + list(np.linspace(-10.,10.,10))
+  gen_codes = []
+  for value in values:
+    gen_code = code
+    gen_code[dim_] = value
+    gen_codes.append(gen_code)
+  gen_ids = range(len(gen_codes))
+  
+  gen_segments_vox = vae.batch_decode(gen_codes)
+  gen_segments_vox = [np.reshape(vox, [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE]) for vox in gen_segments_vox]
+  from voxelize import unvoxelize
+  gen_segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in gen_segments_vox]
+  from visuals import visuals_of_segments
+  visuals_of_segments(gen_segments, gen_ids, directory=dir_, oneview=ONEVIEW)
+  clear_output()
 
 
 # In[ ]:
