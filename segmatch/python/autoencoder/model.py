@@ -112,7 +112,7 @@ class Autoencoder(object):
     dynamic_batch_size = tf.shape(previous_layer)[0]
     for i, (LAYER, target_output_shape) in enumerate(zip(self.MP.CONVOLUTION_LAYERS[::-1],
                                                          deconv_layers_output_shapes)):
-      previous_layer, previous_layer_shape = build_deconv_layer(LAYER, previous_layer, previous_layer_shape,
+      previous_layer, previous_layer_shape = self.build_deconv_layer(LAYER, previous_layer, previous_layer_shape,
                                                                 target_output_shape, dynamic_batch_size,
                                                                 'DeConvLayer'+str(i), 'DeConvLayer'+str(i)+'Weights', '_deconv_'+str(i))
     # Output (as probability of output being 1)
