@@ -197,6 +197,12 @@ bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented
   }
 }
 
+bool exportSegmentsAndFeatures(const std::string& filename_prefix,
+                               const SegmentedCloud& segmented_cloud) {
+  exportSegments(filename_prefix + "_segments.csv", segmented_cloud);
+  exportFeatures(filename_prefix + "_features.csv", segmented_cloud);
+}
+
 bool exportMatches(const std::string& filename, const UniqueIdMatches& matches) {
   ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;

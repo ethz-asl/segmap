@@ -50,6 +50,8 @@ bool exportSegments(const std::string& filename,
                     const SegmentedCloud& segmented_cloud);
 bool exportFeatures(const std::string& filename,
                     const SegmentedCloud& segmented_cloud);
+bool exportSegmentsAndFeatures(const std::string& filename_prefix,
+                               const SegmentedCloud& segmented_cloud);
 bool exportMatches(const std::string& filename, const UniqueIdMatches& matches);
 
 bool importSegments(const std::string& filename,
