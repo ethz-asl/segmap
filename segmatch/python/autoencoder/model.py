@@ -60,6 +60,7 @@ class Autoencoder(object):
     self.Q_only_variables = []
     self.Q_and_D_variables = []
     self.D_only_variables = []
+    self.zero = tf.constant(0)
     # Graph input
     with tf.name_scope('Placeholders') as scope:
       self.input_placeholder = tf.placeholder(self.MP.FLOAT_TYPE,
@@ -165,7 +166,7 @@ class Autoencoder(object):
           self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss,
                   var_list=self.G_variables+self.Q_only_variables+self.Q_and_D_variables)
         with tf.name_scope('Discriminator_Optimizer') as sub_scope:
-          self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss,
+          self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.discriminator_loss,
                   var_list=self.D_only_variables+self.Q_and_D_variables)
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
@@ -174,6 +175,7 @@ class Autoencoder(object):
     tf.initialize_all_variables().run(session=self.sess)
     # Saver
     self.saver = tf.train.Saver(self.variables)
+    tf.get_default_graph().finalize()
 
 
   def build_adversarial_graph(self):
@@ -407,7 +409,7 @@ class Autoencoder(object):
     if summary_writer is not None: summary_writer.add_summary(summary)
     return np.array(cost)
   def cost_on_single_batch(self, batch_input, adversarial=False, summary_writer=None):
-    return self.train_on_single_batch(batch_input, train_target=tf.constant(0), adversarial=adversarial,
+    return self.train_on_single_batch(batch_input, train_target=self.zero, adversarial=adversarial,
                                       dropout=1.0, summary_writer=summary_writer)
 
   def batch_encode(self, batch_input, batch_size=200, verbose=True):

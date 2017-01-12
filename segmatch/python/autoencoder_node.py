@@ -317,13 +317,11 @@ for step in range(MAX_STEPS):
   if ROTATE_SEGMENTS_EVERY_STEP:
       from voxelize import create_rotations
       offset = np.random.random()*np.pi*2
-      val = create_rotations(val, n_angles=1, offset_by_fraction_of_single_angle=offset)
-      train = create_rotations(train, n_angles=1, offset_by_fraction_of_single_angle=offset)
-      print("Voxelizing training data")
+      val = create_rotations(val, n_angles=1, offset_by_fraction_of_single_angle=offset, silent=True)
+      train = create_rotations(train, n_angles=1, offset_by_fraction_of_single_angle=offset, silent=True)
       from voxelize import voxelize
       train_vox, _ = voxelize(train,VOXEL_SIDE)
       val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
-      print("Done rotating segments.")
   val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
   if np.mod(step, VAL_EVERY_N_STEPS) == 0:
     avg_val_cost = Average()
