@@ -135,6 +135,9 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "-SAVE_DIR":
         SAVE_DIR = argv.pop(0)
         print("SAVE_DIR set to " + SAVE_DIR)
+      elif arg == "-BATCH_SIZE":
+        BATCH_SIZE = int(argv.pop(0))
+        print("BATCH_SIZE set to " + str(BATCH_SIZE))
       elif arg == "--noconv":
         MP.CONVOLUTION_LAYERS = []
         print("CONVOLUTION LAYERS REMOVED")
