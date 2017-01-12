@@ -56,6 +56,10 @@ class Autoencoder(object):
     tf.reset_default_graph()
     preset_batch_size = None
     self.variables = []
+    self.G_variables = []
+    self.Q_only_variables = []
+    self.Q_and_D_variables = []
+    self.D_only_variables = []
     # Graph input
     with tf.name_scope('Placeholders') as scope:
       self.input_placeholder = tf.placeholder(self.MP.FLOAT_TYPE,
@@ -64,7 +68,8 @@ class Autoencoder(object):
       if self.MP.DROPOUT is not None:
         default_dropout = tf.constant(1, dtype=self.MP.FLOAT_TYPE)
         self.dropout_placeholder = tf.placeholder_with_default(default_dropout, (), name="dropout_prob")
-      self.twin_placeholder = None
+      self.stop_gradient_placeholder = tf.placeholder_with_default(tf.constant(False, dtype=tf.bool),
+                                                                    (), name="stop_gradient_at_z")
     # Encoder
     previous_layer = self.input_placeholder
     previous_layer_shape = self.MP.INPUT_SHAPE # Excludes batch dim (which should be at pos 0)
@@ -73,7 +78,8 @@ class Autoencoder(object):
     for i, LAYER in enumerate(self.MP.CONVOLUTION_LAYERS):
       self.conv_layers_input_shapes.append(previous_layer_shape)
       previous_layer, previous_layer_shape = self.build_conv_layer(LAYER, previous_layer, previous_layer_shape,
-                                                                   'ConvLayer'+str(i), 'ConvLayer'+str(i)+'Weights', '_conv_'+str(i))
+                                                                   'ConvLayer'+str(i), 'ConvLayer'+str(i)+'Weights', '_conv_'+str(i),
+                                                                   put_variables_in_list=self.Q_and_D_variables)
     # Flatten output
     self.shape_before_flattening = previous_layer_shape
     previous_layer_shape = [np.prod(previous_layer_shape)]
@@ -81,12 +87,15 @@ class Autoencoder(object):
     # Fully connected Layers
     for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS):
       previous_layer, previous_layer_shape = self.build_FC_layer(LAYER, previous_layer, previous_layer_shape,
-                                                                 'EncoderLayer'+str(i), 'EncoderLayer'+str(i)+'Weights', '_encoder_'+str(i))
+                                                                 'EncoderLayer'+str(i), 'EncoderLayer'+str(i)+'Weights', '_encoder_'+str(i),
+                                                                 put_variables_in_list=self.Q_only_variables)
     # Latent space
     self.z_mean, _ = self.build_FC_layer({'shape': self.MP.LATENT_SHAPE}, previous_layer, previous_layer_shape,
-                                         'ZMeanLayer', 'LatentLayerWeights', '_z_mean', activation=lambda x: x)
+                                         'ZMeanLayer', 'LatentLayerWeights', '_z_mean', activation=lambda x: x,
+                                         put_variables_in_list=self.Q_only_variables)
     self.z_log_sigma_squared, _ = self.build_FC_layer({'shape': self.MP.LATENT_SHAPE}, previous_layer, previous_layer_shape,
-                                                      'ZLogSigmaSquaredLayer', 'LatentLayerWeights', '_z_log_sig2', activation=lambda x: x)
+                                                      'ZLogSigmaSquaredLayer', 'LatentLayerWeights', '_z_log_sig2', activation=lambda x: x,
+                                                      put_variables_in_list=self.Q_only_variables)
     # Sample Z values from Latent-space Estimate
     with tf.name_scope('SampleZValues') as scope:
         # sample = mean + sigma*epsilon
@@ -95,18 +104,23 @@ class Autoencoder(object):
         self.z_sample = tf.add(self.z_mean,
                                tf.mul(tf.sqrt(tf.exp(self.z_log_sigma_squared)), epsilon),
                                name='z_sample')
-    # Decoder
+    # Stop gradients if desired
+    previous_layer = tf.cond(self.stop_gradient_placeholder,
+                             lambda: tf.stop_gradient(self.z_sample),
+                             lambda: self.z_sample)
+    # Decoder (a.k.a Generator)
     # Fully connected layers
-    previous_layer = self.z_sample
+    previous_layer = previous_layer
     previous_layer_shape = self.MP.LATENT_SHAPE
     for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS[::-1]):
       previous_layer, previous_layer_shape = self.build_FC_layer(LAYER, previous_layer, previous_layer_shape,
-                                                                 'DecoderLayer'+str(i), 'DecoderLayer'+str(i)+'Weights', '_decoder_'+str(i))
+                                                                 'DecoderLayer'+str(i), 'DecoderLayer'+str(i)+'Weights', '_decoder_'+str(i),
+                                                                 put_variables_in_list=self.G_variables)
     # Post fully-connected layer
     previous_layer, previous_layer_shape = self.build_FC_layer({'shape': [np.prod(self.shape_before_flattening)]}, 
                                                                previous_layer, previous_layer_shape,
                                                                'Reconstruction', 'ReconstructionLayerWeights', '_reconstruction',
-                                                               activation=tf.nn.sigmoid)
+                                                               activation=tf.nn.sigmoid, put_variables_in_list=self.G_variables)
     # Unflatten output
     previous_layer = tf.reshape(previous_layer, shape=[-1]+self.shape_before_flattening, name="unflatten")
     previous_layer_shape = self.shape_before_flattening
@@ -116,8 +130,9 @@ class Autoencoder(object):
     for i, (LAYER, target_output_shape) in enumerate(zip(self.MP.CONVOLUTION_LAYERS[::-1],
                                                          deconv_layers_output_shapes)):
       previous_layer, previous_layer_shape = self.build_deconv_layer(LAYER, previous_layer, previous_layer_shape,
-                                                                target_output_shape, dynamic_batch_size,
-                                                                'DeConvLayer'+str(i), 'DeConvLayer'+str(i)+'Weights', '_deconv_'+str(i))
+                                                                     target_output_shape, dynamic_batch_size,
+                                                                     'DeConvLayer'+str(i), 'DeConvLayer'+str(i)+'Weights', '_deconv_'+str(i),
+                                                                     put_variables_in_list=self.G_variables)
     # Output (as probability of output being 1)
     self.output = tf.minimum(previous_layer, 1)
     # Loss
@@ -144,6 +159,14 @@ class Autoencoder(object):
     # Extra graph
     if adversarial: self.build_adversarial_graph()
     if mutual_info: self.build_mutual_info_graph()
+    if adversarial:
+      with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
+        with tf.name_scope('Generator_Optimizer') as sub_scope:
+          self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss,
+                  var_list=self.G_variables+self.Q_only_variables+self.Q_and_D_variables)
+        with tf.name_scope('Discriminator_Optimizer') as sub_scope:
+          self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss,
+                  var_list=self.D_only_variables+self.Q_and_D_variables)
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
     self.sess = tf.Session()
@@ -171,11 +194,12 @@ class Autoencoder(object):
       for i, LAYER in enumerate(self.MP.HIDDEN_LAYERS):
         previous_layer, previous_layer_shape = self.build_FC_layer(LAYER, previous_layer, previous_layer_shape,
                                                                    'Discriminator_EncoderLayer'+str(i), 'DiscriminatorFCLayer'+str(i)+'Weights', '_discriminator_fc_'+str(i),
-                                                                   reuse=False)
+                                                                   reuse=False, put_variables_in_list=self.D_only_variables)
       # Latent space
       self.discriminator_output_real, _ = self.build_FC_layer({'shape': [1]}, previous_layer, previous_layer_shape,
                                                               'Discriminator_output', 'DiscriminatorOutputWeights',
-                                                              reuse=False, activation=tf.nn.sigmoid)
+                                                              reuse=False, activation=tf.nn.sigmoid,
+                                                              put_variables_in_list=self.D_only_variables)
       ## Apply Discriminator to generator output
       previous_layer = self.output
       previous_layer_shape = self.MP.INPUT_SHAPE
@@ -204,12 +228,6 @@ class Autoencoder(object):
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss', self.generator_loss)
             tf.summary.scalar('discriminator_loss', self.discriminator_loss)
-      # Optimizer (ADAM)
-      with tf.name_scope('Adversarial_Optimizers') as scope:
-        with tf.name_scope('Generator_Optimizer') as sub_scope:
-          self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
-        with tf.name_scope('Discriminator_Optimizer') as sub_scope:
-          self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
 
   def build_mutual_info_graph(self):
     print("Building mutual information graph.")
@@ -253,9 +271,6 @@ class Autoencoder(object):
             tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
             tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
             tf.summary.scalar('MI_loss', self.mutual_information_loss)
-      with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
-        self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss)
-        self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE*0.1).minimize(self.discriminator_loss)
 
   def variable_summaries(self, var):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
@@ -270,7 +285,8 @@ class Autoencoder(object):
         tf.summary.scalar('min', tf.reduce_min(var))
         tf.summary.histogram('histogram', var)
 
-  def build_conv_layer(self, LAYER, previous_layer, previous_layer_shape, scope_name, varscope_name, var_suffix='', reuse=False):
+  def build_conv_layer(self, LAYER, previous_layer, previous_layer_shape, scope_name, varscope_name,
+                       var_suffix='', reuse=False, put_variables_in_list=None):
     with tf.name_scope(scope_name) as scope:
       filter_shape = LAYER['filter']
       stride = LAYER['stride'] if 'stride' in LAYER else 1
@@ -286,6 +302,9 @@ class Autoencoder(object):
       if not reuse:
         self.variables.append(weights)
         self.variables.append(biases)
+        if put_variables_in_list is not None: 
+            put_variables_in_list.append(weights)
+            put_variables_in_list.append(biases)
       layer_output = tf.nn.conv3d(previous_layer, weights, strides, padding)
       layer_output = tf.nn.bias_add(layer_output, biases)
       layer_shape = previous_layer_shape[:]
@@ -308,7 +327,7 @@ class Autoencoder(object):
     return layer_output, layer_shape
 
   def build_FC_layer(self, LAYER, previous_layer, previous_layer_shape, scope_name, varscope_name, var_suffix='',
-                     reuse=False, activation=tf.nn.softplus):
+                     reuse=False, activation=tf.nn.softplus, put_variables_in_list=None):
     with tf.name_scope(scope_name) as scope:
       layer_shape = LAYER['shape']
       with tf.variable_scope(varscope_name, reuse=reuse) as varscope:
@@ -321,6 +340,9 @@ class Autoencoder(object):
       if not reuse:
         self.variables.append(weights)
         self.variables.append(biases)
+        if put_variables_in_list is not None: 
+            put_variables_in_list.append(weights)
+            put_variables_in_list.append(biases)
         self.variable_summaries(weights)
       layer_output = tf.add(n_dimensional_weightmul(previous_layer,
                                                     weights,
@@ -332,7 +354,7 @@ class Autoencoder(object):
     return layer_output, layer_shape
 
   def build_deconv_layer(self, LAYER, previous_layer, previous_layer_shape, target_output_shape, dynamic_batch_size,
-                         scope_name, varscope_name, var_suffix='', reuse=False):
+                         scope_name, varscope_name, var_suffix='', reuse=False, put_variables_in_list=None):
     with tf.name_scope(scope_name) as scope:
       filter_shape = LAYER['filter'][:]
       stride = LAYER['downsampling']['k'] if 'downsampling' in LAYER else 1
@@ -348,6 +370,9 @@ class Autoencoder(object):
       if not reuse:
         self.variables.append(weights)
         self.variables.append(biases)
+        if put_variables_in_list is not None: 
+            put_variables_in_list.append(weights)
+            put_variables_in_list.append(biases)
       output_shape=[dynamic_batch_size]+target_output_shape
       layer_output = tf.nn.conv3d_transpose(previous_layer, weights, output_shape=output_shape, strides=strides, padding=padding)
       layer_output = tf.nn.bias_add(layer_output, biases)
@@ -376,6 +401,7 @@ class Autoencoder(object):
     cost = [self.cost]
     if adversarial: cost = cost + [self.generator_loss, self.discriminator_loss]
     opt = train_target if train_target is not None else self.optimizer
+    if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
     # compute
     cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)

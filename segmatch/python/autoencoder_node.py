@@ -90,7 +90,7 @@ RESTORE_MODEL = True
 SAVE_DIR = HOME_DIR + "/Desktop/autoencoder/"
 SAVE_FILE = "model.checkpoint"
 MP_FILENAME = "model_params.pckl"
-TENSORBOARD_DIR = HOME_DIR + "/tensorboard"
+TENSORBOARD_DIR = "/tmp/tf_log"
 SAVE_UNVALIDATED = False
 CREATE_VISUALS = False
 DETAILED_STEP_TIMES = False
@@ -251,14 +251,14 @@ if RESTORE_MODEL:
     print(MP.CONVOLUTION_LAYERS)
   except Exception as err:
     print("Could not load model: ", end="")
-    print(err)
     try:
       stored_MP = pickle.load(open(SAVE_DIR+MP_FILENAME, 'rb'))
+    except FileNotFoundError:
+        print("no model folder.")
+    else:
       print("ERROR: mismatch between model params.")
       print("Stored model: "); print(stored_MP); print("New model: "); print(MP)
       raise err
-    except:
-      print("no model folder.")
 
 
 # ## Create Voxelized Segment Dataset - With Rotated Copies
