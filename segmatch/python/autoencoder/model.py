@@ -7,9 +7,9 @@ class ModelParams:
     self.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,   1,  64], 'downsampling': {'type': 'max_pool3d', 'k': 2}},
                                {'type': 'conv3d', 'filter': [3, 3, 3,  64, 128], 'downsampling': {'type': 'max_pool3d', 'k': 2}},
                                {'type': 'conv3d', 'filter': [3, 3, 3, 128, 256], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
-    self.HIDDEN_LAYERS = [{'shape': [400]}, {'shape': [400]}]
-    self.LATENT_SHAPE = [15]
-    self.COERCED_LATENT_DIMS = 1
+    self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}, {'shape': [400]}]
+    self.LATENT_SHAPE = [100]
+    self.COERCED_LATENT_DIMS = 10
     self.LEARNING_RATE = 0.000001
     self.CLIP_GRADIENTS = 0
     self.DROPOUT = 0.8 # Keep-prob
