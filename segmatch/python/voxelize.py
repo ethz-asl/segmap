@@ -73,3 +73,11 @@ def create_twins(segments):
     twins_a.append(twin_a)
     twins_b.append(twin_b)
   return twins_a, twins_b
+
+def random_rotated(segments, silent=True):
+  angles = np.random.random((len(segments)))
+  rotated_segments = []
+  for offset, segment in zip(angles, segments):
+    rotated_segment = create_rotations([segment], n_angles=1, offset_by_fraction_of_single_angle=offset, silent=silent)[0]
+    rotated_segments.append(rotated_segment)
+  return rotated_segments

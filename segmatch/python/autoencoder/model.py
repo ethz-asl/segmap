@@ -137,21 +137,23 @@ class Autoencoder(object):
     # Output (as probability of output being 1)
     self.output = tf.minimum(previous_layer, 1)
     # Loss
-    with tf.name_scope('Loss') as scope:
+    with tf.name_scope('Losses') as scope:
       with tf.name_scope('ReconstructionLoss') as sub_scope:
         # Cross entropy loss of output probabilities vs. input certainties.
-        reconstruction_loss = \
-            -tf.reduce_sum(self.input_placeholder * tf.log(TINY + self.output, name="log1")
-                           + (1-self.input_placeholder) * tf.log(TINY + (1 - self.output), name="log2"),
-                           list(range(1,len(self.MP.INPUT_SHAPE)+1)))
+        self.reconstruction_loss = \
+            -tf.reduce_mean(self.input_placeholder * tf.log(TINY + self.output, name="log1")
+                           + (1-self.input_placeholder) * tf.log(TINY + (1 - self.output), name="log2"))
       with tf.name_scope('LatentLoss') as sub_scope:
         # Kullback Leibler divergence between latent normal distribution and ideal.
-        latent_loss = -0.5 * tf.reduce_sum(1 + self.z_log_sigma_squared
+        self.latent_loss = -0.5 * tf.reduce_mean(1 + self.z_log_sigma_squared
                                            - tf.square(self.z_mean)
-                                           - tf.exp(self.z_log_sigma_squared),
-                                           list(range(1,len(self.MP.LATENT_SHAPE)+1)))
+                                           - tf.exp(self.z_log_sigma_squared))
       # Average sum of costs over batch.
-      self.cost = tf.reduce_mean(reconstruction_loss + latent_loss, name="cost")
+      self.cost = self.reconstruction_loss + self.latent_loss
+      if not self.MP.DISABLE_SUMMARY:
+          tf.summary.scalar('self.reconstruction_loss', self.reconstruction_loss)
+          tf.summary.scalar('self.latent_loss', self.latent_loss)
+          tf.summary.scalar('autoencoder_loss', self.cost)
     # Optimizer (ADAM)
     with tf.name_scope('Optimizer') as scope:
       self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
@@ -227,9 +229,12 @@ class Autoencoder(object):
         self.discriminator_loss = tf.reduce_mean(0.5 * -tf.log(self.discriminator_output_real + TINY) +
                                                  0.5 * -tf.log(tf.maximum((1.0 - self.discriminator_output_fake), 0.) + TINY, name="logDfake"))
         self.generator_loss = tf.reduce_mean(-tf.log(self.discriminator_output_fake + TINY))
+        self.discriminator_loss_no_MI = self.discriminator_loss * 1.
+        self.generator_loss_no_MI = self.generator_loss * 1.
+    with tf.name_scope('Losses') as meta_scope:
         if not self.MP.DISABLE_SUMMARY:
-            tf.summary.scalar('generator_loss', self.generator_loss)
-            tf.summary.scalar('discriminator_loss', self.discriminator_loss)
+            tf.summary.scalar('generator_loss', self.generator_loss_no_MI)
+            tf.summary.scalar('discriminator_loss', self.discriminator_loss_no_MI)
 
   def build_mutual_info_graph(self):
     print("Building mutual information graph.")
@@ -266,13 +271,14 @@ class Autoencoder(object):
         c_log_sigma_squared_prior = self.z_log_sigma_squared[:,:self.MP.COERCED_LATENT_DIMS]
         log_li_q_c_given_x = gaussian_log_likelihood(c_sample, self.q_z_mean, self.q_z_log_sigma_squared)
         log_li_q_c = gaussian_log_likelihood(c_sample, c_mean_prior, c_log_sigma_squared_prior)
-        self.mutual_information_loss = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
-        self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
-        self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_loss
+        self.mutual_information_est = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
+        self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+        self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+    with tf.name_scope('Losses') as meta_scope:
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
             tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
-            tf.summary.scalar('MI_loss', self.mutual_information_loss)
+            tf.summary.scalar('MI', self.mutual_information_est)
 
   def variable_summaries(self, var):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
@@ -401,7 +407,7 @@ class Autoencoder(object):
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
     # Graph nodes to target
     cost = [self.cost]
-    if adversarial: cost = cost + [self.generator_loss, self.discriminator_loss]
+    if adversarial: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
     if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
     # compute

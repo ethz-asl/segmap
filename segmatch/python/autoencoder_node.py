@@ -315,10 +315,9 @@ except:
 # single step
 for step in range(MAX_STEPS):
   if ROTATE_SEGMENTS_EVERY_STEP:
-      from voxelize import create_rotations
-      offset = np.random.random()*np.pi*2
-      val = create_rotations(val, n_angles=1, offset_by_fraction_of_single_angle=offset, silent=True)
-      train = create_rotations(train, n_angles=1, offset_by_fraction_of_single_angle=offset, silent=True)
+      from voxelize import random_rotated
+      val = random_rotated(val)
+      train = random_rotated(train)
       from voxelize import voxelize
       train_vox, _ = voxelize(train,VOXEL_SIDE)
       val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
