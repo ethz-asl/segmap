@@ -10,7 +10,7 @@ class ModelParams:
     self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}, {'shape': [400]}]
     self.LATENT_SHAPE = [100]
     self.COERCED_LATENT_DIMS = 10
-    self.LEARNING_RATE = 0.000001
+    self.LEARNING_RATE = 0.00001
     self.CLIP_GRADIENTS = 0
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
