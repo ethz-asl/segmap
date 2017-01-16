@@ -11,7 +11,6 @@ class ModelParams:
     self.LATENT_SHAPE = [100]
     self.COERCED_LATENT_DIMS = 10
     self.LEARNING_RATE = 0.00001
-    self.CLIP_GRADIENTS = 0
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
     self.DISABLE_SUMMARY = False
@@ -147,9 +146,9 @@ class Autoencoder(object):
                            + (1-self.input_placeholder) * tf.log(TINY + (1 - self.output), name="log2"))
       with tf.name_scope('LatentLoss') as sub_scope:
         # Kullback Leibler divergence between latent normal distribution and ideal.
-        self.latent_loss = -0.5 * tf.reduce_mean(1 + self.z_log_sigma_squared
-                                           - tf.square(self.z_mean)
-                                           - tf.exp(self.z_log_sigma_squared))
+        self.latent_loss = -0.5 * 0.001 * tf.reduce_mean(1 + self.z_log_sigma_squared
+                                                         - tf.square(self.z_mean)
+                                                         - tf.exp(self.z_log_sigma_squared))
       # Average sum of costs over batch.
       self.cost = self.reconstruction_loss + self.latent_loss
       if not self.MP.DISABLE_SUMMARY:
@@ -159,8 +158,6 @@ class Autoencoder(object):
     # Optimizer (ADAM)
     with tf.name_scope('Optimizer') as scope:
       self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
-      if self.MP.CLIP_GRADIENTS > 0:
-          raise NotImplementedError
     # Extra graph
     if self.MP.ADVERSARIAL: self.build_adversarial_graph()
     if self.MP.MUTUAL_INFO: self.build_mutual_info_graph()
@@ -175,7 +172,7 @@ class Autoencoder(object):
     # Initialize session
     self.catch_nans = tf.add_check_numerics_ops()
     self.sess = tf.Session()
-    self.merged = tf.summary.merge_all() if not self.MP.DISABLE_SUMMARY else tf.constant(0)
+    self.merged = tf.summary.merge_all() if not self.MP.DISABLE_SUMMARY else self.zero
     tf.initialize_all_variables().run(session=self.sess)
     # Saver
     self.saver = tf.train.Saver(self.variables)
@@ -400,7 +397,7 @@ class Autoencoder(object):
   def encode_decode(self, batch_input):
     return self.sess.run(self.output,
                          feed_dict={self.input_placeholder: batch_input})
-  def train_on_single_batch(self, batch_input, train_target=None, adversarial=False, cost_only=False, dropout=None, summary_writer=None):
+  def train_on_single_batch(self, batch_input, train_target=None, cost_only=False, dropout=None, summary_writer=None):
     # feed placeholders
     dict_ = {self.input_placeholder: batch_input}
     if self.MP.DROPOUT is not None:
@@ -409,16 +406,16 @@ class Autoencoder(object):
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
     # Graph nodes to target
     cost = [self.cost]
-    if adversarial: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
+    if self.MP.ADVERSARIAL: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
-    if adversarial:
+    if self.MP.ADVERSARIAL:
       if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
     # compute
     cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)
     return np.array(cost)
-  def cost_on_single_batch(self, batch_input, adversarial=False, summary_writer=None):
-    return self.train_on_single_batch(batch_input, train_target=self.zero, adversarial=adversarial,
+  def cost_on_single_batch(self, batch_input, summary_writer=None):
+    return self.train_on_single_batch(batch_input, train_target=self.zero,
                                       dropout=1.0, summary_writer=summary_writer)
 
   def batch_encode(self, batch_input, batch_size=200, verbose=True):
