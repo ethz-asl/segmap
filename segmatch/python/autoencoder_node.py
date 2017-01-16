@@ -160,6 +160,10 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "--float64":
         MP.FLOAT_TYPE = tf.float64
         print("MP.FLOAT_TYPE set to " + str(MP.FLOAT_TYPE))
+      elif arg == "--not-vegan":
+        ADVERSARIAL = False
+        MUTUAL_INFO = False
+        print("Reverting to variational autoencoder model only.")
       else:
         print("Unknown argument: " + arg)
         raise NotImplementedError
@@ -378,11 +382,15 @@ for step in range(MAX_STEPS):
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
   avg_step_cost = Average()
   training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
-  train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+  if ADVERSARIAL:
+    train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+  else:
+    train_order = [vae.optimizer]
   for train_target in itertools.cycle(train_order):
-    if train_target is vae.discriminator_optimizer:
-      if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
-        continue
+    if ADVERSARIAL:
+      if train_target is vae.discriminator_optimizer:
+        if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
+          continue
     if training_batchmaker.is_depleted():
       break
     else:
