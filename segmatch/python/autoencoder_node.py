@@ -120,6 +120,9 @@ if SET_MARMOT_PARAMS:
 if not RUN_AS_PY_SCRIPT:
     MP.CONVOLUTION_LAYERS = []
     CREATE_VISUALS = True
+    MP.ADVERSARIAL = False
+    MP.MUTUAL_INFO = False
+    MP.LEARNING_RATE = 0.0001
 
 
 # In[ ]:
@@ -331,7 +334,7 @@ for step in range(MAX_STEPS):
         break
       else:
         batch_input_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=MP.ADVERSARIAL, summary_writer=summary_writer)
+        cost_value = vae.cost_on_single_batch(batch_input_values, summary_writer=summary_writer)
         avg_val_cost.add(cost_value)
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
@@ -345,6 +348,32 @@ for step in range(MAX_STEPS):
     
     val_cost_log.append(avg_val_cost.values)
     
+    
+    if PLOTTING_SUPPORT:
+      # Plot a few random samples
+      import matplotlib.pyplot as plt
+      n_samples = 1
+      import random
+      x_samples = random.sample(val_vox, n_samples)
+      x_samples = [np.reshape(sample, MP.INPUT_SHAPE) for sample in x_samples]
+      x_reconstruct = list(vae.encode_decode(x_samples))
+      try:
+        sample_history += x_samples
+        recons_history += x_reconstruct
+      except NameError:
+        sample_history = x_samples
+        recons_history = x_reconstruct
+      for i, (in_, out_) in enumerate(zip(sample_history, recons_history)):
+        plt.figure("reconstruction for step "+str(i), figsize=(8, 4))
+        plt.subplot(2, 1, 1)
+        plt.imshow(in_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+        plt.title("Top: val input - Bottom: Reconstruction")
+        plt.subplot(2, 1, 2)
+        plt.imshow(out_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+        plt.tight_layout()
+        plt.show()
+        plt.gcf().canvas.draw()
+
     # Training Monitor
     if len(val_cost_log) > 1:
         # Save cost log.
@@ -396,7 +425,7 @@ for step in range(MAX_STEPS):
       batch_input_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, adversarial=MP.ADVERSARIAL, summary_writer=summary_writer)
+      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, summary_writer=summary_writer)
       avg_step_cost.add(cost_value)
       t_c = timer()
       if PLOTTING_SUPPORT:
@@ -410,6 +439,12 @@ for step in range(MAX_STEPS):
 
 
 print("Training ended.")
+
+
+# In[ ]:
+
+if CREATE_VISUALS:
+  raise ValueError('Training ended.')
 
 
 # ## Visualize Autoencoder Performance
