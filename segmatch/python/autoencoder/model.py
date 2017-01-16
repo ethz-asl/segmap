@@ -409,7 +409,8 @@ class Autoencoder(object):
     cost = [self.cost]
     if adversarial: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
-    if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
+    if adversarial:
+      if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
     # compute
     cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)
