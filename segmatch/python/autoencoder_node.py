@@ -778,9 +778,9 @@ if PLOTTING_SUPPORT:
     class_confusion = np.array(confusion_nn)[class_indices]
     plt.plot(np.mean(np.exp(class_confusion), axis=0), marker='_', color=color_, label=class_name)
     plt.hlines(np.mean(np.exp(class_confusion)),0,len(class_features[0])-1, linestyle='--', color=color_)
-plt.show()
-plt.legend()
-print("")
+  plt.show()
+  plt.legend()
+  print("")
 
 
 # ## Export Features
