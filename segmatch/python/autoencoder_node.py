@@ -276,13 +276,13 @@ train = segments[split_at:]
 
 # In[ ]:
 
+from voxelize import voxelize
 if not ROTATE_SEGMENTS_EVERY_STEP:
   print("Voxelizing training data")
-  from voxelize import voxelize
   train_vox, _ = voxelize(train,VOXEL_SIDE)
-  val_vox, _   = voxelize(val  ,VOXEL_SIDE)
 
   del train # Save some memory
+val_vox, _   = voxelize(val  ,VOXEL_SIDE)
 
 
 # In[ ]:
@@ -685,15 +685,16 @@ if CREATE_VISUALS:
 # In[ ]:
 
 #Gifs
-id_ = np.random.choice(ids)
-print(id_)
-segment = segments[ids.index(id_)]
-import visuals
-visuals.single_segment_as_gif(segment)
-visuals.single_segment_reconstruction_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_rotations_reconstruction_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_degeneration_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_confidence_as_gif(segment, vae)
+if CREATE_VISUALS:
+    id_ = np.random.choice(ids)
+    print(id_)
+    segment = segments[ids.index(id_)]
+    import visuals
+    visuals.single_segment_as_gif(segment)
+    visuals.single_segment_reconstruction_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_rotations_reconstruction_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_degeneration_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_confidence_as_gif(segment, vae)
 
 
 # ## Class Signatures
