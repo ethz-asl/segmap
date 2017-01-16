@@ -15,6 +15,8 @@ class ModelParams:
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
     self.DISABLE_SUMMARY = False
+    self.ADVERSARIAL = True
+    self.MUTUAL_INFO = True
     self.INFO_REG_COEFF = 0.5
   def __str__(self):
     return str(self.__dict__)
@@ -50,7 +52,7 @@ def gaussian_log_likelihood(sample, mean, log_sigma_squared):
     return tf.reduce_sum(- 0.5 * np.log(2 * np.pi) - tf.log(stddev + TINY) - 0.5 * tf.square(epsilon), reduction_indices=1)
 
 class Autoencoder(object):
-  def __init__(self, model_params, adversarial=False, mutual_info=False):
+  def __init__(self, model_params):
     self.MP = model_params
 
     tf.reset_default_graph()
@@ -160,9 +162,9 @@ class Autoencoder(object):
       if self.MP.CLIP_GRADIENTS > 0:
           raise NotImplementedError
     # Extra graph
-    if adversarial: self.build_adversarial_graph()
-    if mutual_info: self.build_mutual_info_graph()
-    if adversarial:
+    if self.MP.ADVERSARIAL: self.build_adversarial_graph()
+    if self.MP.MUTUAL_INFO: self.build_mutual_info_graph()
+    if self.MP.ADVERSARIAL:
       with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
         with tf.name_scope('Generator_Optimizer') as sub_scope:
           self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss,

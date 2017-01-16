@@ -75,8 +75,6 @@ ROTATION_OFFSET = 0
 VAL_EVERY_N_STEPS = 1
 VAL_STEP_TOLERANCE = 3
 ROTATE_SEGMENTS_EVERY_STEP = True
-ADVERSARIAL = True
-MUTUAL_INFO = True
 G_THRESHOLD = 0.80
 D_THRESHOLD = 0.45
 
@@ -161,8 +159,8 @@ if RUN_AS_PY_SCRIPT:
         MP.FLOAT_TYPE = tf.float64
         print("MP.FLOAT_TYPE set to " + str(MP.FLOAT_TYPE))
       elif arg == "--not-vegan":
-        ADVERSARIAL = False
-        MUTUAL_INFO = False
+        MP.ADVERSARIAL = False
+        MP.MUTUAL_INFO = False
         print("Reverting to variational autoencoder model only.")
       else:
         print("Unknown argument: " + arg)
@@ -238,7 +236,7 @@ if MP.DISABLE_SUMMARY != temp: print("Summary", "enabled" if not MP.DISABLE_SUMM
 
 # In[ ]:
 
-vae = model.Autoencoder(MP, adversarial=ADVERSARIAL, mutual_info=MUTUAL_INFO)
+vae = model.Autoencoder(MP)
 
 
 # In[ ]:
@@ -333,7 +331,7 @@ for step in range(MAX_STEPS):
         break
       else:
         batch_input_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=ADVERSARIAL, summary_writer=summary_writer)
+        cost_value = vae.cost_on_single_batch(batch_input_values, adversarial=MP.ADVERSARIAL, summary_writer=summary_writer)
         avg_val_cost.add(cost_value)
         if PLOTTING_SUPPORT:
           progress_bar(val_batchmaker)
@@ -382,12 +380,12 @@ for step in range(MAX_STEPS):
   step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
   avg_step_cost = Average()
   training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
-  if ADVERSARIAL:
+  if MP.ADVERSARIAL:
     train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
   else:
     train_order = [vae.optimizer]
   for train_target in itertools.cycle(train_order):
-    if ADVERSARIAL:
+    if MP.ADVERSARIAL:
       if train_target is vae.discriminator_optimizer:
         if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
           continue
@@ -398,7 +396,7 @@ for step in range(MAX_STEPS):
       batch_input_values = training_batchmaker.next_batch()
       t_b = timer()
       # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, adversarial=ADVERSARIAL, summary_writer=summary_writer)
+      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, adversarial=MP.ADVERSARIAL, summary_writer=summary_writer)
       avg_step_cost.add(cost_value)
       t_c = timer()
       if PLOTTING_SUPPORT:
