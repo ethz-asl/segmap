@@ -111,6 +111,7 @@ if SET_MARMOT_PARAMS:
     DATA_DIR = "/home/daniel/database/"
     RUN_NAME = "kitti18-20-27"
     SAVE_DIR = "/home/daniel/autoencoder-marmot/"
+    SAVE_UNVALIDATED = True
     TENSORBOARD_DIR = None
     CREATE_VISUALS = False
     
@@ -120,8 +121,6 @@ if SET_MARMOT_PARAMS:
 if not RUN_AS_PY_SCRIPT:
     MP.CONVOLUTION_LAYERS = []
     CREATE_VISUALS = True
-    MP.ADVERSARIAL = False
-    MP.MUTUAL_INFO = False
     MP.LEARNING_RATE = 0.0001
 
 
@@ -173,9 +172,6 @@ if RUN_AS_PY_SCRIPT:
 # In[ ]:
 
 SAVE_PATH = SAVE_DIR+SAVE_FILE
-if SAVE_UNVALIDATED:
-  SAVE_DIR_NOVAL = SAVE_DIR+"unvalidated/"
-  SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
 
 
 # ## Load Segments and Features
@@ -318,127 +314,137 @@ except:
     val_cost_log = []
     
 # single step
-for step in range(MAX_STEPS):
-  if ROTATE_SEGMENTS_EVERY_STEP:
-      from voxelize import random_rotated
-      val = random_rotated(val)
-      train = random_rotated(train)
-      from voxelize import voxelize
-      train_vox, _ = voxelize(train,VOXEL_SIDE)
-      val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
-  val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
-  if np.mod(step, VAL_EVERY_N_STEPS) == 0:
-    avg_val_cost = Average()
-    while True:
-      if val_batchmaker.is_depleted():
-        break
-      else:
-        batch_input_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, summary_writer=summary_writer)
-        avg_val_cost.add(cost_value)
+try:
+    for step in range(MAX_STEPS):
+      if ROTATE_SEGMENTS_EVERY_STEP:
+          from voxelize import random_rotated
+          val = random_rotated(val)
+          train = random_rotated(train)
+          from voxelize import voxelize
+          train_vox, _ = voxelize(train,VOXEL_SIDE)
+          val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
+      val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
+      if np.mod(step, VAL_EVERY_N_STEPS) == 0:
+        avg_val_cost = Average()
+        while True:
+          if val_batchmaker.is_depleted():
+            break
+          else:
+            batch_input_values = val_batchmaker.next_batch()
+            cost_value = vae.cost_on_single_batch(batch_input_values, summary_writer=summary_writer)
+            avg_val_cost.add(cost_value)
+            if PLOTTING_SUPPORT:
+              progress_bar(val_batchmaker)
+        print("Validation cost: "+str(avg_val_cost)+"  (Training cost: "+str(avg_step_cost)+")", end="")
+        try:
+          print(" Step Time: " + str(step_end-step_start))
+          if DETAILED_STEP_TIMES:
+            print(step_times)
+        except: 
+            print(" ")
+
+        val_cost_log.append(avg_val_cost.values)
+
+
         if PLOTTING_SUPPORT:
-          progress_bar(val_batchmaker)
-    print("Validation cost: "+str(avg_val_cost)+"  (Training cost: "+str(avg_step_cost)+")", end="")
-    try:
-      print(" Step Time: " + str(step_end-step_start))
-      if DETAILED_STEP_TIMES:
-        print(step_times)
-    except: 
-        print(" ")
-    
-    val_cost_log.append(avg_val_cost.values)
-    
-    
-    if PLOTTING_SUPPORT:
-      # Plot a few random samples
-      import matplotlib.pyplot as plt
-      n_samples = 1
-      import random
-      x_samples = random.sample(val_vox, n_samples)
-      x_samples = [np.reshape(sample, MP.INPUT_SHAPE) for sample in x_samples]
-      x_reconstruct = list(vae.encode_decode(x_samples))
-      try:
-        sample_history += x_samples
-        recons_history += x_reconstruct
-      except NameError:
-        sample_history = x_samples
-        recons_history = x_reconstruct
-      for i, (in_, out_) in enumerate(zip(sample_history, recons_history)):
-        plt.figure("reconstruction for step "+str(i), figsize=(8, 4))
-        plt.subplot(2, 1, 1)
-        plt.imshow(in_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
-        plt.title("Top: val input - Bottom: Reconstruction")
-        plt.subplot(2, 1, 2)
-        plt.imshow(out_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
-        plt.tight_layout()
-        plt.show()
-        plt.gcf().canvas.draw()
+          # Plot a few random samples
+          import matplotlib.pyplot as plt
+          n_samples = 1
+          import random
+          x_samples = random.sample(val_vox, n_samples)
+          x_samples = [np.reshape(sample, MP.INPUT_SHAPE) for sample in x_samples]
+          x_reconstruct = list(vae.encode_decode(x_samples))
+          try:
+            sample_history += x_samples
+            recons_history += x_reconstruct
+          except NameError:
+            sample_history = x_samples
+            recons_history = x_reconstruct
+          for i, (in_, out_) in enumerate(zip(sample_history, recons_history)):
+            plt.figure("reconstruction for step "+str(i), figsize=(8, 4))
+            plt.subplot(2, 1, 1)
+            plt.imshow(in_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+            plt.title("Top: val input - Bottom: Reconstruction")
+            plt.subplot(2, 1, 2)
+            plt.imshow(out_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+            plt.tight_layout()
+            plt.show()
+            plt.gcf().canvas.draw()
 
-    # Training Monitor
-    if len(val_cost_log) > 1:
-        # Save cost log.
-        import os
-        if not os.path.exists(SAVE_DIR):
-            os.makedirs(SAVE_DIR)
-            if SAVE_UNVALIDATED: os.makedirs(SAVE_DIR_NOVAL)
-            print("Created directory: %s" % SAVE_DIR)
-            with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
-              pickle.dump(MP, file, protocol=2)
-        np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
-        # Save if cost has improved. Otherwise increment counter.
-        if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0)).any():
-            val_steps_since_last_improvement = 0
-            # save model to disk
-            print("Saving ... ", end='')
-            save_path = vae.saver.save(vae.sess, SAVE_PATH)
-            print("Model saved in file: %s" % save_path)      
+        # Training Monitor
+        if len(val_cost_log) > 1:
+            # Save cost log.
+            import os
+            if not os.path.exists(SAVE_DIR):
+                os.makedirs(SAVE_DIR)
+                if SAVE_UNVALIDATED: os.makedirs(SAVE_DIR_NOVAL)
+                print("Created directory: %s" % SAVE_DIR)
+                with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
+                  pickle.dump(MP, file, protocol=2)
+            np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
+            # Save if cost has improved. Otherwise increment counter.
+            if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0)).any():
+                val_steps_since_last_improvement = 0
+                # save model to disk
+                print("Saving ... ", end='')
+                save_path = vae.saver.save(vae.sess, SAVE_PATH)
+                print("Model saved in file: %s" % save_path)      
+            else:
+                val_steps_since_last_improvement += 1  
+        # Stop training if val_cost hasn't improved in VAL_STEP_TOLERANCE steps
+        if val_steps_since_last_improvement > VAL_STEP_TOLERANCE:
+            if SAVE_UNVALIDATED:
+                print("Saving ... ", end='')
+                save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
+                print("Unvalidated model saved in file: %s" % save_path)
+            print("Training stopped by validation monitor.")
+            break
+
+      # Train on batches
+      step_start = timer()
+      zero = timer() - timer()
+      step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
+      avg_step_cost = Average()
+      training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
+      if MP.ADVERSARIAL:
+        train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+      else:
+        train_order = [vae.optimizer]
+      for train_target in itertools.cycle(train_order):
+        if MP.ADVERSARIAL:
+          if train_target is vae.discriminator_optimizer:
+            if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
+              continue
+        if training_batchmaker.is_depleted():
+          break
         else:
-            val_steps_since_last_improvement += 1  
-    # Stop training if val_cost hasn't improved in VAL_STEP_TOLERANCE steps
-    if val_steps_since_last_improvement > VAL_STEP_TOLERANCE:
-        if SAVE_UNVALIDATED:
-            print("Saving ... ", end='')
-            save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
-            print("Unvalidated model saved in file: %s" % save_path)
-        print("Training stopped by validation monitor.")
-        break
-            
-  # Train on batches
-  step_start = timer()
-  zero = timer() - timer()
-  step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
-  avg_step_cost = Average()
-  training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
-  if MP.ADVERSARIAL:
-    train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
-  else:
-    train_order = [vae.optimizer]
-  for train_target in itertools.cycle(train_order):
-    if MP.ADVERSARIAL:
-      if train_target is vae.discriminator_optimizer:
-        if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
-          continue
-    if training_batchmaker.is_depleted():
-      break
-    else:
-      t_a = timer()  
-      batch_input_values = training_batchmaker.next_batch()
-      t_b = timer()
-      # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, summary_writer=summary_writer)
-      avg_step_cost.add(cost_value)
-      t_c = timer()
-      if PLOTTING_SUPPORT:
-        progress_bar(training_batchmaker)
-      t_d = timer()
-      step_times['batchmaking'] += t_b - t_a
-      step_times['training']    += t_c - t_b
-      step_times['plotting']    += t_d - t_c
-  step_cost_log.append(avg_step_cost.values)
-  step_end = timer()
-
-
-print("Training ended.")
+          t_a = timer()  
+          batch_input_values = training_batchmaker.next_batch()
+          t_b = timer()
+          # Train over 1 batch.
+          cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, summary_writer=summary_writer)
+          avg_step_cost.add(cost_value)
+          t_c = timer()
+          if PLOTTING_SUPPORT:
+            progress_bar(training_batchmaker)
+          t_d = timer()
+          step_times['batchmaking'] += t_b - t_a
+          step_times['training']    += t_c - t_b
+          step_times['plotting']    += t_d - t_c
+      step_cost_log.append(avg_step_cost.values)
+      step_end = timer()
+except KeyboardInterrupt:
+    print("Training interrupted.")
+else:
+    print("Training ended.")
+    
+if SAVE_UNVALIDATED:
+    SAVE_DIR_NOVAL = SAVE_DIR+"unvalidated/"
+    SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
+    os.makedirs(SAVE_DIR_NOVAL)
+    print("Saving ... ", end='')
+    save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
+    print("Unvalidated model saved in file: %s" % save_path)
 
 
 # In[ ]:
