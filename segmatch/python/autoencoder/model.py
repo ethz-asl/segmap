@@ -151,16 +151,17 @@ class Autoencoder(object):
                                                          - tf.exp(self.z_log_sigma_squared))
       # Average sum of costs over batch.
       self.cost = self.reconstruction_loss + self.latent_loss
+      self.cost_no_MI = self.cost * 1.0
       if not self.MP.DISABLE_SUMMARY:
           tf.summary.scalar('self.reconstruction_loss', self.reconstruction_loss)
           tf.summary.scalar('self.latent_loss', self.latent_loss)
-          tf.summary.scalar('autoencoder_loss', self.cost)
-    # Optimizer (ADAM)
-    with tf.name_scope('Optimizer') as scope:
-      self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
+          tf.summary.scalar('autoencoder_loss', self.cost_no_MI)
     # Extra graph
     if self.MP.ADVERSARIAL: self.build_adversarial_graph()
     if self.MP.MUTUAL_INFO: self.build_mutual_info_graph()
+    # Optimizers (ADAM)
+    with tf.name_scope('Optimizer') as scope:
+      self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
     if self.MP.ADVERSARIAL:
       with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
         with tf.name_scope('Generator_Optimizer') as sub_scope:
@@ -273,10 +274,12 @@ class Autoencoder(object):
         self.mutual_information_est = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
         self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
         self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+        self.cost -= self.MP.INFO_REG_COEFF * self.mutual_information_est
     with tf.name_scope('Losses') as meta_scope:
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
             tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
+            tf.summary.scalar('autoencoder_loss_with_MI', self.cost)
             tf.summary.scalar('MI', self.mutual_information_est)
 
   def variable_summaries(self, var):
