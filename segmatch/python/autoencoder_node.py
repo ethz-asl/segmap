@@ -382,7 +382,7 @@ try:
                   pickle.dump(MP, file, protocol=2)
             np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
             # Save if cost has improved. Otherwise increment counter.
-            if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0)).any():
+            if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0))[0]:
                 val_steps_since_last_improvement = 0
                 # save model to disk
                 print("Saving ... ", end='')

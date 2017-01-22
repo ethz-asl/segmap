@@ -408,7 +408,7 @@ class Autoencoder(object):
     else:
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
     # Graph nodes to target
-    cost = [self.cost]
+    cost = [self.cost_no_MI]
     if self.MP.ADVERSARIAL: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
     if self.MP.ADVERSARIAL:
