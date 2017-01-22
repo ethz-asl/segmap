@@ -377,7 +377,6 @@ try:
             import os
             if not os.path.exists(SAVE_DIR):
                 os.makedirs(SAVE_DIR)
-                if SAVE_UNVALIDATED: os.makedirs(SAVE_DIR_NOVAL)
                 print("Created directory: %s" % SAVE_DIR)
                 with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
                   pickle.dump(MP, file, protocol=2)
