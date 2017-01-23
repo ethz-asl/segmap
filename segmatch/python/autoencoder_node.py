@@ -393,10 +393,6 @@ try:
                 val_steps_since_last_improvement += 1  
         # Stop training if val_cost hasn't improved in VAL_STEP_TOLERANCE steps
         if val_steps_since_last_improvement > VAL_STEP_TOLERANCE:
-            if SAVE_UNVALIDATED:
-                print("Saving ... ", end='')
-                save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
-                print("Unvalidated model saved in file: %s" % save_path)
             print("Training stopped by validation monitor.")
             break
 
