@@ -81,3 +81,33 @@ def random_rotated(segments, silent=True):
     rotated_segment = create_rotations([segment], n_angles=1, offset_by_fraction_of_single_angle=offset, silent=silent)[0]
     rotated_segments.append(rotated_segment)
   return rotated_segments
+
+def align(segments, precision=10):
+    """ segments is a list of segment, each segment being a list of 3d points
+        precision corresponds to the precision of alignment, measured in fractions of a quarter rotation"""
+    aligned_segments = []
+    longest_directions = []
+    for segment in segments:
+        if len(segment) < 2: 
+            aligned_segments.append(segment)
+            longest_directions.append(0)
+            continue
+        ## find the rotation of the segment which leads to the bounding box with largest aspect ratio
+        best_aspect_ratio = 0
+        angles = np.linspace(0, np.pi/2., precision)
+        for angle in angles:
+            rotated = create_rotations([segment], 1, angle, silent=True)[0]
+            x = rotated[:,0]
+            dx = max(x) - min(x)
+            y = rotated[:,1]
+            dy = max(y) - min(y)
+            assert dx > 0 and dy > 0
+            horizontal = dx > dy
+            lrg = max((dx,dy))
+            sml = min((dx,dy))
+            if lrg/sml > best_aspect_ratio:
+                best_angle = angle if horizontal else angle + np.pi/2
+        aligned_segments.append(create_rotations([segment], 1, best_angle, silent=True)[0])
+        longest_directions.append(best_angle)
+    return aligned_segments, longest_directions
+
