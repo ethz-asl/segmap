@@ -8,8 +8,8 @@ class ModelParams:
                                {'type': 'conv3d', 'filter': [3, 3, 3,  64, 128], 'downsampling': {'type': 'max_pool3d', 'k': 2}},
                                {'type': 'conv3d', 'filter': [3, 3, 3, 128, 256], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
     self.HIDDEN_LAYERS = [{'shape': [1000]}, {'shape': [600]}, {'shape': [400]}]
-    self.LATENT_SHAPE = [100]
-    self.COERCED_LATENT_DIMS = 10
+    self.LATENT_SHAPE = [15]
+    self.COERCED_LATENT_DIMS = 5
     self.LEARNING_RATE = 0.00001
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
@@ -151,19 +151,20 @@ class Autoencoder(object):
                                                          - tf.exp(self.z_log_sigma_squared))
       # Average sum of costs over batch.
       self.cost = self.reconstruction_loss + self.latent_loss
-      self.cost_no_MI = self.cost * 1.0
       if not self.MP.DISABLE_SUMMARY:
           tf.summary.scalar('self.reconstruction_loss', self.reconstruction_loss)
           tf.summary.scalar('self.latent_loss', self.latent_loss)
-          tf.summary.scalar('autoencoder_loss', self.cost_no_MI)
+          tf.summary.scalar('autoencoder_loss', self.cost)
     # Extra graph
     if self.MP.ADVERSARIAL: self.build_adversarial_graph()
     if self.MP.MUTUAL_INFO: self.build_mutual_info_graph()
     # Optimizers (ADAM)
     with tf.name_scope('Optimizer') as scope:
       self.optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost)
+      if self.MP.MUTUAL_INFO:
+          self.optimizer_with_MI = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.cost_with_MI)
     if self.MP.ADVERSARIAL:
-      with tf.name_scope('Adversarial_Optimizers_With_MI') as scope:
+      with tf.name_scope('Adversarial_Optimizers') as scope:
         with tf.name_scope('Generator_Optimizer') as sub_scope:
           self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.MP.LEARNING_RATE).minimize(self.generator_loss,
                   var_list=self.G_variables+self.Q_only_variables+self.Q_and_D_variables)
@@ -274,12 +275,12 @@ class Autoencoder(object):
         self.mutual_information_est = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
         self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
         self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
-        self.cost -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+        self.cost_with_MI = self.cost - 0.01 * self.MP.INFO_REG_COEFF * self.mutual_information_est
     with tf.name_scope('Losses') as meta_scope:
         if not self.MP.DISABLE_SUMMARY:
             tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
             tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
-            tf.summary.scalar('autoencoder_loss_with_MI', self.cost)
+            tf.summary.scalar('autoencoder_loss_with_MI', self.cost_with_MI)
             tf.summary.scalar('MI', self.mutual_information_est)
 
   def variable_summaries(self, var):
@@ -408,11 +409,11 @@ class Autoencoder(object):
     else:
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
     # Graph nodes to target
-    cost = [self.cost_no_MI]
+    cost = [self.cost]
     if self.MP.ADVERSARIAL: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
     if self.MP.ADVERSARIAL:
-      if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
+      if opt is self.discriminator_optimizer or opt is self.generator_optimizer or opt is self.optimizer_with_MI: dict_[self.stop_gradient_placeholder] = True
     # compute
     cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)
