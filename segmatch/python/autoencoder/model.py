@@ -410,10 +410,13 @@ class Autoencoder(object):
       if dropout is not None: raise ValueError('This model does not implement dropout yet a value was specified')
     # Graph nodes to target
     cost = [self.cost]
-    if self.MP.ADVERSARIAL: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI, self.mutual_information_est]
+    if self.MP.ADVERSARIAL: cost = cost + [self.generator_loss_no_MI, self.discriminator_loss_no_MI]
+    if self.MP.MUTUAL_INFO: cost = cost + [self.mutual_information_est]
     opt = train_target if train_target is not None else self.optimizer
     if self.MP.ADVERSARIAL:
-      if opt is self.discriminator_optimizer or opt is self.generator_optimizer or opt is self.optimizer_with_MI: dict_[self.stop_gradient_placeholder] = True
+      if opt is self.discriminator_optimizer or opt is self.generator_optimizer: dict_[self.stop_gradient_placeholder] = True
+    if self.MP.MUTUAL_INFO:
+      if opt is self.optimizer_with_MI: dict_[self.stop_gradient_placeholder] = True
     # compute
     cost, _, _, summary = self.sess.run((cost, opt, self.catch_nans, self.merged), feed_dict=dict_)
     if summary_writer is not None: summary_writer.add_summary(summary)

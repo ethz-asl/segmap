@@ -80,6 +80,7 @@ D_THRESHOLD = 0.45
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
+MP.MUTUAL_INFO = False
 
 HOME_DIR = os.path.expanduser('~')
 DATA_DIR = "./database/"
@@ -89,7 +90,8 @@ SAVE_DIR = HOME_DIR + "/Desktop/autoencoder/"
 SAVE_FILE = "model.checkpoint"
 MP_FILENAME = "model_params.pckl"
 TENSORBOARD_DIR = "/tmp/tf_log"
-SAVE_UNVALIDATED = False
+SAVE_DIR_NOVAL = "/tmp/unvalidated/"
+SAVE_UNVALIDATED = True
 CREATE_VISUALS = False
 DETAILED_STEP_TIMES = False
 
@@ -121,7 +123,6 @@ if SET_MARMOT_PARAMS:
 if not RUN_AS_PY_SCRIPT:
     MP.CONVOLUTION_LAYERS = []
     CREATE_VISUALS = True
-    MP.LEARNING_RATE = 0.0001
 
 
 # In[ ]:
@@ -438,7 +439,6 @@ else:
     print("Training ended.")
     
 if SAVE_UNVALIDATED:
-    SAVE_DIR_NOVAL = SAVE_DIR+"unvalidated/"
     SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
     os.makedirs(SAVE_DIR_NOVAL)
     print("Saving ... ", end='')
