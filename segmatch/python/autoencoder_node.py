@@ -408,6 +408,8 @@ try:
       training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
       if MP.ADVERSARIAL:
         train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+      elif MP.MUTUAL_INFO:
+        train_order = [vae.optimizer, vae.optimizer_with_MI]
       else:
         train_order = [vae.optimizer]
       for train_target in itertools.cycle(train_order):
