@@ -82,7 +82,7 @@ def random_rotated(segments, silent=True):
     rotated_segments.append(rotated_segment)
   return rotated_segments
 
-def align(segments, precision=10):
+def align(segments, precision=12):
     """ segments is a list of segment, each segment being a list of 3d points
         precision corresponds to the precision of alignment, measured in fractions of a quarter rotation"""
     aligned_segments = []
@@ -107,6 +107,17 @@ def align(segments, precision=10):
             sml = min((dx,dy))
             if lrg/sml > best_aspect_ratio:
                 best_angle = angle if horizontal else angle + np.pi/2
+        ## Decide between the two possible angles, by choosing side with most points.
+        rotated = create_rotations([segment], 1, best_angle, silent=True)[0]
+        x = rotated[:,0]
+        y = rotated[:,1]
+        x_bias = 1.*np.sum(x > (min(x)/2. + max(x)/2.))/len(x) - 0.5
+        y_bias = 1.*np.sum(y > (min(y)/2. + max(y)/2.))/len(y) - 0.5
+        if abs(x_bias) > abs(y_bias):
+            best_angle = best_angle if x_bias > 0 else np.mod(best_angle + np.pi, np.pi * 2.)
+        else:
+            best_angle = best_angle if y_bias < 0 else np.mod(best_angle + np.pi, np.pi * 2.)
+
         aligned_segments.append(create_rotations([segment], 1, best_angle, silent=True)[0])
         longest_directions.append(best_angle)
     return aligned_segments, longest_directions
