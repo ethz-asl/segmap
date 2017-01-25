@@ -871,7 +871,7 @@ if EXPORT_FEATURES:
   update_features(fnames_nn, features_nn, updated_fnames, updated_features)
 
   # Scale features
-  sc_fnames = ['x_scale', 'y_scale', 'z_scale']
+  sc_fnames = ['scale_x', 'scale_y', 'scale_z']
   update_features(sc_fnames, features_voxel_scale, updated_fnames, updated_features)
 
 

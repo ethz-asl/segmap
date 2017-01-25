@@ -86,11 +86,11 @@ def align(segments, precision=12):
     """ segments is a list of segment, each segment being a list of 3d points
         precision corresponds to the precision of alignment, measured in fractions of a quarter rotation"""
     aligned_segments = []
-    longest_directions = []
+    alignment_features = []
     for segment in segments:
         if len(segment) < 2: 
             aligned_segments.append(segment)
-            longest_directions.append(0)
+            alignment_features.append(0)
             continue
         ## find the rotation of the segment which leads to the bounding box with largest aspect ratio
         best_aspect_ratio = 0
@@ -119,6 +119,13 @@ def align(segments, precision=12):
             best_angle = best_angle if y_bias < 0 else np.mod(best_angle + np.pi, np.pi * 2.)
 
         aligned_segments.append(create_rotations([segment], 1, best_angle, silent=True)[0])
-        longest_directions.append(best_angle)
-    return aligned_segments, longest_directions
+        alignment_features.append([-best_angle])
+    return aligned_segments, np.array(alignment_features)
+
+def unalign(segments, alignment_features):
+  unaligned_segments = []
+  for alignment_feature, segment in zip(alignment_features, segments):
+    rotated_segment = create_rotations([segment], 1, alignment_feature[0], silent=True)[0]
+    unaligned_segments.append(rotated_segment)
+  return unaligned_segments
 
