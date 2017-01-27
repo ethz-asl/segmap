@@ -48,7 +48,8 @@ Features Features::rotationInvariantFeaturesOnly() const {
     for (size_t j = 0u; j < at(i).size(); j++) {
       if (at(i).at(j).name != "scale_x" &&
           at(i).at(j).name != "scale_y" &&
-          at(i).at(j).name != "scale_z") {
+          at(i).at(j).name != "scale_z" &&
+          at(i).at(j).name != "alignment") {
         feature.push_back(at(i).at(j));
       }
     }

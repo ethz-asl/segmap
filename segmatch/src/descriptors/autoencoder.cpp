@@ -22,8 +22,9 @@ void AutoencoderDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   // TODO: get rid of kDimension.
   const unsigned int scale_feature_dimension = 6u;
+  const unsigned int align_feature_dimension = 1u;
   CHECK(kDimension == params_.autoencoder_latent_space_dimension +
-        scale_feature_dimension) << "kDimension != params.";
+        scale_feature_dimension + align_feature_dimension) << "kDimension != params.";
 
   // Export segmented cloud.
   database::exportSegments(params_.autoencoder_temp_folder_path + kSegmentsFilename,

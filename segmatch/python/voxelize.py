@@ -31,8 +31,9 @@ def voxelize( segments, size ):
 
 def create_rotations(segments, n_angles=10,
                      offset_by_fraction_of_single_angle=0,
+                     offset_in_radians=None,
                      classes=[], silent=False):
-  offset = offset_by_fraction_of_single_angle * (2*np.pi/n_angles)
+  offset = offset_by_fraction_of_single_angle * (2*np.pi/n_angles) if offset_in_radians is None else offset_in_radians
   angles = np.linspace(2*np.pi/n_angles, 2*np.pi, n_angles) - offset
   rotated_segments = []
   rotated_classes = []
@@ -81,3 +82,51 @@ def random_rotated(segments, silent=True):
     rotated_segment = create_rotations([segment], n_angles=1, offset_by_fraction_of_single_angle=offset, silent=silent)[0]
     rotated_segments.append(rotated_segment)
   return rotated_segments
+
+def align(segments, precision=12):
+    """ segments is a list of segment, each segment being a list of 3d points
+        precision corresponds to the precision of alignment, measured in fractions of a quarter rotation"""
+    aligned_segments = []
+    alignment_features = []
+    for segment in segments:
+        if len(segment) < 2: 
+            aligned_segments.append(segment)
+            alignment_features.append(0)
+            continue
+        ## find the rotation of the segment which leads to the bounding box with largest aspect ratio
+        best_aspect_ratio = 0
+        angles = np.linspace(0, np.pi/2., precision)
+        for angle in angles:
+            rotated = create_rotations([segment], 1, offset_in_radians=angle, silent=True)[0]
+            x = rotated[:,0]
+            dx = max(x) - min(x)
+            y = rotated[:,1]
+            dy = max(y) - min(y)
+            assert dx > 0 and dy > 0
+            horizontal = dx > dy
+            lrg = max((dx,dy))
+            sml = min((dx,dy))
+            if lrg/sml > best_aspect_ratio:
+                best_angle = angle if horizontal else angle + np.pi/2
+        ## Decide between the two possible angles, by choosing side with most points.
+        rotated = create_rotations([segment], 1, offset_in_radians=best_angle, silent=True)[0]
+        x = rotated[:,0]
+        y = rotated[:,1]
+        x_bias = 1.*np.sum(x > (min(x)/2. + max(x)/2.))/len(x) - 0.5
+        y_bias = 1.*np.sum(y > (min(y)/2. + max(y)/2.))/len(y) - 0.5
+        if abs(x_bias) > abs(y_bias):
+            best_angle = best_angle if x_bias > 0 else np.mod(best_angle + np.pi, np.pi * 2.)
+        else:
+            best_angle = best_angle if y_bias < 0 else np.mod(best_angle + np.pi, np.pi * 2.)
+
+        aligned_segments.append(create_rotations([segment], 1, offset_in_radians=best_angle, silent=True)[0])
+        alignment_features.append([-best_angle])
+    return aligned_segments, np.array(alignment_features)
+
+def unalign(segments, alignment_features):
+  unaligned_segments = []
+  for alignment_feature, segment in zip(alignment_features, segments):
+    rotated_segment = create_rotations([segment], 1, offset_in_radians=alignment_feature[0], silent=True)[0]
+    unaligned_segments.append(rotated_segment)
+  return unaligned_segments
+

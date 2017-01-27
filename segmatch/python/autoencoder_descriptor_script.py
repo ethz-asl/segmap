@@ -62,13 +62,21 @@ try:
     if PROFILING:
         from timeit import default_timer as timer
         total_start = timer()
+        align_start = timer()
+
+    # Align
+    from voxelize import align
+    segments_aligned, alignment_features = align(segments)
+
+    if PROFILING:
+        align_end = timer()
         vox_start = timer()
 
     # Voxelize
     voxel_side = 24
     voxel_size = voxel_side * voxel_side * voxel_side
     from voxelize import voxelize
-    segments_vox, xyz_scale_features = voxelize(segments,voxel_side)
+    segments_vox, xyz_scale_features = voxelize(segments_aligned,voxel_side)
 
     if PROFILING:
         vox_end = timer()
@@ -81,8 +89,10 @@ try:
     ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
     sc_features = [sorted(xyz_scale) + list(xyz_scale) for xyz_scale in xyz_scale_features]
     sc_fnames = ['scale_sml', 'scale_med', 'scale_lrg', 'scale_x', 'scale_y', 'scale_z']
-    features = [list(ae) + list(sc) for ae, sc in zip(ae_features, sc_features)]
-    fnames = ae_fnames + sc_fnames
+    al_features = alignment_features
+    al_fnames = ['alignment']
+    features = [list(ae) + list(sc) + list(al) for ae, sc, al in zip(ae_features, sc_features, al_features)]
+    fnames = ae_fnames + sc_fnames + al_fnames
 
     if PROFILING:
         predict_end = timer()
@@ -102,6 +112,8 @@ try:
         print("Timings:")
         print("  Total - ", end='')
         print(total_end - total_start)
+        print("  Alignment - ", end='')
+        print(align_end - align_start)
         print("  Voxelization - ", end='')
         print(vox_end - vox_start)
         print("  Predict - ", end='')
