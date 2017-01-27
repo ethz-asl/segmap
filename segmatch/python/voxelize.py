@@ -38,8 +38,8 @@ def create_rotations(segments, n_angles=10,
   rotated_segments = []
   rotated_classes = []
   for th in angles:
-    x2x_y2y = np.array([ np.cos(th), -np.cos(th), 1 ])
-    x2y_y2x = np.array([ np.sin(th),  np.sin(th), 0 ])
+    x2x_y2y = np.array([  np.cos(th), np.cos(th), 1 ])
+    x2y_y2x = np.array([ -np.sin(th), np.sin(th), 0 ])
     rotated_segments = rotated_segments + [(segment*x2x_y2y+segment[:,[1,0,2]]*x2y_y2x)
                                            for segment in segments]
     if classes:
