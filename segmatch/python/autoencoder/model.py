@@ -14,8 +14,8 @@ class ModelParams:
     self.DROPOUT = 0.8 # Keep-prob
     self.FLOAT_TYPE = tf.float32
     self.DISABLE_SUMMARY = False
-    self.ADVERSARIAL = True
-    self.MUTUAL_INFO = True
+    self.ADVERSARIAL = False
+    self.MUTUAL_INFO = False
     self.INFO_REG_COEFF = 0.5
   def __str__(self):
     return str(self.__dict__)

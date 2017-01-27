@@ -80,7 +80,6 @@ D_THRESHOLD = 0.45
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
-MP.MUTUAL_INFO = False
 
 HOME_DIR = os.path.expanduser('~')
 DATA_DIR = "./database/"
@@ -165,6 +164,10 @@ if RUN_AS_PY_SCRIPT:
         MP.ADVERSARIAL = False
         MP.MUTUAL_INFO = False
         print("Reverting to variational autoencoder model only.")
+      elif arg == "--vegan":
+        MP.ADVERSARIAL = True
+        MP.MUTUAL_INFO = True
+        print("Enabling adversarial and mutual info graphs.")
       else:
         print("Unknown argument: " + arg)
         raise NotImplementedError
