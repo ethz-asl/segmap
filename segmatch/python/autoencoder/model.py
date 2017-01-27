@@ -273,13 +273,15 @@ class Autoencoder(object):
         log_li_q_c_given_x = gaussian_log_likelihood(c_sample, self.q_z_mean, self.q_z_log_sigma_squared)
         log_li_q_c = gaussian_log_likelihood(c_sample, c_mean_prior, c_log_sigma_squared_prior)
         self.mutual_information_est = tf.reduce_mean(-log_li_q_c) - tf.reduce_mean(-log_li_q_c_given_x)
-        self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
-        self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+        if self.MP.ADVERSARIAL:
+            self.discriminator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
+            self.generator_loss -= self.MP.INFO_REG_COEFF * self.mutual_information_est
         self.cost_with_MI = self.cost - 0.01 * self.MP.INFO_REG_COEFF * self.mutual_information_est
     with tf.name_scope('Losses') as meta_scope:
         if not self.MP.DISABLE_SUMMARY:
-            tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
-            tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
+            if self.MP.ADVERSARIAL:
+                tf.summary.scalar('generator_loss_with_MI', self.generator_loss)
+                tf.summary.scalar('discriminator_loss_with_MI', self.discriminator_loss)
             tf.summary.scalar('autoencoder_loss_with_MI', self.cost_with_MI)
             tf.summary.scalar('MI', self.mutual_information_est)
 

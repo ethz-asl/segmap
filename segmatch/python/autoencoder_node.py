@@ -438,7 +438,11 @@ else:
     
 if SAVE_UNVALIDATED:
     SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
-    os.makedirs(SAVE_DIR_NOVAL)
+    try: 
+        os.makedirs(SAVE_DIR_NOVAL)
+        print("Directory created", SAVE_DIR_NOVAL)
+    except:
+        print("")
     print("Saving ... ", end='')
     save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
     print("Unvalidated model saved in file: %s" % save_path)
@@ -635,7 +639,7 @@ ONEVIEW = True
 
 # Reconstructions
 if not RUN_AS_PY_SCRIPT:
-  N = 400
+  N = 100
   SV_ = segments_vox[:N]
   S_ = segments[:N]
   I_ = ids[:N]
