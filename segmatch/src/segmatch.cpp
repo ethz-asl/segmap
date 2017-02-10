@@ -192,7 +192,7 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
           if (source_segment.track_id != target_segment.track_id ||
               std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
               std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
-              kMinTimeBetweenSegmentForMatches_ns) {
+              params_.min_time_between_segment_for_matches_ns) {
             time_filtered_cluster.push_back(match);
           }
         }
@@ -489,6 +489,7 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
         &target_segment_ids);
 
     const unsigned int n_nearest_segments = 1u;
+    const laser_slam::Time max_time_diff_ns = 60000000000u;
     if (target_segment_ids.size() > n_nearest_segments) {
       // Set up nearest neighbour search.
       pcl::KdTreeFLANN<PclPoint> kdtree;
@@ -508,8 +509,19 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
           LOG(ERROR) << "Nearest neighbour search failed.";
         }
 
+        // Check if within distance.
         if (nearest_neighbour_squared_distance[0u] <= params_.centroid_distance_threshold_m) {
-          duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
+          Segment older_segment;
+          segmented_target_cloud_.findValidSegmentById(
+              target_segment_ids[nearest_neighbour_indice[0u]], &older_segment);
+          // Do not remove if older segment is from other trajectory.
+          if (older_segment.timestamp_ns == older_segment.timestamp_ns) {
+            // Do not remove if older segment is too old (far from moving window).
+            // CHECK_LT(older_segment.timestamp_ns, it->second.timestamp_ns);
+            if (it->second.timestamp_ns < older_segment.timestamp_ns + max_time_diff_ns) {
+              duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
+            }
+          }
         }
       }
     }

@@ -126,6 +126,11 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
               params.filter_duplicate_segments);
   nh.getParam(ns + "/centroid_distance_threshold_m",
               params.centroid_distance_threshold_m);
+  int min_time_between_segment_for_matches_s;
+  nh.getParam(ns + "/min_time_between_segment_for_matches_s",
+              min_time_between_segment_for_matches_s);
+  params.min_time_between_segment_for_matches_ns =
+      laser_slam::Time(min_time_between_segment_for_matches_s) * 1000000000u;
 
   // Descriptors parameters.
   nh.getParam(ns + "/Descriptors/descriptor_types",

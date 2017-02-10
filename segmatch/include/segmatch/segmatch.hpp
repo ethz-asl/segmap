@@ -26,6 +26,7 @@ struct SegMatchParams {
   double boundary_radius_m;
   bool filter_duplicate_segments;
   double centroid_distance_threshold_m;
+  laser_slam::Time min_time_between_segment_for_matches_ns;
 
   DescriptorsParameters descriptors_params;
   SegmenterParameters segmenter_params;
@@ -166,8 +167,6 @@ class SegMatch {
   // Filtering parameters.
   static constexpr double kCylinderHeight_m = 40;
   static constexpr unsigned int kMaxNumberOfCloudToTransfer = 1u;
-
-  static constexpr laser_slam::Time kMinTimeBetweenSegmentForMatches_ns = 20000000000u;
 
   static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 20000000000u;
 

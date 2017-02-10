@@ -50,6 +50,7 @@ LaserMapper: {
     boundary_radius_m: 59.0,
     filter_duplicate_segments: true,
     centroid_distance_threshold_m: 2.0,
+    min_time_between_segment_for_matches_s: 0,
 
     Segmenters: {
       segmenter_type: "EuclideanSegmenter", #RegionGrowingSegmenter
