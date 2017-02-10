@@ -142,6 +142,8 @@ class SegMatch {
 
   laser_slam::Time findTimeOfClosestSegmentationPose(const segmatch::Segment& segment) const;
 
+  void filterDuplicatesAfterLoopClosure();
+
   SegMatchParams params_;
 
   std::unique_ptr<Segmenter> segmenter_;
