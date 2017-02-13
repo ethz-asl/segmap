@@ -568,6 +568,7 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
 }
 
 void SegMatch::getLastTransform(Eigen::Matrix4d* out) const {
+  CHECK_NOTNULL(out);
   *out = last_transformation_.cast<double>();
 }
 

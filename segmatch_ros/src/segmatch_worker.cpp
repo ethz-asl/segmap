@@ -1,7 +1,6 @@
 #include "segmatch_ros/segmatch_worker.hpp"
 
 #include <eigen_conversions/eigen_msg.h>
-
 #include <laser_slam/common.hpp>
 
 namespace segmatch_ros {
