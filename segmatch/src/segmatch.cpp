@@ -363,17 +363,26 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   // Update the last filtered matches.
   for (auto& match: last_filtered_matches_) {
     Segment segment;
-    CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
-    match.centroids_.first = segment.centroid;
-    CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
-    match.centroids_.second = segment.centroid;
+    // TODO Replaced the CHECK with a if. How should we handle the case
+    // when one segment was removed during duplicate check?
+    if (segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment)) {
+      match.centroids_.first = segment.centroid;
+    }
+
+    if (segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment)) {
+      match.centroids_.second = segment.centroid;
+    }
   }
+
   for (auto& match: last_predicted_matches_) {
     Segment segment;
-    CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
-    match.centroids_.first = segment.centroid;
-    CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
-    match.centroids_.second = segment.centroid;
+    if (segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment)) {
+      match.centroids_.first = segment.centroid;
+    }
+
+    if (segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment)) {
+      match.centroids_.second = segment.centroid;
+    }
   }
 
   // Filter duplicates.
