@@ -40,6 +40,8 @@ LaserMapper: {
   align_target_map_on_first_loop_closure: false,
   
   ratio_of_points_to_keep_when_publishing: 1.0,
+  
+  export_segments_and_matches: false,
 
   SegMatch: {
     segmentation_radius_m: 60.0,
@@ -105,7 +107,8 @@ LaserMapper: {
       use_icp_factors: false,
       nscan_to_match: 3,
       nscan_in_sub_map: 20,
-      save_icp_results: false
+      save_icp_results: false,
+      force_priors: false
     }
   }
 }

@@ -128,6 +128,7 @@ class SegMatch {
   };
 
   segmatch::PairwiseMatches  getFilteredMatches() const { return last_filtered_matches_; };
+  segmatch::PairwiseMatches  getPredictedMatches() const { return last_predicted_matches_; };
 
   void getLoopClosures(std::vector<laser_slam::RelativePose>* loop_closures) const;
 
@@ -158,6 +159,7 @@ class SegMatch {
   std::vector<laser_slam::Trajectory> segmentation_poses_;
 
   PairwiseMatches last_filtered_matches_;
+  PairwiseMatches last_predicted_matches_;
 
   std::vector<laser_slam::RelativePose> loop_closures_;
 
@@ -167,10 +169,12 @@ class SegMatch {
   static constexpr double kCylinderHeight_m = 40;
   static constexpr unsigned int kMaxNumberOfCloudToTransfer = 1u;
 
+  static constexpr laser_slam::Time kMinTimeBetweenSegmentForMatches_ns = 20000000000u;
+
   static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 20000000000u;
 
 }; // class SegMatch
 
 } // namespace segmatch
 
-#endif // SEGMENT_MATCHER_SEGMENT_MATCHER_HPP_
+#endif // SEGMATCH_SEGMATCH_HPP_

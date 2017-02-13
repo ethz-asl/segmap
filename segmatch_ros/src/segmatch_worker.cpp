@@ -27,6 +27,8 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_representation", kPublisherQueueSize);
   matches_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/segment_matches", kPublisherQueueSize);
+  predicted_matches_pub_ = nh.advertise<visualization_msgs::Marker>(
+      "/segmatch/predicted_segment_matches", kPublisherQueueSize);
   loop_closures_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/loop_closures", kPublisherQueueSize);
   segmentation_positions_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
@@ -37,6 +39,21 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/source_segments_centroids", kPublisherQueueSize);
   last_transformation_pub_ = nh.advertise<geometry_msgs::Transform>(
       "/segmatch/last_transformation", 5, true);
+
+  if (params_.export_segments_and_matches) {
+    export_run_service_ = nh.advertiseService("export_run",
+                                              &SegMatchWorker::exportRunServiceCall, this);
+  }
+  if (std::find(params_.segmatch_params.descriptors_params.descriptor_types.begin(),
+                params_.segmatch_params.descriptors_params.descriptor_types.end(), 
+                "Autoencoder") != 
+      params_.segmatch_params.descriptors_params.descriptor_types.end() && 
+      params_.autoencoder_reconstructor_script_path != "") {
+    reconstruct_segments_service_ = nh.advertiseService(
+        "reconstruct_segments", &SegMatchWorker::reconstructSegmentsServiceCall, this);
+    reconstruction_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
+        "/segmatch/reconstruction", kPublisherQueueSize);
+  }
 
   if (params_.localize) {
     loadTargetCloud();
@@ -109,6 +126,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
                                                    loop_closure);
       LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
+      LOG(INFO) << "Number of matches after filtering: " << filtered_matches.size() << ".";
 
       // TODO move after optimizing and updating target map?
       if (params_.close_loops) {
@@ -124,6 +142,17 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
             LOG(INFO) << "Aligning target map.";
             segmatch_.alignTargetMap();
             publishTargetRepresentation();
+          }
+        }
+      }
+
+      // Store segments and matches in database if desired, for later export.
+      if (params_.export_segments_and_matches) {
+        segments_database_ += segmatch_.getSourceAsSegmentedCloud();
+        if (loop_closure_found) {
+          for (size_t i = 0u; i < filtered_matches.size(); ++i) {
+            matches_database_.addMatch(filtered_matches.at(i).ids_.first,
+                                       filtered_matches.at(i).ids_.second);
           }
         }
       }
@@ -204,6 +233,16 @@ void SegMatchWorker::publishMatches() const {
   }
   publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
                  Color(0.0, 1.0, 0.0), matches_pub_);
+  const PairwiseMatches predicted_matches = segmatch_.getPredictedMatches();
+  point_pairs.clear();
+  for (size_t i = 0u; i < predicted_matches.size(); ++i) {
+    PclPoint target_segment_centroid = predicted_matches[i].getCentroids().second;
+    target_segment_centroid.z -= params_.distance_to_lower_target_cloud_for_viz_m;
+    point_pairs.push_back(
+        PointPair(predicted_matches[i].getCentroids().first, target_segment_centroid));
+  }
+  publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
+                 Color(0.7, 0.7, 0.7), predicted_matches_pub_);
 }
 
 void SegMatchWorker::publishSegmentationPositions() const {
@@ -276,6 +315,92 @@ void SegMatchWorker::publishLastTransformation() const {
     tf::transformEigenToMsg(transformation, transform_msg);
     last_transformation_pub_.publish(transform_msg);
   }
+}
+
+bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,
+                                         std_srvs::Empty::Response& res) {
+  // Get current date.
+  const boost::posix_time::ptime time_as_ptime = ros::WallTime::now().toBoost();
+  std::string acquisition_time = to_iso_extended_string(time_as_ptime);
+  database::exportFeatures("/tmp/online_matcher/run_" + acquisition_time + "_features.csv",
+                            segments_database_);
+  database::exportSegments("/tmp/online_matcher/run_" + acquisition_time + "_segments.csv",
+                            segments_database_);
+  database::exportMatches("/tmp/online_matcher/run_" + acquisition_time + "_matches.csv",
+                           matches_database_);
+  return true;
+}
+
+bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& req,
+                                                    std_srvs::Empty::Response& res) {
+  const std::string kSegmentsFilename = "autoencoder_reconstructor_segments.txt";
+  const std::string kFeaturesFilename = "autoencoder_reconstructor_features.txt";
+  FILE* script_process_pipe;
+  DescriptorsParameters descriptors_params = params_.segmatch_params.descriptors_params;
+  const std::string command = descriptors_params.autoencoder_python_env + " -u " +
+      params_.autoencoder_reconstructor_script_path + " " +
+      descriptors_params.autoencoder_model_path + " " +
+      descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename + " " +
+      descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename + " " +
+      std::to_string(descriptors_params.autoencoder_latent_space_dimension) + " 2>&1";
+
+  LOG(INFO) << "Executing command: $" << command;
+  if (!(script_process_pipe = popen(command.c_str(), "r"))) {
+    LOG(FATAL) << "Could not execute autoencoder reconstruction command";
+  }
+
+  char buff[512];
+  while (fgets(buff, sizeof(buff), script_process_pipe) != NULL) {
+    LOG(INFO) << buff;
+    if (std::string(buff) == "__INIT_COMPLETE__\n") {
+      break;
+    }
+  }
+
+  // Export segmented cloud.
+  LOG(INFO) << "Exporting autoencoder features.";
+  SegmentedCloud original_target_segments = segmatch_.getTargetAsSegmentedCloud();
+  database::exportFeatures(descriptors_params.autoencoder_temp_folder_path + kFeaturesFilename,
+                           original_target_segments);
+  LOG(INFO) << "Done.";
+
+  // Wait for script to describe segments.
+  while (fgets(buff, sizeof(buff), script_process_pipe) != NULL) {
+    LOG(INFO) << buff;
+    if (std::string(buff) == "__RCST_COMPLETE__\n") {
+      break;
+    }
+  }
+
+  SegmentedCloud reconstructed_target_segments;
+  // Import the autoencoder features from file.
+  LOG(INFO) << "Importing autoencoder segments.";
+  CHECK(database::importSegments(descriptors_params.autoencoder_temp_folder_path + kSegmentsFilename,
+                                 &reconstructed_target_segments));
+  LOG(INFO) << "Done.";
+
+  pclose(script_process_pipe);
+
+  // Move reconstructions to their centroid locations.
+  for (std::unordered_map<Id, Segment>::const_iterator it = original_target_segments.begin();
+      it != original_target_segments.end(); ++it) {
+    PclPoint centroid = it->second.centroid;
+    Segment* segment_ptr;
+    CHECK(reconstructed_target_segments.findValidSegmentPtrById(it->first, &segment_ptr));
+    translateCloud(Translation(centroid.x, centroid.y, centroid.z), &(segment_ptr->point_cloud));
+  }
+
+  // Publish reconstruction
+  PointICloud reconstructed_target_representation;
+  segmentedCloudToCloud(reconstructed_target_segments, &reconstructed_target_representation);
+  translateCloud(Translation(0.0, 0.0, -2*params_.distance_to_lower_target_cloud_for_viz_m),
+                 &reconstructed_target_representation);
+  sensor_msgs::PointCloud2 reconstructed_target_representation_as_message;
+  convert_to_point_cloud_2_msg(reconstructed_target_representation, params_.world_frame,
+                               &reconstructed_target_representation_as_message);
+  reconstruction_pub_.publish(reconstructed_target_representation_as_message);
+
+  return true;
 }
 
 } // namespace segmatch_ros

@@ -33,6 +33,10 @@ struct SegMatchWorkerParams {
   segmatch::SegMatchParams segmatch_params;
 
   double ratio_of_points_to_keep_when_publishing;
+
+  bool export_segments_and_matches = false;
+
+  std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
 
 
@@ -268,6 +272,12 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/align_target_map_on_first_loop_closure",
               params.align_target_map_on_first_loop_closure);
+
+  nh.getParam(ns +"/export_segments_and_matches",
+              params.export_segments_and_matches);
+
+  nh.getParam(ns +"/autoencoder_reconstructor_script_path",
+              params.autoencoder_reconstructor_script_path);
 
   nh.getParam(ns +"/ratio_of_points_to_keep_when_publishing",
               params.ratio_of_points_to_keep_when_publishing);

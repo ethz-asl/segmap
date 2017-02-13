@@ -91,43 +91,14 @@ void SegMatch::transferSourceToTarget() {
     }
   }
 
-  // Check whether the pose linked to the segments of the oldest cloud in the queue
-  // has a sufficient distance to the latest pose.
-  bool try_adding_latest_cloud = true;
   unsigned int num_cloud_transfered = 0u;
-  while (try_adding_latest_cloud && num_cloud_transfered < kMaxNumberOfCloudToTransfer) {
-    try_adding_latest_cloud = false;
-    if (!target_queue_.empty()) {
-      // Get an iterator to the latest cloud with the same track_id.
-      it = target_queue_.begin();
-      bool found = false;
-      while (!found && it != target_queue_.end()) {
-        if (it->getValidSegmentByIndex(0u).track_id ==
-            segmented_source_cloud_.getValidSegmentByIndex(0u).track_id) {
-          found = true;
-        } else {
-          ++it;
-        }
-      }
-
-      if (found) {
-        // Check distance since last segmentation.
-        laser_slam::SE3 oldest_queue_pose = it->getValidSegmentByIndex(0u).T_w_linkpose;
-        laser_slam::SE3 latest_pose =
-            segmented_source_cloud_.getValidSegmentByIndex(0u).T_w_linkpose;
-        const double distance = distanceBetweenTwoSE3(oldest_queue_pose, latest_pose);
-        if (distance > params_.segmentation_radius_m) {
-          if (params_.filter_duplicate_segments) {
-            filterDuplicateSegmentsOfTargetMap(*it);
-          }
-          segmented_target_cloud_.addSegmentedCloud(*it);
-          target_queue_.erase(it);
-          ++num_cloud_transfered;
-          try_adding_latest_cloud = true;
-          LOG(INFO) << "Transfered a source cloud to the target cloud.";
-        }
-      }
+  if (!target_queue_.empty()) {
+    if (params_.filter_duplicate_segments) {
+      filterDuplicateSegmentsOfTargetMap(target_queue_.at(0u));
     }
+    segmented_target_cloud_.addSegmentedCloud(target_queue_.at(0u));
+    target_queue_.erase(target_queue_.begin());
+    ++num_cloud_transfered;
   }
 
   if (num_cloud_transfered > 0u) {
@@ -206,16 +177,41 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       geometric_consistency_grouping.setModelSceneCorrespondences(correspondences);
       geometric_consistency_grouping.recognize(correspondence_transformations, clustered_corrs);
 
+      // Filter the matches by segment timestamps.
+      Correspondences time_filtered_clustered_corrs;
+      for (const auto& cluster: clustered_corrs) {
+        pcl::Correspondences time_filtered_cluster;
+        for (const auto& match: cluster) {
+          PairwiseMatch pairwise_match = predicted_matches.at(match.index_query);
+          Segment source_segment, target_segment;
+          CHECK(segmented_source_cloud_.findValidSegmentById(pairwise_match.ids_.first,
+                                                             &source_segment));
+          CHECK(segmented_target_cloud_.findValidSegmentById(pairwise_match.ids_.second,
+                                                             &target_segment));
+
+          if (source_segment.track_id != target_segment.track_id ||
+              std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
+              std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
+              kMinTimeBetweenSegmentForMatches_ns) {
+            time_filtered_cluster.push_back(match);
+          }
+        }
+        time_filtered_clustered_corrs.push_back(time_filtered_cluster);
+      }
+      clustered_corrs = time_filtered_clustered_corrs;
+
       if (!clustered_corrs.empty()) {
         // Find largest cluster.
         size_t largest_cluster_size = 0;
         size_t largest_cluster_index = 0;
         for (size_t i = 0u; i < clustered_corrs.size(); ++i) {
+          LOG(INFO) << "Cluster " << i << " has " << clustered_corrs[i].size() << "segments.";
           if (clustered_corrs[i].size() >= largest_cluster_size) {
             largest_cluster_size = clustered_corrs[i].size();
             largest_cluster_index = i;
           }
         }
+        LOG(INFO) << "Largest cluster: " << largest_cluster_size << " matches.";
 
         // Catch the cases when PCL returns clusters smaller than the minimum cluster size.
         if (largest_cluster_size >= params_.geometric_consistency_params.min_cluster_size) {
@@ -298,8 +294,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
       loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
 
-      CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
-
       // Get the track_id of segments created at that time.
       bool found = false;
       for (size_t i = 0u; i < source_segments.size(); ++i) {
@@ -318,6 +312,10 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       }
       CHECK(found);
 
+      if (loop_closure->track_id_a == loop_closure->track_id_b) {
+        CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
+      }
+
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
       loop_closure->T_a_b = w_T_a_b;
 
@@ -327,6 +325,7 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
     // Save a copy of the fitered matches.
     last_filtered_matches_ = filtered_matches;
+    last_predicted_matches_ = predicted_matches;
   }
 
 
@@ -350,6 +349,13 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
 
   // Update the last filtered matches.
   for (auto& match: last_filtered_matches_) {
+    Segment segment;
+    CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
+    match.centroids_.first = segment.centroid;
+    CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
+    match.centroids_.second = segment.centroid;
+  }
+  for (auto& match: last_predicted_matches_) {
     Segment segment;
     CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
     match.centroids_.first = segment.centroid;
@@ -380,14 +386,17 @@ void SegMatch::getTargetSegmentsCentroids(PointICloud* segments_centroids) const
     permuted_indexes.push_back(i);
   }
   std::random_shuffle(permuted_indexes.begin(), permuted_indexes.end());
-  for (size_t i = 0u; i < segmented_target_cloud_.getNumberOfValidSegments(); ++i) {
+  unsigned int i = 0u;
+  for (std::unordered_map<Id, Segment>::const_iterator it = segmented_target_cloud_.begin();
+      it != segmented_target_cloud_.end(); ++it) {
     PointI centroid;
-    Segment segment = segmented_target_cloud_.getValidSegmentByIndex(i);
+    Segment segment = it->second;
     centroid.x = segment.centroid.x;
     centroid.y = segment.centroid.y;
     centroid.z = segment.centroid.z;
     centroid.intensity = permuted_indexes[i];
     cloud.points.push_back(centroid);
+    ++i;
   }
   cloud.width = 1;
   cloud.height = cloud.points.size();
@@ -404,14 +413,17 @@ void SegMatch::getSourceSegmentsCentroids(PointICloud* segments_centroids) const
     permuted_indexes.push_back(i);
   }
   std::random_shuffle(permuted_indexes.begin(), permuted_indexes.end());
-  for (size_t i = 0u; i < segmented_source_cloud_.getNumberOfValidSegments(); ++i) {
+  unsigned int i = 0u;
+  for (std::unordered_map<Id, Segment>::const_iterator it = segmented_source_cloud_.begin();
+      it != segmented_source_cloud_.end(); ++it) {
     PointI centroid;
-    Segment segment = segmented_source_cloud_.getValidSegmentByIndex(i);
+    Segment segment = it->second;
     centroid.x = segment.centroid.x;
     centroid.y = segment.centroid.y;
     centroid.z = segment.centroid.z;
     centroid.intensity = permuted_indexes[i];
     cloud.points.push_back(centroid);
+    ++i;
   }
   cloud.width = 1;
   cloud.height = cloud.points.size();
@@ -440,8 +452,9 @@ void SegMatch::filterBoundarySegmentsOfSourceCloud(const PclPoint& center) {
     const double squared_radius = params_.boundary_radius_m * params_.boundary_radius_m;
     // Get a list of segments with at least one point outside the boundary.
     std::vector<Id> boundary_segments_ids;
-    for (size_t i = 0u; i < segmented_source_cloud_.getNumberOfValidSegments(); ++i) {
-      Segment segment = segmented_source_cloud_.getValidSegmentByIndex(i);
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_source_cloud_.begin();
+        it != segmented_source_cloud_.end(); ++it) {
+      Segment segment = it->second;
       PointICloud segment_cloud = segment.point_cloud;
       // Loop over points until one is found outside of the boundary.
       for (size_t j = 0u; j < segment_cloud.size(); ++j) {
@@ -468,7 +481,12 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
     laser_slam::Clock clock;
     std::vector<Id> duplicate_segments_ids;
     std::vector<Id> target_segment_ids;
-    PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(&target_segment_ids);
+
+    // Get a cloud with segments centroids which are close to the cloud to be added.
+    PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(
+        cloud_to_be_added.begin()->second.T_w_linkpose,
+        params_.segmentation_radius_m * 3.0,
+        &target_segment_ids);
 
     const unsigned int n_nearest_segments = 1u;
     if (target_segment_ids.size() > n_nearest_segments) {
@@ -478,12 +496,13 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
       pcl::copyPointCloud(centroid_cloud, *centroid_cloud_ptr);
       kdtree.setInputCloud(centroid_cloud_ptr);
 
-      for (size_t i = 0u; i < cloud_to_be_added.getNumberOfValidSegments(); ++i) {
+      for (std::unordered_map<Id, Segment>::const_iterator it = cloud_to_be_added.begin();
+          it != cloud_to_be_added.end(); ++it) {
         std::vector<int> nearest_neighbour_indice(n_nearest_segments);
         std::vector<float> nearest_neighbour_squared_distance(n_nearest_segments);
 
         // Find the nearest neighbours.
-        if (kdtree.nearestKSearch(cloud_to_be_added.getValidSegmentByIndex(i).centroid,
+        if (kdtree.nearestKSearch(it->second.centroid,
                                   n_nearest_segments, nearest_neighbour_indice,
                                   nearest_neighbour_squared_distance) <= 0) {
           LOG(ERROR) << "Nearest neighbour search failed.";

@@ -29,6 +29,7 @@ class Feature {
   }
 
   size_t size() const { return feature_values_.size(); }
+  bool empty() { return feature_values_.empty(); }
   const FeatureValue& at(const size_t& index) const { return feature_values_.at(index); }
   void clear() { feature_values_.clear(); }
   void push_back(const FeatureValue& value) {
@@ -60,6 +61,7 @@ class Features {
   size_t sizeWhenFlattened() const;
   std::vector<FeatureValueType> asVectorOfValues() const;
   Eigen::MatrixXd asEigenMatrix() const;
+  Features rotationInvariantFeaturesOnly() const;
   std::vector<std::string> asVectorOfNames() const;
 
  private:

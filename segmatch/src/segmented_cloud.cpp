@@ -1,6 +1,7 @@
 #include "segmatch/segmented_cloud.hpp"
 
 #include <cfenv>
+#include <utility>
 
 namespace segmatch {
 
@@ -99,17 +100,14 @@ Id SegmentedCloud::getNextId(const Id& begin_counting_from_this_id) {
 
 void SegmentedCloud::addSegmentedCloud(const SegmentedCloud& segmented_cloud_to_add) {
   if (!segmented_cloud_to_add.empty()) {
-    for (size_t i = 0u; i < segmented_cloud_to_add.getNumberOfValidSegments(); ++i) {
-      addValidSegment(segmented_cloud_to_add.getValidSegmentByIndex(i));
-    }
+    valid_segments_.insert(segmented_cloud_to_add.valid_segments_.begin(),
+                           segmented_cloud_to_add.valid_segments_.end());
   }
 }
 
-void SegmentedCloud::addSegmentsTo(const pcl::IndicesClusters& segments_to_add,
-                                   const pcl::PointCloud<pcl::PointNormal>& reference_cloud,
-                                   std::vector<Segment>* target_cluster_ptr,
-                                   const bool also_copy_normals_data) {
-  CHECK_NOTNULL(target_cluster_ptr);
+void SegmentedCloud::addSegments(const pcl::IndicesClusters& segments_to_add,
+                                 const pcl::PointCloud<pcl::PointNormal>& reference_cloud,
+                                 const bool also_copy_normals_data) {
   // Loop over clusters.
   for (size_t i = 0u; i < segments_to_add.size(); ++i) {
     std::vector<int> indices = segments_to_add[i].indices;
@@ -118,11 +116,7 @@ void SegmentedCloud::addSegmentsTo(const pcl::IndicesClusters& segments_to_add,
     Segment segment;
 
     // Assign the segment an id.
-    if (target_cluster_ptr == &valid_segments_) {
-      segment.segment_id = getNextId();
-    } else {
-      segment.segment_id = kInvId;
-    }
+    segment.segment_id = getNextId();
 
     // Copy points into segment.
     for (size_t j = 0u; j < indices.size(); ++j) {
@@ -164,109 +158,77 @@ void SegmentedCloud::addSegmentsTo(const pcl::IndicesClusters& segments_to_add,
     }
 
     segment.calculateCentroid();
-    target_cluster_ptr->push_back(segment);
+    valid_segments_.insert(std::make_pair(segment.segment_id, segment));
   }
 }
 
 void SegmentedCloud::addValidSegments(const pcl::IndicesClusters& segments_to_add,
                                       const pcl::PointCloud<pcl::PointNormal>& reference_cloud) {
-  addSegmentsTo(segments_to_add, reference_cloud, &valid_segments_);
-}
-
-void SegmentedCloud::addSmallSegments(const pcl::IndicesClusters& segments_to_add,
-                                      const pcl::PointCloud<pcl::PointNormal>& reference_cloud) {
-  addSegmentsTo(segments_to_add, reference_cloud, &small_segments_);
-}
-
-void SegmentedCloud::addLargeSegments(const pcl::IndicesClusters& segments_to_add,
-                                      const pcl::PointCloud<pcl::PointNormal>& reference_cloud) {
-  addSegmentsTo(segments_to_add, reference_cloud, &large_segments_);
+  addSegments(segments_to_add, reference_cloud);
 }
 
 void SegmentedCloud::addValidSegment(const Segment& segment_to_add) {
   CHECK(segment_to_add.hasValidId());
-  valid_segments_.push_back(segment_to_add);
+  valid_segments_.insert(std::make_pair(segment_to_add.segment_id, segment_to_add));
 }
 
 size_t SegmentedCloud::getNumberOfValidSegments() const {
   return valid_segments_.size();
 }
 
-bool SegmentedCloud::findValidSegmentById(const Id segment_id, Segment* result,
-                                          size_t* index_ptr) const {
-  for (size_t i = 0u; i < getNumberOfValidSegments(); ++i) {
-    if (getValidSegmentByIndex(i).segment_id == segment_id) {
-      if (result != NULL) {
-        *result = valid_segments_.at(i);
-      }
-      // If desired, pass the segment's index.
-      if (index_ptr != NULL) {
-        *index_ptr = i;
-      }
-      return true;
+bool SegmentedCloud::findValidSegmentById(const Id segment_id, Segment* result) const {
+  if (valid_segments_.count(segment_id)) {
+    if (result != NULL) {
+      *result = valid_segments_.at(segment_id);
     }
+    return true;
+  } else {
+    return false;
   }
-  return false;
 }
 
-bool SegmentedCloud::findValidSegmentPtrById(const Id segment_id, Segment** result,
-                                             size_t* index_ptr) {
-  // Find the index of the segment using already-existing code.
-  size_t index;
-  if (!findValidSegmentById(segment_id, NULL, &index)) { return false; }
-  // If desired, pass the index.
-  if (index_ptr != NULL) { *index_ptr = index; }
-  // If desired, pass the segment ptr.
-  if (result != NULL) { *result = CHECK_NOTNULL(&valid_segments_[index]); }
+bool SegmentedCloud::findValidSegmentPtrById(const Id segment_id, Segment** result) {
+  if (!findValidSegmentById(segment_id, NULL)) { return false; }
+  if (result != NULL) { *result = CHECK_NOTNULL(&valid_segments_.at(segment_id)); }
   return true;
 }
 
-Segment SegmentedCloud::getValidSegmentByIndex(const size_t index) const {
-  CHECK_LT(index, valid_segments_.size()) <<
-      "Attempted to access index out of bounds of valid_segments_";
-  return valid_segments_[index];
-}
-
-Segment* SegmentedCloud::getValidSegmentPtrByIndex(const size_t index) {
-  CHECK_LT(index, valid_segments_.size()) <<
-      "Attempted to access index out of bounds of valid_segments_";
-  return CHECK_NOTNULL(&valid_segments_[index]);
-}
-
 void SegmentedCloud::deleteSegmentsById(const std::vector<Id>& ids, size_t* n_removals) {
-  if (n_removals != NULL) { *n_removals = 0; }
-  for (size_t i = 0u; i < ids.size(); ++i) {
-    size_t index;
-    if (findValidSegmentById(ids.at(i), NULL, &index)) {
-      valid_segments_.erase(valid_segments_.begin() + index);
-      if (n_removals != NULL) { (*n_removals)++; }
+  if (n_removals != NULL) {
+    *n_removals = 0;
+  }
+  for (const auto& id: ids) {
+    valid_segments_.erase(id);
+    // TODO obsolete?
+    if (n_removals != NULL) {
+      (*n_removals)++;
     }
   }
 }
 
 void SegmentedCloud::calculateSegmentCentroids() {
-  for (size_t i = 0u; i < getNumberOfValidSegments(); ++i) {
-    getValidSegmentPtrByIndex(i)->calculateCentroid();
+  for (auto& segment: valid_segments_) {
+    segment.second.calculateCentroid();
   }
 }
 
 void SegmentedCloud::clear() {
   //TODO(Daniel): fill this function
   valid_segments_.clear();
-  small_segments_.clear();
-  large_segments_.clear();
 }
 
 PointICloud SegmentedCloud::validSegmentsAsPointCloud(
     std::vector<Id>* segment_id_for_each_point_ptr) const {
-  if (segment_id_for_each_point_ptr != NULL) { segment_id_for_each_point_ptr->clear(); }
+  if (segment_id_for_each_point_ptr != NULL) {
+    segment_id_for_each_point_ptr->clear();
+  }
   PointICloud result;
-  for (size_t i = 0u; i < getNumberOfValidSegments(); ++i) {
-    result += getValidSegmentByIndex(i).point_cloud;
+  for (const auto& id_segment: valid_segments_) {
+    result += id_segment.second.point_cloud;
     // Export the segment ids if desired.
     if (segment_id_for_each_point_ptr != NULL) {
-      for (size_t j = 0u; j < getValidSegmentByIndex(i).point_cloud.size(); ++j) {
-        segment_id_for_each_point_ptr->push_back(getValidSegmentByIndex(i).segment_id);
+      for (size_t j = 0u; j < id_segment.second.point_cloud.size(); ++j) {
+        segment_id_for_each_point_ptr->push_back(id_segment.first);
       }
       CHECK(segment_id_for_each_point_ptr->size() == result.size()) <<
           "Each point should have a single segment id.";
@@ -299,19 +261,48 @@ PointICloud SegmentedCloud::validSegmentsAsPointCloudFromIds(
 
 PointCloud SegmentedCloud::centroidsAsPointCloud(
     std::vector<Id>* segment_id_for_each_point_ptr) const {
-  if (segment_id_for_each_point_ptr != NULL) { segment_id_for_each_point_ptr->clear(); }
+  if (segment_id_for_each_point_ptr != NULL) {
+    segment_id_for_each_point_ptr->clear();
+  }
   PointCloud result;
-  for (size_t i = 0u; i < getNumberOfValidSegments(); ++i) {
-    result.push_back(getValidSegmentByIndex(i).centroid);
+  for (const auto& id_segment: valid_segments_) {
+    result.push_back(id_segment.second.centroid);
     // Export the segment ids if desired.
     if (segment_id_for_each_point_ptr != NULL) {
-      segment_id_for_each_point_ptr->push_back(getValidSegmentByIndex(i).segment_id);
+      segment_id_for_each_point_ptr->push_back(id_segment.first);
     }
   }
   if (segment_id_for_each_point_ptr != NULL) {
     CHECK(segment_id_for_each_point_ptr->size() == result.size()) <<
         "Each point should have a single segment id.";
   }
+  return result;
+}
+
+PointCloud SegmentedCloud::centroidsAsPointCloud(
+    const laser_slam::SE3& center, double maximum_linkpose_distance,
+    std::vector<Id>* segment_id_for_each_point_ptr) const {
+  if (segment_id_for_each_point_ptr != NULL) {
+    segment_id_for_each_point_ptr->clear();
+  }
+  PointCloud result;
+  for (const auto& id_segment: valid_segments_) {
+    Segment segment = id_segment.second;
+    if (laser_slam::distanceBetweenTwoSE3(segment.T_w_linkpose, center) <=
+        maximum_linkpose_distance) {
+      result.push_back(segment.centroid);
+      // Export the segment ids if desired.
+      if (segment_id_for_each_point_ptr != NULL) {
+        segment_id_for_each_point_ptr->push_back(segment.segment_id);
+      }
+    }
+  }
+  if (segment_id_for_each_point_ptr != NULL) {
+    CHECK(segment_id_for_each_point_ptr->size() == result.size()) <<
+        "Each point should have a single segment id.";
+  }
+  LOG(INFO) << "centroidsAsPointCloud returning " << result.size() << " from " <<
+      valid_segments_.size() << " segments.";
   return result;
 }
 
@@ -386,8 +377,10 @@ bool SegmentedCloud::computeSegmentOverlaps(const SegmentedCloud& target_segment
 
   // Loop over valid segments in this SegmentedCloud.
   const float overlap_radius_squared = overlap_radius * overlap_radius;
-  for (size_t i = 0u; i < getNumberOfValidSegments(); ++i) {
-    Segment current_segment = getValidSegmentByIndex(i);
+
+  unsigned int i = 0u;
+  for (const auto& id_segment: valid_segments_) {
+    Segment current_segment = id_segment.second;
     IdOccurences id_occurences_in_segment_overlap;
 
     // Find the nearest segments by centroid.
@@ -448,6 +441,7 @@ bool SegmentedCloud::computeSegmentOverlaps(const SegmentedCloud& target_segment
     } else {
       LOG(INFO) << "Worst offender for " << current_segment.segment_id << ": None.";
     }
+    ++i;
   }
 
   CHECK(overlaps->worst_offenders_.size() == getNumberOfValidSegments());
@@ -456,36 +450,36 @@ bool SegmentedCloud::computeSegmentOverlaps(const SegmentedCloud& target_segment
 }
 
 void SegmentedCloud::setTimeStampOfSegments(const laser_slam::Time& timestamp_ns) {
-  for (Segment& segment: valid_segments_) {
-    segment.timestamp_ns = timestamp_ns;
+  for (auto& id_segment: valid_segments_) {
+    id_segment.second.timestamp_ns = timestamp_ns;
   }
 }
 
 void SegmentedCloud::setLinkPoseOfSegments(const laser_slam::SE3& link_pose) {
-  for (Segment& segment: valid_segments_) {
-    segment.T_w_linkpose = link_pose;
+  for (auto& id_segment: valid_segments_) {
+    id_segment.second.T_w_linkpose = link_pose;
   }
 }
 
 void SegmentedCloud::setTrackId(unsigned int track_id) {
-  for (Segment& segment: valid_segments_) {
-    segment.track_id = track_id;
+  for (auto& id_segment: valid_segments_) {
+    id_segment.second.track_id = track_id;
   }
 }
 
 void SegmentedCloud::updateSegments(const std::vector<laser_slam::Trajectory>& trajectories) {
-  for (Segment& segment: valid_segments_) {
-    SE3 new_pose = trajectories.at(segment.track_id).at(segment.timestamp_ns);
+  for (auto& id_segment: valid_segments_) {
+    SE3 new_pose = trajectories.at(id_segment.second.track_id).at(id_segment.second.timestamp_ns);
 
-    SE3 transformation = new_pose * segment.T_w_linkpose.inverse();
+    SE3 transformation = new_pose * id_segment.second.T_w_linkpose.inverse();
     // Transform the point cloud.
-    transformPointCloud(transformation, &segment.point_cloud);
+    transformPointCloud(transformation, &id_segment.second.point_cloud);
 
     // Transform the segment centroid.
-    transformPclPoint(transformation, &segment.centroid);
+    transformPclPoint(transformation, &id_segment.second.centroid);
 
     // Update the link pose.
-    segment.T_w_linkpose = new_pose;
+    id_segment.second.T_w_linkpose = new_pose;
   }
 }
 
