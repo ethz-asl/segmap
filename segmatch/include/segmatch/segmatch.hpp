@@ -138,7 +138,7 @@ class SegMatch {
  private:
   void filterBoundarySegmentsOfSourceCloud(const PclPoint& center);
 
-  void filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to_be_added);
+  void filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_added);
 
   laser_slam::Time findTimeOfClosestSegmentationPose(const segmatch::Segment& segment) const;
 

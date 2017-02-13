@@ -96,7 +96,7 @@ void SegMatch::transferSourceToTarget() {
   unsigned int num_cloud_transfered = 0u;
   if (!target_queue_.empty()) {
     if (params_.filter_duplicate_segments) {
-      filterDuplicateSegmentsOfTargetMap(target_queue_.at(0u));
+      filterDuplicateSegmentsOfTargetMap(&target_queue_.at(0u));
     }
     segmented_target_cloud_.addSegmentedCloud(target_queue_.at(0u));
     target_queue_.erase(target_queue_.begin());
@@ -180,25 +180,36 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       geometric_consistency_grouping.recognize(correspondence_transformations, clustered_corrs);
 
       // Filter the matches by segment timestamps.
+      LOG(INFO) << "Filtering the matches based on timestamps.";
       Correspondences time_filtered_clustered_corrs;
       for (const auto& cluster: clustered_corrs) {
         pcl::Correspondences time_filtered_cluster;
         for (const auto& match: cluster) {
           PairwiseMatch pairwise_match = predicted_matches.at(match.index_query);
           Segment source_segment, target_segment;
-          CHECK(segmented_source_cloud_.findValidSegmentById(pairwise_match.ids_.first,
-                                                             &source_segment));
-          CHECK(segmented_target_cloud_.findValidSegmentById(pairwise_match.ids_.second,
-                                                             &target_segment));
-
-          if (source_segment.track_id != target_segment.track_id ||
-              std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
-              std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
-              params_.min_time_between_segment_for_matches_ns) {
-            time_filtered_cluster.push_back(match);
+          if (segmented_source_cloud_.findValidSegmentById(pairwise_match.ids_.first,
+                                                             &source_segment)) {
+            if (segmented_target_cloud_.findValidSegmentById(pairwise_match.ids_.second,
+                                                               &target_segment)) {
+              if (source_segment.track_id != target_segment.track_id ||
+                  std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
+                  std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
+                  params_.min_time_between_segment_for_matches_ns) {
+                time_filtered_cluster.push_back(match);
+              } else {
+                LOG(INFO) << "Removed match with source_segment.timestamp_ns " << source_segment.timestamp_ns
+                    << " and target_segment.timestamp_ns " << target_segment.timestamp_ns;
+              }
+            } else {
+              LOG(INFO) << "Could not find target segment when filtering on timestamps";
+            }
+          } else {
+            LOG(INFO) << "Could not find source segment when filtering on timestamps";
           }
         }
         time_filtered_clustered_corrs.push_back(time_filtered_cluster);
+        LOG(INFO) << "Cluster had size " << cluster.size() << " before and " <<
+            time_filtered_cluster.size() << " after.";
       }
       clustered_corrs = time_filtered_clustered_corrs;
 
@@ -479,15 +490,16 @@ void SegMatch::filterBoundarySegmentsOfSourceCloud(const PclPoint& center) {
   }
 }
 
-void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to_be_added) {
-  if (!cloud_to_be_added.empty()) {
+void SegMatch::filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_added) {
+  if (!cloud_to_be_added->empty()) {
     laser_slam::Clock clock;
     std::vector<Id> duplicate_segments_ids;
+    std::vector<Id> duplicate_segments_ids_in_cloud_to_add;
     std::vector<Id> target_segment_ids;
 
     // Get a cloud with segments centroids which are close to the cloud to be added.
     PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(
-        cloud_to_be_added.begin()->second.T_w_linkpose,
+        cloud_to_be_added->begin()->second.T_w_linkpose,
         params_.segmentation_radius_m * 3.0,
         &target_segment_ids);
 
@@ -500,8 +512,8 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
       pcl::copyPointCloud(centroid_cloud, *centroid_cloud_ptr);
       kdtree.setInputCloud(centroid_cloud_ptr);
 
-      for (std::unordered_map<Id, Segment>::const_iterator it = cloud_to_be_added.begin();
-          it != cloud_to_be_added.end(); ++it) {
+      for (std::unordered_map<Id, Segment>::const_iterator it = cloud_to_be_added->begin();
+          it != cloud_to_be_added->end(); ++it) {
         std::vector<int> nearest_neighbour_indice(n_nearest_segments);
         std::vector<float> nearest_neighbour_squared_distance(n_nearest_segments);
 
@@ -514,16 +526,17 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
 
         // Check if within distance.
         if (nearest_neighbour_squared_distance[0u] <= params_.centroid_distance_threshold_m) {
-          Segment older_segment;
+          Segment other_segment;
           segmented_target_cloud_.findValidSegmentById(
-              target_segment_ids[nearest_neighbour_indice[0u]], &older_segment);
-          // Do not remove if older segment is from other trajectory.
-          if (older_segment.timestamp_ns == older_segment.timestamp_ns) {
+              target_segment_ids[nearest_neighbour_indice[0u]], &other_segment);
+          if (other_segment.track_id == it->second.track_id) {
             // Do not remove if older segment is too old (far from moving window).
-            // CHECK_LT(older_segment.timestamp_ns, it->second.timestamp_ns);
-            if (it->second.timestamp_ns < older_segment.timestamp_ns + max_time_diff_ns) {
+            if (it->second.timestamp_ns < other_segment.timestamp_ns + max_time_diff_ns) {
               duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
             }
+          } else {
+            // Remove current segment if other is from trajectory.
+            duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
           }
         }
       }
@@ -533,8 +546,10 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to
     size_t n_removals;
     segmented_target_cloud_.deleteSegmentsById(duplicate_segments_ids, &n_removals);
     clock.takeTime();
-    LOG(INFO) << "Removed " << n_removals << " duplicate segments in " <<
+    LOG(INFO) << "Removed " << n_removals << " duplicate segments in target map in " <<
         clock.getRealTime() << " ms.";
+    cloud_to_be_added->deleteSegmentsById(duplicate_segments_ids_in_cloud_to_add, &n_removals);
+    LOG(INFO) << "Removed " << n_removals << " duplicate segments in source map.";
   }
 }
 

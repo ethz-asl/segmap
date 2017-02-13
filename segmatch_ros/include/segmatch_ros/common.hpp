@@ -36,6 +36,8 @@ struct SegMatchWorkerParams {
 
   bool export_segments_and_matches = false;
 
+  bool publish_predicted_segment_matches = false;
+
   std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
 
@@ -286,6 +288,9 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/ratio_of_points_to_keep_when_publishing",
               params.ratio_of_points_to_keep_when_publishing);
+
+  nh.getParam(ns +"/publish_predicted_segment_matches",
+              params.publish_predicted_segment_matches);
 
   params.segmatch_params = getSegMatchParams(nh, ns);
 

@@ -42,6 +42,7 @@ LaserMapper: {
   ratio_of_points_to_keep_when_publishing: 1.0,
   
   export_segments_and_matches: false,
+  publish_predicted_segment_matches: false,
 
   SegMatch: {
     segmentation_radius_m: 60.0,

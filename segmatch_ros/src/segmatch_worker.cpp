@@ -25,8 +25,10 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_representation", kPublisherQueueSize);
   matches_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/segment_matches", kPublisherQueueSize);
-  predicted_matches_pub_ = nh.advertise<visualization_msgs::Marker>(
-      "/segmatch/predicted_segment_matches", kPublisherQueueSize);
+  if (params_.publish_predicted_segment_matches) {
+    predicted_matches_pub_ = nh.advertise<visualization_msgs::Marker>(
+        "/segmatch/predicted_segment_matches", kPublisherQueueSize);
+  }
   loop_closures_pub_ = nh.advertise<visualization_msgs::Marker>(
       "/segmatch/loop_closures", kPublisherQueueSize);
   segmentation_positions_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
@@ -227,16 +229,19 @@ void SegMatchWorker::publishMatches() const {
   }
   publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
                  Color(0.0, 1.0, 0.0), matches_pub_);
-  const PairwiseMatches predicted_matches = segmatch_.getPredictedMatches();
-  point_pairs.clear();
-  for (size_t i = 0u; i < predicted_matches.size(); ++i) {
-    PclPoint target_segment_centroid = predicted_matches[i].getCentroids().second;
-    target_segment_centroid.z -= params_.distance_to_lower_target_cloud_for_viz_m;
-    point_pairs.push_back(
-        PointPair(predicted_matches[i].getCentroids().first, target_segment_centroid));
+
+  if (params_.publish_predicted_segment_matches) {
+    const PairwiseMatches predicted_matches = segmatch_.getPredictedMatches();
+    point_pairs.clear();
+    for (size_t i = 0u; i < predicted_matches.size(); ++i) {
+      PclPoint target_segment_centroid = predicted_matches[i].getCentroids().second;
+      target_segment_centroid.z -= params_.distance_to_lower_target_cloud_for_viz_m;
+      point_pairs.push_back(
+          PointPair(predicted_matches[i].getCentroids().first, target_segment_centroid));
+    }
+    publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
+                   Color(0.7, 0.7, 0.7), predicted_matches_pub_);
   }
-  publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
-                 Color(0.7, 0.7, 0.7), predicted_matches_pub_);
 }
 
 void SegMatchWorker::publishSegmentationPositions() const {
