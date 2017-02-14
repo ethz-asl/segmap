@@ -146,6 +146,53 @@ PairwiseMatches SegMatch::findMatches(PairwiseMatches* matches_after_first_stage
   return candidates;
 }
 
+Time findTimeOfClosestPose(Time center_time_ns, const Trajectory& poses,
+                           std::vector<Segment>& segments) {
+  // Get a time window of poses around a given time.
+  // Todo how to extend to multiple segments?
+  const Time half_window_size_ns = 60000000000u;
+  Trajectory poses_in_window;
+  for (const auto& pose: poses) {
+    if (pose.first <= center_time_ns + half_window_size_ns &&
+        pose.first + half_window_size_ns >= center_time_ns) {
+      poses_in_window.emplace(pose.first, pose.second);
+    }
+  }
+
+  LOG(INFO) << "Found " << poses_in_window.size() << " poses in time window. Total distances :";
+  // Calculate total distance from each pose to each segments centroid.
+  std::vector<double> total_distances_m;
+  std::vector<Time> pose_times_ns;
+  for (const auto& pose: poses_in_window) {
+    double total_distance_m = 0;
+    PclPoint pose_point = se3ToPclPoint(pose.second);
+    for (const auto& segment: segments) {
+      total_distance_m += pointToPointDistance(pose_point,
+                                               segment.centroid);
+    }
+    LOG(INFO) << total_distance_m;
+    total_distances_m.push_back(total_distance_m);
+    pose_times_ns.push_back(pose.first);
+  }
+
+  // Find the timestamp of the closest pose in average.
+  const double min_distance_m = *std::min_element(total_distances_m.begin(),
+                                                  total_distances_m.end());
+
+  LOG(INFO) << "min_distance_m " << min_distance_m;
+  bool found = false;
+  Time closest_pose_timestamp_ns;
+  for (size_t i = 0u; i < total_distances_m.size(); ++i) {
+    if (min_distance_m == total_distances_m[i]) {
+      closest_pose_timestamp_ns = pose_times_ns[i];
+      found = true;
+      break;
+    }
+  }
+  CHECK(found);
+  return closest_pose_timestamp_ns;
+}
+
 bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
                              PairwiseMatches* filtered_matches_ptr,
                              RelativePose* loop_closure,
@@ -294,10 +341,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
     // If desired, return the loop-closure.
     if (loop_closure != NULL && !filtered_matches.empty()) {
+      LOG(INFO) << "Found a loop";
       // Find the trajectory poses to be linked by the loop-closure.
       // For each segment, find the timestamp of the closest segmentation pose.
       std::vector<Time> source_segmentation_times;
       std::vector<Time> target_segmentation_times;
+      std::vector<Id> source_track_ids;
+      std::vector<Id> target_track_ids;
       std::vector<Segment> source_segments;
       std::vector<Segment> target_segments;
       for (const auto& match: filtered_matches) {
@@ -305,33 +355,62 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
         CHECK(segmented_source_cloud_.findValidSegmentById(match.ids_.first, &segment));
         source_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
         source_segments.push_back(segment);
+        source_track_ids.push_back(segment.track_id);
+        LOG(INFO) << "Source segment ID " << segment.segment_id;
 
         CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
         target_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
         target_segments.push_back(segment);
+        target_track_ids.push_back(segment.track_id);
+        LOG(INFO) << "Target segment ID " << segment.segment_id;
       }
+
+      const Id source_track_id = findMostOccuringId(source_track_ids);
+      const Id target_track_id = findMostOccuringId(target_track_ids);
+
+      LOG(INFO) << "source_track_id " << source_track_id << " target_track_id " <<
+          target_track_id;
+
+      LOG(INFO) << "Finding source_track_time_ns";
+      const Time source_track_time_ns =  findTimeOfClosestPose(source_segments[0u].timestamp_ns,
+                                                               segmentation_poses_[source_track_id],
+                                                               source_segments);
+
+      LOG(INFO) << "source_track_time_ns " << source_track_time_ns;
+
+      LOG(INFO) << "Finding target_track_time_ns";
+      const Time target_track_time_ns =  findTimeOfClosestPose(target_segments[0u].timestamp_ns,
+                                                               segmentation_poses_[target_track_id],
+                                                               target_segments);
+
+      LOG(INFO) << "target_track_time_ns " << target_track_time_ns;
+
+      loop_closure->time_a_ns = target_track_time_ns;
+      loop_closure->time_b_ns = source_track_time_ns;
+      loop_closure->track_id_a = target_track_id;
+      loop_closure->track_id_b = source_track_id;
 
       // Save the most occuring time stamps as timestamps for loop closure.
-      loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
-      loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
+      //      loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
+      //      loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
 
       // Get the track_id of segments created at that time.
-      bool found = false;
-      for (size_t i = 0u; i < source_segments.size(); ++i) {
-        if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
-          found = true;
-          loop_closure->track_id_b = source_segments[i].track_id;
-        }
-      }
-      CHECK(found);
-      found = false;
-      for (size_t i = 0u; i < target_segments.size(); ++i) {
-        if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
-          found = true;
-          loop_closure->track_id_a = target_segments[i].track_id;
-        }
-      }
-      CHECK(found);
+      //      bool found = false;
+      //      for (size_t i = 0u; i < source_segments.size(); ++i) {
+      //        if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
+      //          found = true;
+      //          loop_closure->track_id_b = source_segments[i].track_id;
+      //        }
+      //      }
+      //      CHECK(found);
+      //      found = false;
+      //      for (size_t i = 0u; i < target_segments.size(); ++i) {
+      //        if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
+      //          found = true;
+      //          loop_closure->track_id_a = target_segments[i].track_id;
+      //        }
+      //      }
+      //      CHECK(found);
 
       if (loop_closure->track_id_a == loop_closure->track_id_b) {
         CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
@@ -681,13 +760,8 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
 
 
         for (unsigned int i = 1u; i < n_nearest_segments; ++i) {
-
-          LOG(INFO) << "i " << i << " nearest_neighbour_squared_distance[i] " <<
-              nearest_neighbour_squared_distance[i];
-
           // Check if within distance.
           if (nearest_neighbour_squared_distance[i] <= minimum_distance_squared) {
-            LOG(INFO) << "Removed!";
             Segment other_segment;
             cloud->findValidSegmentById(
                 segment_ids[nearest_neighbour_indice[i]], &other_segment);

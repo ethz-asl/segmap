@@ -412,6 +412,11 @@ static PclPoint se3ToPclPoint(const laser_slam::SE3& transform) {
   return point;
 }
 
+static double pointToPointDistance(const PclPoint& p1, const PclPoint& p2) {
+  return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) +
+              (p1.z-p2.z)*(p1.z-p2.z));
+}
+
 static void transformPointCloud(const SE3& transform, PointICloud* point_cloud) {
   CHECK_NOTNULL(point_cloud);
   const Eigen::Matrix4f transform_matrix = transform.getTransformationMatrix().cast<float>();
@@ -443,6 +448,23 @@ static laser_slam::Time findMostOccuringTime(const std::vector<laser_slam::Time>
     }
   }
   return most_occuring_timestamp;
+}
+
+static Id findMostOccuringId(const std::vector<Id>& ids) {
+  CHECK(!ids.empty());
+  std::map<Id, unsigned int> counts;
+  for (const auto& id: ids) {
+    counts[id]++;
+  }
+  unsigned int max_count = 0u;
+  Id most_occuring_id = 0u;
+  for (const auto& count: counts) {
+    if (count.second > max_count) {
+      max_count = count.second;
+      most_occuring_id = count.first;
+    }
+  }
+  return most_occuring_id;
 }
 
 static void applyRandomFilterToCloud(double ratio_of_points_to_keep,
