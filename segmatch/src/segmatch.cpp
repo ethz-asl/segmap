@@ -188,9 +188,9 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
           PairwiseMatch pairwise_match = predicted_matches.at(match.index_query);
           Segment source_segment, target_segment;
           if (segmented_source_cloud_.findValidSegmentById(pairwise_match.ids_.first,
-                                                             &source_segment)) {
+                                                           &source_segment)) {
             if (segmented_target_cloud_.findValidSegmentById(pairwise_match.ids_.second,
-                                                               &target_segment)) {
+                                                             &target_segment)) {
               if (source_segment.track_id != target_segment.track_id ||
                   std::max(source_segment.timestamp_ns, target_segment.timestamp_ns) >=
                   std::min(source_segment.timestamp_ns, target_segment.timestamp_ns) +
@@ -539,13 +539,29 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_ad
           segmented_target_cloud_.findValidSegmentById(
               target_segment_ids[nearest_neighbour_indice[0u]], &other_segment);
           if (other_segment.track_id == it->second.track_id) {
-            // Do not remove if older segment is too old (far from moving window).
+            // If inside the window, remove the old one. Otherwise remove current one.
             if (it->second.timestamp_ns < other_segment.timestamp_ns + max_time_diff_ns) {
-              duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
+              if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                            target_segment_ids[nearest_neighbour_indice[0u]]) ==
+                                duplicate_segments_ids.end()) {
+                duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
+              }
+            } else {
+              if (std::find(duplicate_segments_ids_in_cloud_to_add.begin(),
+                            duplicate_segments_ids_in_cloud_to_add.end(),
+                            it->second.segment_id) ==
+                                duplicate_segments_ids_in_cloud_to_add.end()) {
+                duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
+              }
             }
           } else {
-            // Remove current segment if other is from trajectory.
-            duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
+            // Remove current segment if other is from another trajectory.
+            if (std::find(duplicate_segments_ids_in_cloud_to_add.begin(),
+                          duplicate_segments_ids_in_cloud_to_add.end(),
+                          it->second.segment_id) ==
+                              duplicate_segments_ids_in_cloud_to_add.end()) {
+              duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
+            }
           }
         }
       }
@@ -619,7 +635,7 @@ void SegMatch::filterDuplicatesAfterLoopClosure() {
   PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(
       &target_segment_ids);
 
-  const unsigned int n_nearest_segments = 2u;
+  const unsigned int n_nearest_segments = 5u;
   const laser_slam::Time max_time_diff_ns = 60000000000u;
   if (target_segment_ids.size() > n_nearest_segments) {
     // Set up nearest neighbour search.
@@ -630,34 +646,45 @@ void SegMatch::filterDuplicatesAfterLoopClosure() {
 
     for (std::unordered_map<Id, Segment>::const_iterator it = segmented_target_cloud_.begin();
         it != segmented_target_cloud_.end(); ++it) {
-      std::vector<int> nearest_neighbour_indice(n_nearest_segments);
-      std::vector<float> nearest_neighbour_squared_distance(n_nearest_segments);
 
-      // Find the nearest neighbours.
-      if (kdtree.nearestKSearch(it->second.centroid,
-                                n_nearest_segments, nearest_neighbour_indice,
-                                nearest_neighbour_squared_distance) <= 0) {
-        LOG(ERROR) << "Nearest neighbour search failed.";
-      }
+      // If this id is not already in the list to be removed.
+      if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                    it->second.segment_id) == duplicate_segments_ids.end()) {
 
-      // Check if within distance.
-      if (nearest_neighbour_squared_distance[1u] <= params_.centroid_distance_threshold_m) {
-        Segment other_segment;
-        segmented_target_cloud_.findValidSegmentById(
-            target_segment_ids[nearest_neighbour_indice[1u]], &other_segment);
+        std::vector<int> nearest_neighbour_indice(n_nearest_segments);
+        std::vector<float> nearest_neighbour_squared_distance(n_nearest_segments);
 
-        // Keep the oldest segment.
-        Id id_to_remove;
-        if (it->second.timestamp_ns > other_segment.timestamp_ns) {
-          id_to_remove = it->second.segment_id;
-        } else {
-          id_to_remove = other_segment.segment_id;
+        // Find the nearest neighbours.
+        if (kdtree.nearestKSearch(it->second.centroid,
+                                  n_nearest_segments, nearest_neighbour_indice,
+                                  nearest_neighbour_squared_distance) <= 0) {
+          LOG(ERROR) << "Nearest neighbour search failed.";
         }
 
-        // Add id to remove if not already in the list.
-        if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
-                      id_to_remove) == duplicate_segments_ids.end()) {
-          duplicate_segments_ids.push_back(id_to_remove);
+
+        for (unsigned int i = 1u; i < n_nearest_segments; ++i) {
+          // Check if within distance.
+          LOG(INFO) << "i " << i << " nearest_neighbour_squared_distance[i] " << nearest_neighbour_squared_distance[i];
+          if (nearest_neighbour_squared_distance[i] <= params_.centroid_distance_threshold_m) {
+            LOG(INFO) << "Removed";
+            Segment other_segment;
+            segmented_target_cloud_.findValidSegmentById(
+                target_segment_ids[nearest_neighbour_indice[i]], &other_segment);
+
+            // Keep the oldest segment.
+            Id id_to_remove;
+            if (it->second.timestamp_ns > other_segment.timestamp_ns) {
+              id_to_remove = it->second.segment_id;
+            } else {
+              id_to_remove = other_segment.segment_id;
+            }
+
+            // Add id to remove if not already in the list.
+            if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                          id_to_remove) == duplicate_segments_ids.end()) {
+              duplicate_segments_ids.push_back(id_to_remove);
+            }
+          }
         }
       }
     }
