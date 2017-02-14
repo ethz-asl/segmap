@@ -59,6 +59,11 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
 
   // Segment the cloud and set segment information.
   segmenter_->segment(filtered_cloud, &segmented_source_cloud_);
+
+  LOG(INFO) << "Removing too near segments from source map.";
+  filterNearestSegmentsInCloud(&segmented_source_cloud_,
+                               params_.centroid_distance_threshold_m, 5u);
+
   segmented_source_cloud_.setTimeStampOfSegments(latest_pose.time_ns);
   segmented_source_cloud_.setLinkPoseOfSegments(latest_pose.T_w);
   segmented_source_cloud_.setTrackId(track_id);
@@ -118,6 +123,9 @@ void SegMatch::processCloud(const PointICloud& target_cloud,
     // First timing is segmentation.
     timings->push_back(clock.getRealTime());
   }
+
+  LOG(INFO) << "Removing too near segments from source map.";
+  filterNearestSegmentsInCloud(segmented_cloud, params_.centroid_distance_threshold_m, 5u);
 
   std::vector<double> segmentation_timings;
   descriptors_->describe(segmented_cloud, &segmentation_timings);
@@ -341,7 +349,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
     last_predicted_matches_ = predicted_matches;
   }
 
-
   return !filtered_matches.empty();
 }
 
@@ -386,7 +393,9 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   }
 
   // Filter duplicates.
-  filterDuplicatesAfterLoopClosure();
+  LOG(INFO) << "Removing too near segments from target map.";
+  filterNearestSegmentsInCloud(&segmented_target_cloud_, params_.centroid_distance_threshold_m,
+                               5u);
 }
 
 void SegMatch::getSourceRepresentation(PointICloud* source_representation,
@@ -512,9 +521,13 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_ad
         params_.segmentation_radius_m * 3.0,
         &target_segment_ids);
 
-    const unsigned int n_nearest_segments = 1u;
+    const double minimum_distance_squared = params_.centroid_distance_threshold_m *
+        params_.centroid_distance_threshold_m;
+
+    unsigned int n_nearest_segments = 4u;
     const laser_slam::Time max_time_diff_ns = 60000000000u;
-    if (target_segment_ids.size() > n_nearest_segments) {
+    if (!target_segment_ids.empty()) {
+      n_nearest_segments = std::min(static_cast<unsigned int>(target_segment_ids.size()), n_nearest_segments);
       // Set up nearest neighbour search.
       pcl::KdTreeFLANN<PclPoint> kdtree;
       PointCloudPtr centroid_cloud_ptr(new PointCloud);
@@ -533,34 +546,36 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_ad
           LOG(ERROR) << "Nearest neighbour search failed.";
         }
 
-        // Check if within distance.
-        if (nearest_neighbour_squared_distance[0u] <= params_.centroid_distance_threshold_m) {
-          Segment other_segment;
-          segmented_target_cloud_.findValidSegmentById(
-              target_segment_ids[nearest_neighbour_indice[0u]], &other_segment);
-          if (other_segment.track_id == it->second.track_id) {
-            // If inside the window, remove the old one. Otherwise remove current one.
-            if (it->second.timestamp_ns < other_segment.timestamp_ns + max_time_diff_ns) {
-              if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
-                            target_segment_ids[nearest_neighbour_indice[0u]]) ==
-                                duplicate_segments_ids.end()) {
-                duplicate_segments_ids.push_back(target_segment_ids[nearest_neighbour_indice[0u]]);
+        for (size_t i = 0u; i < n_nearest_segments; ++i) {
+          // Check if within distance.
+          if (nearest_neighbour_squared_distance[i] <= minimum_distance_squared) {
+            Segment other_segment;
+            segmented_target_cloud_.findValidSegmentById(
+                target_segment_ids[nearest_neighbour_indice[i]], &other_segment);
+            if (other_segment.track_id == it->second.track_id) {
+              // If inside the window, remove the old one. Otherwise remove current one.
+              if (it->second.timestamp_ns < other_segment.timestamp_ns + max_time_diff_ns) {
+                if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                              other_segment.segment_id) ==
+                                  duplicate_segments_ids.end()) {
+                  duplicate_segments_ids.push_back(other_segment.segment_id);
+                }
+              } else {
+                if (std::find(duplicate_segments_ids_in_cloud_to_add.begin(),
+                              duplicate_segments_ids_in_cloud_to_add.end(),
+                              it->second.segment_id) ==
+                                  duplicate_segments_ids_in_cloud_to_add.end()) {
+                  duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
+                }
               }
             } else {
+              // Remove current segment if other is from another trajectory.
               if (std::find(duplicate_segments_ids_in_cloud_to_add.begin(),
                             duplicate_segments_ids_in_cloud_to_add.end(),
                             it->second.segment_id) ==
                                 duplicate_segments_ids_in_cloud_to_add.end()) {
                 duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
               }
-            }
-          } else {
-            // Remove current segment if other is from another trajectory.
-            if (std::find(duplicate_segments_ids_in_cloud_to_add.begin(),
-                          duplicate_segments_ids_in_cloud_to_add.end(),
-                          it->second.segment_id) ==
-                              duplicate_segments_ids_in_cloud_to_add.end()) {
-              duplicate_segments_ids_in_cloud_to_add.push_back(it->second.segment_id);
             }
           }
         }
@@ -626,26 +641,29 @@ void SegMatch::alignTargetMap() {
   segmented_target_cloud_.transform(last_transformation_.inverse());
 }
 
-void SegMatch::filterDuplicatesAfterLoopClosure() {
+void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimum_distance_m,
+                                            unsigned int n_nearest_segments) {
   laser_slam::Clock clock;
   std::vector<Id> duplicate_segments_ids;
-  std::vector<Id> target_segment_ids;
+  std::vector<Id> segment_ids;
+
+  const double minimum_distance_squared = minimum_distance_m * minimum_distance_m;
 
   // Get a cloud with segments centroids.
-  PointCloud centroid_cloud = segmented_target_cloud_.centroidsAsPointCloud(
-      &target_segment_ids);
+  PointCloud centroid_cloud = cloud->centroidsAsPointCloud(&segment_ids);
 
-  const unsigned int n_nearest_segments = 5u;
-  const laser_slam::Time max_time_diff_ns = 60000000000u;
-  if (target_segment_ids.size() > n_nearest_segments) {
+  LOG(INFO) << "segment_ids.size() " << segment_ids.size();
+
+  if (segment_ids.size() > 2u) {
+    n_nearest_segments = std::min(static_cast<unsigned int>(segment_ids.size()), n_nearest_segments);
     // Set up nearest neighbour search.
     pcl::KdTreeFLANN<PclPoint> kdtree;
     PointCloudPtr centroid_cloud_ptr(new PointCloud);
     pcl::copyPointCloud(centroid_cloud, *centroid_cloud_ptr);
     kdtree.setInputCloud(centroid_cloud_ptr);
 
-    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_target_cloud_.begin();
-        it != segmented_target_cloud_.end(); ++it) {
+    for (std::unordered_map<Id, Segment>::const_iterator it = cloud->begin();
+        it != cloud->end(); ++it) {
 
       // If this id is not already in the list to be removed.
       if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
@@ -663,13 +681,16 @@ void SegMatch::filterDuplicatesAfterLoopClosure() {
 
 
         for (unsigned int i = 1u; i < n_nearest_segments; ++i) {
+
+          LOG(INFO) << "i " << i << " nearest_neighbour_squared_distance[i] " <<
+              nearest_neighbour_squared_distance[i];
+
           // Check if within distance.
-          LOG(INFO) << "i " << i << " nearest_neighbour_squared_distance[i] " << nearest_neighbour_squared_distance[i];
-          if (nearest_neighbour_squared_distance[i] <= params_.centroid_distance_threshold_m) {
-            LOG(INFO) << "Removed";
+          if (nearest_neighbour_squared_distance[i] <= minimum_distance_squared) {
+            LOG(INFO) << "Removed!";
             Segment other_segment;
-            segmented_target_cloud_.findValidSegmentById(
-                target_segment_ids[nearest_neighbour_indice[i]], &other_segment);
+            cloud->findValidSegmentById(
+                segment_ids[nearest_neighbour_indice[i]], &other_segment);
 
             // Keep the oldest segment.
             Id id_to_remove;
@@ -692,10 +713,10 @@ void SegMatch::filterDuplicatesAfterLoopClosure() {
 
   // Remove duplicates.
   size_t n_removals;
-  segmented_target_cloud_.deleteSegmentsById(duplicate_segments_ids, &n_removals);
+  cloud->deleteSegmentsById(duplicate_segments_ids, &n_removals);
   clock.takeTime();
   LOG(INFO) << "Removed " << n_removals << " duplicate segments in " <<
-      clock.getRealTime() << " ms after a loop closure.";
+      clock.getRealTime() << " ms.";
 }
 
 } // namespace segmatch

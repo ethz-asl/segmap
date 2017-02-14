@@ -142,7 +142,8 @@ class SegMatch {
 
   laser_slam::Time findTimeOfClosestSegmentationPose(const segmatch::Segment& segment) const;
 
-  void filterDuplicatesAfterLoopClosure();
+  void filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimum_distance_m,
+                                    unsigned int n_nearest_segments = 2u);
 
   SegMatchParams params_;
 
