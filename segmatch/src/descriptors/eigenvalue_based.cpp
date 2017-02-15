@@ -84,15 +84,25 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
   CHECK_NE(e1, 0.0);
   CHECK_NE(sum_of_eigenvalues, 0.0);
 
+  const double kNormalizationPercentile = 0.9;
+
+  const double kLinearityMax = 28890.9 / kNormalizationPercentile;
+  const double kPlanarityMax = 95919.2 / kNormalizationPercentile;
+  const double kScatteringMax = 124811 / kNormalizationPercentile;
+  const double kOmnivarianceMax = 0.278636 / kNormalizationPercentile;
+  const double kAnisotropyMax = 124810 / kNormalizationPercentile;
+  const double kEigenEntropyMax = 0.956129 / kNormalizationPercentile;
+  const double kChangeOfCurvatureMax = 0.99702 / kNormalizationPercentile;
+
   Feature eigenvalue_feature;
-  eigenvalue_feature.push_back(FeatureValue("linearity", (e1 - e2) / e1));
-  eigenvalue_feature.push_back(FeatureValue("planarity", (e2 - e3) / e1));
-  eigenvalue_feature.push_back(FeatureValue("scattering", e3 / e1));
-  eigenvalue_feature.push_back(FeatureValue("omnivariance", std::pow(e1 * e2 * e3, kOneThird)));
-  eigenvalue_feature.push_back(FeatureValue("anisotropy", (e1 - e3) / e1));
+  eigenvalue_feature.push_back(FeatureValue("linearity", (e1 - e2) / e1 / kLinearityMax));
+  eigenvalue_feature.push_back(FeatureValue("planarity", (e2 - e3) / e1 / kPlanarityMax));
+  eigenvalue_feature.push_back(FeatureValue("scattering", e3 / e1 / kScatteringMax));
+  eigenvalue_feature.push_back(FeatureValue("omnivariance", std::pow(e1 * e2 * e3, kOneThird) / kOmnivarianceMax));
+  eigenvalue_feature.push_back(FeatureValue("anisotropy", (e1 - e3) / e1 / kAnisotropyMax));
   eigenvalue_feature.push_back(FeatureValue("eigen_entropy",
-                                            (e1 * std::log(e1)) + (e2 * std::log(e2)) + (e3 * std::log(e3))));
-  eigenvalue_feature.push_back(FeatureValue("change_of_curvature", e3 / sum_of_eigenvalues));
+                                            (e1 * std::log(e1)) + (e2 * std::log(e2)) + (e3 * std::log(e3)) / kEigenEntropyMax));
+  eigenvalue_feature.push_back(FeatureValue("change_of_curvature", e3 / sum_of_eigenvalues / kChangeOfCurvatureMax));
 
   CHECK_EQ(eigenvalue_feature.size(), kDimension) << "Feature has the wrong dimension";
   features->push_back(eigenvalue_feature);
