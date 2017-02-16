@@ -356,13 +356,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
         source_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
         source_segments.push_back(segment);
         source_track_ids.push_back(segment.track_id);
-        LOG(INFO) << "Source segment ID " << segment.segment_id;
+        LOG(INFO) << "Source Track id " << segment.track_id << " Source segment ID " << segment.segment_id;
 
         CHECK(segmented_target_cloud_.findValidSegmentById(match.ids_.second, &segment));
         target_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
         target_segments.push_back(segment);
         target_track_ids.push_back(segment.track_id);
-        LOG(INFO) << "Target segment ID " << segment.segment_id;
+        LOG(INFO) << "Target Track id " << segment.track_id << " Source segment ID " << segment.segment_id;
       }
 
       const Id source_track_id = findMostOccuringId(source_track_ids);
@@ -412,9 +412,9 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       //      }
       //      CHECK(found);
 
-      if (loop_closure->track_id_a == loop_closure->track_id_b) {
+      /*if (loop_closure->track_id_a == loop_closure->track_id_b) {
         CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
-      }
+      }*/
 
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
       loop_closure->T_a_b = w_T_a_b;
