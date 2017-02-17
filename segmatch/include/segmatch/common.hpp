@@ -204,18 +204,21 @@ static void extractBox(const PointPair& limit_points, float margin, PointICloud*
 }
 
 static void applyCylindricalFilter(const PclPoint& center, double radius_m,
-                                   double height_m, PointICloud* cloud) {
+                                   double height_above_m, double height_below_m,
+                                   PointICloud* cloud) {
   CHECK_NOTNULL(cloud);
   PointICloud filtered_cloud;
 
   const double radius_squared = pow(radius_m, 2.0);
-  const double height_halved_m = height_m / 2.0;
 
   for (size_t i = 0u; i < cloud->size(); ++i) {
     if ((pow(cloud->points[i].x - center.x, 2.0)
-        + pow(cloud->points[i].y - center.y, 2.0)) <= radius_squared &&
-        abs(cloud->points[i].z - center.z) <= height_halved_m) {
-      filtered_cloud.points.push_back(cloud->points[i]);
+        + pow(cloud->points[i].y - center.y, 2.0)) <= radius_squared) {
+
+      if (cloud->points[i].z < center.z + height_above_m &&
+          cloud->points[i].z > center.z - height_below_m) {
+        filtered_cloud.points.push_back(cloud->points[i]);
+      }
     }
   }
   filtered_cloud.width = 1;

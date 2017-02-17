@@ -55,10 +55,16 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
   PointICloud filtered_cloud = source_cloud;
   applyCylindricalFilter(laserSlamPoseToPclPoint(latest_pose),
                          params_.segmentation_radius_m,
-                         kCylinderHeight_m, &filtered_cloud);
+                         params_.segmentation_height_above_m,
+                         params_.segmentation_height_below_m, &filtered_cloud);
 
   // Segment the cloud and set segment information.
   segmenter_->segment(filtered_cloud, &segmented_source_cloud_);
+
+  // Filter the boundary segments.
+  if (params_.filter_boundary_segments) {
+    filterBoundarySegmentsOfSourceCloud(laserSlamPoseToPclPoint(latest_pose));
+  }
 
   LOG(INFO) << "Removing too near segments from source map.";
   filterNearestSegmentsInCloud(&segmented_source_cloud_,
@@ -67,11 +73,6 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
   segmented_source_cloud_.setTimeStampOfSegments(latest_pose.time_ns);
   segmented_source_cloud_.setLinkPoseOfSegments(latest_pose.T_w);
   segmented_source_cloud_.setTrackId(track_id);
-
-  // Filter the boundary segments.
-  if (params_.filter_boundary_segments) {
-    filterBoundarySegmentsOfSourceCloud(laserSlamPoseToPclPoint(latest_pose));
-  }
 
   // Describe the cloud.
   descriptors_->describe(&segmented_source_cloud_);
@@ -101,7 +102,11 @@ void SegMatch::transferSourceToTarget() {
   unsigned int num_cloud_transfered = 0u;
   if (!target_queue_.empty()) {
     if (params_.filter_duplicate_segments) {
+      LOG(INFO) << "Source cloud size before duplicates: " <<
+          target_queue_.at(0u).getNumberOfValidSegments();
       filterDuplicateSegmentsOfTargetMap(&target_queue_.at(0u));
+      LOG(INFO) << "Source cloud size after duplicates: " <<
+          target_queue_.at(0u).getNumberOfValidSegments();
     }
     segmented_target_cloud_.addSegmentedCloud(target_queue_.at(0u));
     target_queue_.erase(target_queue_.begin());
@@ -368,18 +373,24 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       const Id source_track_id = findMostOccuringId(source_track_ids);
       const Id target_track_id = findMostOccuringId(target_track_ids);
 
+      const Time source_most_occuring_time = findMostOccuringTime(source_segmentation_times);
+      const Time target_most_occuring_time = findMostOccuringTime(target_segmentation_times);
+
+      LOG(INFO) << "source_most_occuring_time " << source_most_occuring_time;
+      LOG(INFO) << "target_most_occuring_time " << target_most_occuring_time;
+
       LOG(INFO) << "source_track_id " << source_track_id << " target_track_id " <<
           target_track_id;
 
       LOG(INFO) << "Finding source_track_time_ns";
-      const Time source_track_time_ns =  findTimeOfClosestPose(source_segments[0u].timestamp_ns,
+      const Time source_track_time_ns =  findTimeOfClosestPose(source_most_occuring_time,
                                                                segmentation_poses_[source_track_id],
                                                                source_segments);
 
       LOG(INFO) << "source_track_time_ns " << source_track_time_ns;
 
       LOG(INFO) << "Finding target_track_time_ns";
-      const Time target_track_time_ns =  findTimeOfClosestPose(target_segments[0u].timestamp_ns,
+      const Time target_track_time_ns =  findTimeOfClosestPose(target_most_occuring_time,
                                                                segmentation_poses_[target_track_id],
                                                                target_segments);
 
@@ -560,7 +571,12 @@ void SegMatch::getLatestMatch(int64_t* time_a, int64_t* time_b,
 
 void SegMatch::filterBoundarySegmentsOfSourceCloud(const PclPoint& center) {
   if (!segmented_source_cloud_.empty()) {
-    const double squared_radius = params_.boundary_radius_m * params_.boundary_radius_m;
+    const double squared_radius_m = (params_.segmentation_radius_m - 1.0) *
+        (params_.segmentation_radius_m -1.0);
+
+    const double height_above_m = params_.segmentation_height_above_m - 1.0;
+    const double height_below_m = params_.segmentation_height_below_m - 1.0;
+
     // Get a list of segments with at least one point outside the boundary.
     std::vector<Id> boundary_segments_ids;
     for (std::unordered_map<Id, Segment>::const_iterator it = segmented_source_cloud_.begin();
@@ -572,8 +588,16 @@ void SegMatch::filterBoundarySegmentsOfSourceCloud(const PclPoint& center) {
         PointI point = segment_cloud.at(j);
         point.x -= center.x;
         point.y -= center.y;
-        if ((point.x * point.x + point.y * point.y) >= squared_radius) {
+        if ((point.x * point.x + point.y * point.y) >= squared_radius_m) {
           // If found, add the segment to the deletion list, and move on to the next segment.
+          boundary_segments_ids.push_back(segment.segment_id);
+          break;
+        }
+        if (point.z > center.z + height_above_m) {
+          boundary_segments_ids.push_back(segment.segment_id);
+          break;
+        }
+        if (point.z < center.z - height_below_m){
           boundary_segments_ids.push_back(segment.segment_id);
           break;
         }
@@ -604,7 +628,7 @@ void SegMatch::filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_ad
         params_.centroid_distance_threshold_m;
 
     unsigned int n_nearest_segments = 4u;
-    const laser_slam::Time max_time_diff_ns = 60000000000u;
+    const laser_slam::Time max_time_diff_ns = 40000000000u;
     if (!target_segment_ids.empty()) {
       n_nearest_segments = std::min(static_cast<unsigned int>(target_segment_ids.size()), n_nearest_segments);
       // Set up nearest neighbour search.

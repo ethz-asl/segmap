@@ -22,6 +22,9 @@ namespace segmatch {
 
 struct SegMatchParams {
   double segmentation_radius_m;
+  double segmentation_height_above_m;
+  double segmentation_height_below_m;
+
   bool filter_boundary_segments;
   double boundary_radius_m;
   bool filter_duplicate_segments;

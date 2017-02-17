@@ -302,7 +302,7 @@ void SegMatchWorker::publishLoopClosures() const {
   }
 
   // Query the segmentation_poses_ at that time.
-  publishLineSet(point_pairs, params_.world_frame, kLineScaleLoopClosures,
+  publishLineSet(point_pairs, params_.world_frame, params_.line_scale_loop_closures,
                  Color(0.0, 0.0, 1.0), loop_closures_pub_);
 }
 

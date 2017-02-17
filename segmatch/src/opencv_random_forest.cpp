@@ -228,10 +228,10 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
           PairwiseMatch candidate = candidates_after_first_stage[i];
           Eigen::MatrixXd f1 = candidate.features1_;
           Eigen::MatrixXd f2 = candidate.features2_;
-          if (params_.normalize_eigen_for_hard_threshold) {
+          /*if (params_.normalize_eigen_for_hard_threshold) {
             normalizeEigenFeatures(&f1);
             normalizeEigenFeatures(&f2);
-          }
+          }*/
 
           if ((f1 - f2).squaredNorm() < params_.feature_distance_threshold) {
             candidates.push_back(candidate);

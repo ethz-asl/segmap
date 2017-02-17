@@ -38,6 +38,8 @@ struct SegMatchWorkerParams {
 
   bool publish_predicted_segment_matches = false;
 
+  double line_scale_loop_closures;
+
   std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
 
@@ -120,6 +122,11 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns + "/segmentation_radius_m",
               params.segmentation_radius_m);
+  nh.getParam(ns + "/segmentation_height_above_m",
+              params.segmentation_height_above_m);
+  nh.getParam(ns + "/segmentation_height_below_m",
+              params.segmentation_height_below_m);
+
   nh.getParam(ns + "/filter_boundary_segments",
               params.filter_boundary_segments);
   nh.getParam(ns + "/boundary_radius_m",
@@ -291,6 +298,9 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/publish_predicted_segment_matches",
               params.publish_predicted_segment_matches);
+
+  nh.getParam(ns +"/line_scale_loop_closures",
+              params.line_scale_loop_closures);
 
   params.segmatch_params = getSegMatchParams(nh, ns);
 

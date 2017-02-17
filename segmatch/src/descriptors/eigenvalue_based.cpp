@@ -85,7 +85,7 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
   CHECK_NE(e1, 0.0);
   CHECK_NE(sum_of_eigenvalues, 0.0);
 
-  const double kNormalizationPercentile = 0.9;
+  const double kNormalizationPercentile = 1.0;
 
   const double kLinearityMax = 28890.9 * kNormalizationPercentile;
   const double kPlanarityMax = 95919.2 * kNormalizationPercentile;
@@ -118,12 +118,12 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
   diff_z = point_max.z - point_min.z;
 
   if (diff_z < diff_x && diff_z < diff_y) {
-    eigenvalue_feature.push_back(FeatureValue("pointing_up", 10));
+    eigenvalue_feature.push_back(FeatureValue("pointing_up", 0.2));
   } else {
     eigenvalue_feature.push_back(FeatureValue("pointing_up", 0.0));
   }
 
-  eigenvalue_feature.push_back(FeatureValue("n_points", kNPoints / kNPointsMax));
+  // eigenvalue_feature.push_back(FeatureValue("n_points", kNPoints / kNPointsMax));
 
   CHECK_EQ(eigenvalue_feature.size(), kDimension) << "Feature has the wrong dimension";
   features->push_back(eigenvalue_feature);

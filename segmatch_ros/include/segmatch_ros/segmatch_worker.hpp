@@ -79,7 +79,6 @@ class SegMatchWorker {
 
   // Publishing parameters.
   static constexpr float kLineScaleSegmentMatches = 0.3;
-  static constexpr float kLineScaleLoopClosures = 3.0;
 
   static constexpr unsigned int kPublisherQueueSize = 50u;
 }; // SegMatchWorker
