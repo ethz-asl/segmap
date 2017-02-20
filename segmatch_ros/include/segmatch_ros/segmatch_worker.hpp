@@ -77,6 +77,8 @@ class SegMatchWorker {
   segmatch::SegmentedCloud segments_database_;
   segmatch::database::UniqueIdMatches matches_database_;
 
+  std::unordered_map<unsigned int, segmatch::PointICloud> source_representations_;
+
   // Publishing parameters.
   static constexpr float kLineScaleSegmentMatches = 0.3;
 

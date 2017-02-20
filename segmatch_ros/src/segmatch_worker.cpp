@@ -108,6 +108,16 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
       LOG(INFO) << "Processing the source cloud took " << clock.takeRealTime() << " ms.";
 
+      // Save the representation for publishing.
+      PointICloud source_representation;
+      segmatch_.getSourceRepresentation(&source_representation);
+      auto it = source_representations_.find(track_id);
+      if (it != source_representations_.end()) {
+        it->second = source_representation;
+      } else {
+        source_representations_.emplace(track_id, source_representation);
+      }
+
       // Find matches.
       clock.start();
       PairwiseMatches predicted_matches = segmatch_.findMatches();
@@ -209,7 +219,10 @@ void SegMatchWorker::publishTargetRepresentation() const {
 
 void SegMatchWorker::publishSourceRepresentation() const {
   PointICloud source_representation;
-  segmatch_.getSourceRepresentation(&source_representation);
+  for (const auto source: source_representations_) {
+    source_representation += source.second;
+  }
+
   applyRandomFilterToCloud(params_.ratio_of_points_to_keep_when_publishing,
                            &source_representation);
   sensor_msgs::PointCloud2 source_representation_as_message;
