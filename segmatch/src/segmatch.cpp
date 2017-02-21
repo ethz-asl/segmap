@@ -1,6 +1,7 @@
 #include "segmatch/segmatch.hpp"
 
 #include <algorithm>
+#include <limits>
 
 #include <laser_slam/common.hpp>
 #include <pcl/recognition/cg/geometric_consistency.h>
@@ -151,11 +152,14 @@ PairwiseMatches SegMatch::findMatches(PairwiseMatches* matches_after_first_stage
   return candidates;
 }
 
-Time findTimeOfClosestPose(Time center_time_ns, const Trajectory& poses,
+Time findTimeOfClosestPose(const Trajectory& poses,
                            std::vector<Segment>& segments) {
+  CHECK(!poses.empty());
+  CHECK(!segments.empty());
+
   // Get a time window of poses around a given time.
   // Todo how to extend to multiple segments?
-  const Time half_window_size_ns = 60000000000u;
+  /*const Time half_window_size_ns = 60000000000u;
   Trajectory poses_in_window;
   for (const auto& pose: poses) {
     if (pose.first <= center_time_ns + half_window_size_ns &&
@@ -164,38 +168,31 @@ Time findTimeOfClosestPose(Time center_time_ns, const Trajectory& poses,
     }
   }
 
-  LOG(INFO) << "Found " << poses_in_window.size() << " poses in time window. Total distances :";
+  LOG(INFO) << "Found " << poses_in_window.size() << " poses in time window. Total distances :";*/
   // Calculate total distance from each pose to each segments centroid.
-  std::vector<double> total_distances_m;
-  std::vector<Time> pose_times_ns;
-  for (const auto& pose: poses_in_window) {
-    double total_distance_m = 0;
-    PclPoint pose_point = se3ToPclPoint(pose.second);
-    for (const auto& segment: segments) {
-      total_distance_m += pointToPointDistance(pose_point,
-                                               segment.centroid);
-    }
-    LOG(INFO) << total_distance_m;
-    total_distances_m.push_back(total_distance_m);
-    pose_times_ns.push_back(pose.first);
+
+  // Compute center of segments.
+  PclPoint segments_center;
+  for (const auto& segment: segments) {
+    segments_center.x += segment.centroid.x;
+    segments_center.y += segment.centroid.y;
+    segments_center.z += segment.centroid.z;
   }
+  segments_center.x /= double(segments.size());
+  segments_center.y /= double(segments.size());
+  segments_center.z /= double(segments.size());
 
-  // Find the timestamp of the closest pose in average.
-  const double min_distance_m = *std::min_element(total_distances_m.begin(),
-                                                  total_distances_m.end());
-
-  LOG(INFO) << "min_distance_m " << min_distance_m;
-  bool found = false;
-  Time closest_pose_timestamp_ns;
-  for (size_t i = 0u; i < total_distances_m.size(); ++i) {
-    if (min_distance_m == total_distances_m[i]) {
-      closest_pose_timestamp_ns = pose_times_ns[i];
-      found = true;
-      break;
+  double minimum_distance_m = std::numeric_limits<double>::max();
+  Time closest_pose_time_ns;
+  for (const auto& pose: poses) {
+    double distance_m = pointToPointDistance(se3ToPclPoint(pose.second), segments_center);
+    if (distance_m < minimum_distance_m) {
+      minimum_distance_m = distance_m;
+      closest_pose_time_ns = pose.first;
     }
   }
-  CHECK(found);
-  return closest_pose_timestamp_ns;
+
+  return closest_pose_time_ns;
 }
 
 bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
@@ -373,27 +370,47 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       const Id source_track_id = findMostOccuringId(source_track_ids);
       const Id target_track_id = findMostOccuringId(target_track_ids);
 
-      const Time source_most_occuring_time = findMostOccuringTime(source_segmentation_times);
-      const Time target_most_occuring_time = findMostOccuringTime(target_segmentation_times);
+      //const Time source_most_occuring_time = findMostOccuringTime(source_segmentation_times);
+      //const Time target_most_occuring_time = findMostOccuringTime(target_segmentation_times);
 
-      LOG(INFO) << "source_most_occuring_time " << source_most_occuring_time;
-      LOG(INFO) << "target_most_occuring_time " << target_most_occuring_time;
+      //LOG(INFO) << "source_most_occuring_time " << source_most_occuring_time;
+      //LOG(INFO) << "target_most_occuring_time " << target_most_occuring_time;
 
       LOG(INFO) << "source_track_id " << source_track_id << " target_track_id " <<
           target_track_id;
 
-      LOG(INFO) << "Finding source_track_time_ns";
-      const Time source_track_time_ns =  findTimeOfClosestPose(source_most_occuring_time,
-                                                               segmentation_poses_[source_track_id],
-                                                               source_segments);
+      LOG(INFO) << "Finding source_track_time_ns and target_track_time_ns";
+      Time source_track_time_ns, target_track_time_ns;
+
+      if (source_track_id != target_track_id) {
+        source_track_time_ns =  findTimeOfClosestPose(segmentation_poses_[source_track_id],
+                                                      source_segments);
+        target_track_time_ns =  findTimeOfClosestPose(segmentation_poses_[target_track_id],
+                                                      target_segments);
+      } else {
+        // Split the trajectory into head and tail.
+        Time trajectory_last_time_ns = segmentation_poses_[source_track_id].rbegin()->first;
+        CHECK_GT(trajectory_last_time_ns, params_.min_time_between_segment_for_matches_ns);
+        Time start_time_of_head_ns = trajectory_last_time_ns -
+            params_.min_time_between_segment_for_matches_ns;
+
+        Trajectory tail_poses, head_poses;
+
+        for (const auto pose: segmentation_poses_[source_track_id]) {
+          if (pose.first < start_time_of_head_ns) {
+            tail_poses.emplace(pose.first, pose.second);
+          } else {
+            head_poses.emplace(pose.first, pose.second);
+          }
+        }
+
+        source_track_time_ns =  findTimeOfClosestPose(head_poses,
+                                                      source_segments);
+        target_track_time_ns =  findTimeOfClosestPose(tail_poses,
+                                                      target_segments);
+      }
 
       LOG(INFO) << "source_track_time_ns " << source_track_time_ns;
-
-      LOG(INFO) << "Finding target_track_time_ns";
-      const Time target_track_time_ns =  findTimeOfClosestPose(target_most_occuring_time,
-                                                               segmentation_poses_[target_track_id],
-                                                               target_segments);
-
       LOG(INFO) << "target_track_time_ns " << target_track_time_ns;
 
       loop_closure->time_a_ns = target_track_time_ns;
