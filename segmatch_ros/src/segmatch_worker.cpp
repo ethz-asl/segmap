@@ -218,7 +218,9 @@ void SegMatchWorker::publishTargetRepresentation() const {
 }
 
 void SegMatchWorker::publishSourceRepresentation() const {
+  laser_slam::Clock clock;
   PointICloud source_representation;
+  LOG(INFO) << "source_representations_.size() " << source_representations_.size();
   for (const auto source: source_representations_) {
     source_representation += source.second;
   }
@@ -229,6 +231,7 @@ void SegMatchWorker::publishSourceRepresentation() const {
   convert_to_point_cloud_2_msg(source_representation, params_.world_frame,
                                &source_representation_as_message);
   source_representation_pub_.publish(source_representation_as_message);
+  LOG(INFO) << "Publishing the source clouds took " << clock.takeRealTime() << " ms.";
 }
 
 void SegMatchWorker::publishMatches() const {

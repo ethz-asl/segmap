@@ -792,10 +792,18 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
 
             // Keep the oldest segment.
             Id id_to_remove;
-            if (it->second.timestamp_ns > other_segment.timestamp_ns) {
-              id_to_remove = it->second.segment_id;
-            } else {
+            if (it->second.timestamp_ns != other_segment.timestamp_ns) {
+              if (it->second.timestamp_ns > other_segment.timestamp_ns) {
+                id_to_remove = it->second.segment_id;
+                break;
+              } else {
+                id_to_remove = other_segment.segment_id;
+              }
+            } else if (it->second.point_cloud.size() >  other_segment.point_cloud.size()) {
               id_to_remove = other_segment.segment_id;
+            } else {
+              id_to_remove = it->second.segment_id;
+              break;
             }
 
             // Add id to remove if not already in the list.
