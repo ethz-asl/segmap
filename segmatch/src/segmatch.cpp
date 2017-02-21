@@ -812,6 +812,11 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
             if (it->second.timestamp_ns != other_segment.timestamp_ns) {
               if (it->second.timestamp_ns > other_segment.timestamp_ns) {
                 id_to_remove = it->second.segment_id;
+                // Add id to remove if not already in the list.
+                if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                              id_to_remove) == duplicate_segments_ids.end()) {
+                  duplicate_segments_ids.push_back(id_to_remove);
+                }
                 break;
               } else {
                 id_to_remove = other_segment.segment_id;
@@ -820,6 +825,11 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
               id_to_remove = other_segment.segment_id;
             } else {
               id_to_remove = it->second.segment_id;
+              // Add id to remove if not already in the list.
+              if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
+                            id_to_remove) == duplicate_segments_ids.end()) {
+                duplicate_segments_ids.push_back(id_to_remove);
+              }
               break;
             }
 
