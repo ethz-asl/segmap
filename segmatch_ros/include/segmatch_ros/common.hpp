@@ -140,6 +140,9 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
               min_time_between_segment_for_matches_s);
   params.min_time_between_segment_for_matches_ns =
       laser_slam::Time(min_time_between_segment_for_matches_s) * 1000000000u;
+  nh.getParam(ns + "/check_pose_lies_below_segments",
+              params.check_pose_lies_below_segments);
+
 
   // Descriptors parameters.
   nh.getParam(ns + "/Descriptors/descriptor_types",

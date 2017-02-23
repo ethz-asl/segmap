@@ -393,9 +393,15 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       if (source_track_id != target_track_id) {
         // Get the head of the source trajectory.
         Time trajectory_last_time_ns = segmentation_poses_[source_track_id].rbegin()->first;
-        CHECK_GT(trajectory_last_time_ns, params_.min_time_between_segment_for_matches_ns);
-        Time start_time_of_head_ns = trajectory_last_time_ns -
-            params_.min_time_between_segment_for_matches_ns;
+        Time start_time_of_head_ns;
+
+        if (trajectory_last_time_ns > params_.min_time_between_segment_for_matches_ns) {
+          start_time_of_head_ns = trajectory_last_time_ns - params_.min_time_between_segment_for_matches_ns;
+        } else {
+          start_time_of_head_ns = 0u;
+        }
+
+        LOG(INFO) << "start_time_of_head_ns " << start_time_of_head_ns;
 
         Trajectory head_poses;
 
@@ -404,6 +410,8 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
             head_poses.emplace(pose.first, pose.second);
           }
         }
+
+        LOG(INFO) << "head_poses.size() " << head_poses.size();
 
         // Get a window over the target trajectory.
         const Time half_window_size_ns = 180000000000u;
@@ -427,7 +435,8 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
             segments_center.z /= double(target_segments.size());
 
             // Check that pose lies below the segments center of mass.
-            if (pose.second.getPosition()(2) < segments_center.z) {
+            if (!params_.check_pose_lies_below_segments ||
+                pose.second.getPosition()(2) < segments_center.z) {
               poses_in_window.emplace(pose.first, pose.second);
             }
           }

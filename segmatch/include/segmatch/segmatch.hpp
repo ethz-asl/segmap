@@ -30,6 +30,7 @@ struct SegMatchParams {
   bool filter_duplicate_segments;
   double centroid_distance_threshold_m;
   laser_slam::Time min_time_between_segment_for_matches_ns;
+  bool check_pose_lies_below_segments = false;
 
   DescriptorsParameters descriptors_params;
   SegmenterParameters segmenter_params;
