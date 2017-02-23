@@ -79,6 +79,8 @@ class SegMatchWorker {
 
   std::unordered_map<unsigned int, segmatch::PointICloud> source_representations_;
 
+  unsigned int num_tracks_;
+
   // Publishing parameters.
   static constexpr float kLineScaleSegmentMatches = 0.3;
 

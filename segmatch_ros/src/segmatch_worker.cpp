@@ -14,6 +14,7 @@ SegMatchWorker::~SegMatchWorker() { }
 void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& params,
                           unsigned int num_tracks) {
   params_ = params;
+  num_tracks_ = num_tracks;
 
   // Initialize SegMatch.
   segmatch_.init(params_.segmatch_params, num_tracks);
@@ -108,7 +109,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       segmatch_.processAndSetAsSourceCloud(source_cloud, latest_pose, track_id);
       LOG(INFO) << "Processing the source cloud took " << clock.takeRealTime() << " ms.";
 
-      clock.start();
+      /*clock.start();
       // Save the representation for publishing.
       PointICloud source_representation;
       segmatch_.getSourceRepresentation(&source_representation);
@@ -119,10 +120,11 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
         source_representations_.emplace(track_id, source_representation);
       }
       LOG(INFO) << "Saving source cloud representation " << clock.takeRealTime() << " ms.";
+*/
 
       // Find matches.
       clock.start();
-      PairwiseMatches predicted_matches = segmatch_.findMatches();
+      PairwiseMatches predicted_matches = segmatch_.findMatches(NULL, track_id);
       LOG(INFO) << "Finding matches took " << clock.takeRealTime() << " ms.";
       if (!predicted_matches.empty()) {
         LOG(INFO) << "Number of candidates after full matching: " << predicted_matches.size() <<
@@ -133,7 +135,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       clock.start();
       PairwiseMatches filtered_matches;
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
-                                                   loop_closure);
+                                                   loop_closure, NULL, track_id);
       LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
       LOG(INFO) << "Number of matches after filtering: " << filtered_matches.size() << ".";
 
@@ -142,7 +144,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
         // If we did not find a loop-closure, transfer the source to the target map.
         if (filtered_matches.empty()) {
           LOG(INFO) << "Transfering source cloud to target.";
-          segmatch_.transferSourceToTarget();
+          segmatch_.transferSourceToTarget(track_id);
         }
       } else if (params_.localize){
         if (!filtered_matches.empty() && !first_localization_occured) {
@@ -157,7 +159,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
 
       // Store segments and matches in database if desired, for later export.
       if (params_.export_segments_and_matches) {
-        segments_database_ += segmatch_.getSourceAsSegmentedCloud();
+        segments_database_ += segmatch_.getSourceAsSegmentedCloud(track_id);
         if (loop_closure_found) {
           for (size_t i = 0u; i < filtered_matches.size(); ++i) {
             matches_database_.addMatch(filtered_matches.at(i).ids_.first,
@@ -221,16 +223,18 @@ void SegMatchWorker::publishTargetRepresentation() const {
 
 void SegMatchWorker::publishSourceRepresentation() const {
   laser_slam::Clock clock;
-  PointICloud source_representation;
-  LOG(INFO) << "source_representations_.size() " << source_representations_.size();
-  for (const auto source: source_representations_) {
-    source_representation += source.second;
+  PointICloud full_source_representation;
+
+  for (unsigned int i = 0u; i < num_tracks_; ++i) {
+    PointICloud source_representation;
+    segmatch_.getSourceRepresentation(&source_representation, 0.0, i);
+    full_source_representation += source_representation;
   }
 
   applyRandomFilterToCloud(params_.ratio_of_points_to_keep_when_publishing,
-                           &source_representation);
+                           &full_source_representation);
   sensor_msgs::PointCloud2 source_representation_as_message;
-  convert_to_point_cloud_2_msg(source_representation, params_.world_frame,
+  convert_to_point_cloud_2_msg(full_source_representation, params_.world_frame,
                                &source_representation_as_message);
   source_representation_pub_.publish(source_representation_as_message);
   LOG(INFO) << "Publishing the source clouds took " << clock.takeRealTime() << " ms.";
@@ -294,10 +298,16 @@ void SegMatchWorker::publishTargetSegmentsCentroids() const {
 }
 
 void SegMatchWorker::publishSourceSegmentsCentroids() const {
-  PointICloud segments_centroids;
-  segmatch_.getSourceSegmentsCentroids(&segments_centroids);
+  PointICloud full_segments_centroids;
+
+  for (unsigned int i = 0u; i < num_tracks_; ++i) {
+    PointICloud segments_centroids;
+    segmatch_.getSourceSegmentsCentroids(&segments_centroids, i);
+    full_segments_centroids += segments_centroids;
+  }
+
   sensor_msgs::PointCloud2 segments_centroids_as_message;
-  convert_to_point_cloud_2_msg(segments_centroids, params_.world_frame,
+  convert_to_point_cloud_2_msg(full_segments_centroids, params_.world_frame,
                                &segments_centroids_as_message);
   source_segments_centroids_pub_.publish(segments_centroids_as_message);
 }
