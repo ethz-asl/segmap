@@ -39,6 +39,7 @@ struct SegMatchWorkerParams {
   bool publish_predicted_segment_matches = false;
 
   double line_scale_loop_closures;
+  double line_scale_matches;
 
   std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
@@ -304,6 +305,9 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/line_scale_loop_closures",
               params.line_scale_loop_closures);
+
+  nh.getParam(ns +"/line_scale_matches",
+              params.line_scale_matches);
 
   params.segmatch_params = getSegMatchParams(nh, ns);
 

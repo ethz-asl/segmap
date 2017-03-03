@@ -60,11 +60,13 @@ class SegMatch {
   void processAndSetAsTargetCloud(const PointICloud& target_cloud);
 
   /// \brief Transfer the source cloud to the target cloud.
-  void transferSourceToTarget(unsigned int track_id = 0u);
+  void transferSourceToTarget(unsigned int track_id = 0u,
+                              laser_slam::Time timestamp_ns = 0u);
 
   /// \brief Find matches between the source and the target clouds.
   PairwiseMatches findMatches(PairwiseMatches* matches_after_first_stage = NULL,
-                              unsigned int track_id = 0u);
+                              unsigned int track_id = 0u,
+                              laser_slam::Time timestamp_ns = 0u);
 
   /// \brief Find nearest neighbours between the source and target segments.
   PairwiseMatches findNearestNeighbours() { };
@@ -74,7 +76,8 @@ class SegMatch {
                      PairwiseMatches* filtered_matches_ptr,
                      laser_slam::RelativePose* loop_closure = NULL,
                      std::vector<PointICloudPair>* matched_segment_clouds = NULL,
-                     unsigned int track_id = 0u);
+                     unsigned int track_id = 0u,
+                     laser_slam::Time timestamp_ns = 0u);
 
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
@@ -149,6 +152,10 @@ class SegMatch {
 
   void alignTargetMap();
 
+  void displayTimings() const;
+
+  void saveTimings() const;
+
  private:
   void filterBoundarySegmentsOfSourceCloud(const PclPoint& center,
                                            unsigned int track_id = 0u);
@@ -183,6 +190,18 @@ class SegMatch {
   std::vector<laser_slam::RelativePose> loop_closures_;
 
   Eigen::Matrix4f last_transformation_;
+
+  // Timings.
+  std::map<laser_slam::Time, double> segmentation_and_description_timings_;
+  std::map<laser_slam::Time, double> matching_timings_;
+  std::map<laser_slam::Time, double> geometric_verification_timings_;
+  std::map<laser_slam::Time, double> source_to_target_timings_;
+  std::map<laser_slam::Time, double> update_timings_;
+
+  std::vector<double> n_segments_in_source_;
+  std::vector<double> n_points_in_source_;
+
+  std::vector<double> loops_timestamps_;
 
   // Filtering parameters.
   static constexpr double kCylinderHeight_m = 40;

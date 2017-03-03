@@ -124,7 +124,8 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
 
       // Find matches.
       clock.start();
-      PairwiseMatches predicted_matches = segmatch_.findMatches(NULL, track_id);
+      PairwiseMatches predicted_matches = segmatch_.findMatches(NULL, track_id,
+                                                                latest_pose.time_ns);
       LOG(INFO) << "Finding matches took " << clock.takeRealTime() << " ms.";
       if (!predicted_matches.empty()) {
         LOG(INFO) << "Number of candidates after full matching: " << predicted_matches.size() <<
@@ -135,7 +136,8 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       clock.start();
       PairwiseMatches filtered_matches;
       loop_closure_found = segmatch_.filterMatches(predicted_matches, &filtered_matches,
-                                                   loop_closure, NULL, track_id);
+                                                   loop_closure, NULL, track_id,
+                                                   latest_pose.time_ns);
       LOG(INFO) << "Filtering matches took " << clock.takeRealTime() << " ms.";
       LOG(INFO) << "Number of matches after filtering: " << filtered_matches.size() << ".";
 
@@ -144,7 +146,8 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
         // If we did not find a loop-closure, transfer the source to the target map.
         if (filtered_matches.empty()) {
           LOG(INFO) << "Transfering source cloud to target.";
-          segmatch_.transferSourceToTarget(track_id);
+          segmatch_.transferSourceToTarget(track_id,
+                                           latest_pose.time_ns);
         }
       } else if (params_.localize){
         if (!filtered_matches.empty() && !first_localization_occured) {
@@ -249,7 +252,7 @@ void SegMatchWorker::publishMatches() const {
     point_pairs.push_back(
         PointPair(matches[i].getCentroids().first, target_segment_centroid));
   }
-  publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
+  publishLineSet(point_pairs, params_.world_frame, params_.line_scale_matches,
                  Color(0.0, 1.0, 0.0), matches_pub_);
 
   if (params_.publish_predicted_segment_matches) {
@@ -261,7 +264,7 @@ void SegMatchWorker::publishMatches() const {
       point_pairs.push_back(
           PointPair(predicted_matches[i].getCentroids().first, target_segment_centroid));
     }
-    publishLineSet(point_pairs, params_.world_frame, kLineScaleSegmentMatches,
+    publishLineSet(point_pairs, params_.world_frame, params_.line_scale_matches,
                    Color(0.7, 0.7, 0.7), predicted_matches_pub_);
   }
 }

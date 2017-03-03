@@ -49,6 +49,7 @@ void SegMatch::setParams(const SegMatchParams& params) {
 void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                                           const laser_slam::Pose& latest_pose,
                                           unsigned int track_id) {
+  Clock clock;
   // Save the segmentation pose.
   segmentation_poses_[track_id][latest_pose.time_ns] = latest_pose.T_w;
   last_processed_source_cloud_ = track_id;
@@ -59,6 +60,8 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
                          params_.segmentation_radius_m,
                          params_.segmentation_height_above_m,
                          params_.segmentation_height_below_m, &filtered_cloud);
+
+  n_points_in_source_.push_back(filtered_cloud.size());
 
   // Segment the cloud and set segment information.
   if (segmented_source_clouds_.find(track_id) == segmented_source_clouds_.end()) {
@@ -82,6 +85,10 @@ void SegMatch::processAndSetAsSourceCloud(const PointICloud& source_cloud,
 
   // Describe the cloud.
   descriptors_->describe(&segmented_source_clouds_[track_id]);
+  clock.takeTime();
+  segmentation_and_description_timings_.emplace(latest_pose.time_ns, clock.getRealTime());
+
+  n_segments_in_source_.push_back(segmented_source_clouds_[track_id].getNumberOfValidSegments());
 }
 
 void SegMatch::processAndSetAsTargetCloud(const PointICloud& target_cloud) {
@@ -92,7 +99,9 @@ void SegMatch::processAndSetAsTargetCloud(const PointICloud& target_cloud) {
   classifier_->setTarget(segmented_target_cloud_);
 }
 
-void SegMatch::transferSourceToTarget(unsigned int track_id) {
+void SegMatch::transferSourceToTarget(unsigned int track_id,
+                                      laser_slam::Time timestamp_ns) {
+  Clock clock;
   target_queue_.push_back(segmented_source_clouds_[track_id]);
 
   // Remove empty clouds from queue.
@@ -122,6 +131,8 @@ void SegMatch::transferSourceToTarget(unsigned int track_id) {
   if (num_cloud_transfered > 0u) {
     classifier_->setTarget(segmented_target_cloud_);
   }
+  clock.takeTime();
+  source_to_target_timings_.emplace(timestamp_ns, clock.getRealTime());
 }
 
 void SegMatch::processCloud(const PointICloud& target_cloud,
@@ -149,12 +160,16 @@ void SegMatch::processCloud(const PointICloud& target_cloud,
 }
 
 PairwiseMatches SegMatch::findMatches(PairwiseMatches* matches_after_first_stage,
-                                      unsigned int track_id) {
+                                      unsigned int track_id,
+                                      laser_slam::Time timestamp_ns) {
+  Clock clock;
   PairwiseMatches candidates;
   if (!segmented_source_clouds_[track_id].empty()) {
     candidates = classifier_->findCandidates(segmented_source_clouds_[track_id],
                                              matches_after_first_stage);
   }
+  clock.takeTime();
+  matching_timings_.emplace(timestamp_ns, clock.getRealTime());
   return candidates;
 }
 
@@ -205,11 +220,14 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
                              PairwiseMatches* filtered_matches_ptr,
                              RelativePose* loop_closure,
                              std::vector<PointICloudPair>* matched_segment_clouds,
-                             unsigned int track_id) {
+                             unsigned int track_id,
+                             laser_slam::Time timestamp_ns) {
   if (matched_segment_clouds != NULL) { matched_segment_clouds->clear(); }
 
   PairwiseMatches filtered_matches;
   Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
+
+  Clock clock;
 
   if (!predicted_matches.empty()) {
     //TODO: use a (gc) filtering class for an extra layer of abstraction?
@@ -313,6 +331,9 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       }
     }
 
+    clock.takeTime();
+    geometric_verification_timings_.emplace(timestamp_ns, clock.getRealTime());
+
     // If desired, pass the filtered matches.
     if (filtered_matches_ptr != NULL && !filtered_matches.empty()) {
       *filtered_matches_ptr = filtered_matches;
@@ -351,6 +372,8 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
     // If desired, return the loop-closure.
     if (loop_closure != NULL && !filtered_matches.empty()) {
       LOG(INFO) << "Found a loop";
+
+      loops_timestamps_.push_back(timestamp_ns);
       laser_slam::Clock clock;
       // Find the trajectory poses to be linked by the loop-closure.
       // For each segment, find the timestamp of the closest segmentation pose.
@@ -522,6 +545,7 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 }
 
 void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
+  Clock clock;
   CHECK_EQ(trajectories.size(), segmentation_poses_.size());
   // Update the segmentation positions.
   for (size_t i = 0u; i < trajectories.size(); ++i) {
@@ -569,6 +593,9 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   LOG(INFO) << "Removing too near segments from target map.";
   filterNearestSegmentsInCloud(&segmented_target_cloud_, params_.centroid_distance_threshold_m,
                                5u);
+
+  clock.takeTime();
+  update_timings_.emplace(trajectories[0u].rbegin()->first, clock.getRealTime());
 }
 
 void SegMatch::getSourceRepresentation(PointICloud* source_representation,
@@ -582,7 +609,8 @@ void SegMatch::getSourceRepresentation(PointICloud* source_representation,
 }
 
 void SegMatch::getTargetRepresentation(PointICloud* target_representation) const {
-  segmentedCloudToCloud(segmented_target_cloud_, target_representation);
+  segmentedCloudToCloud(segmented_target_cloud_
+                        , target_representation);
 }
 
 void SegMatch::getTargetSegmentsCentroids(PointICloud* segments_centroids) const {
@@ -924,6 +952,96 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
   clock.takeTime();
   LOG(INFO) << "Removed " << n_removals << " duplicate segments in " <<
       clock.getRealTime() << " ms.";
+}
+
+void SegMatch::displayTimings() const {
+  /*double mean, sigma;
+  getMeanAndSigma(segmentation_and_description_timings_, &mean, &sigma);
+  LOG(INFO) << "segmentation_and_description_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(matching_timings_, &mean, &sigma);
+  LOG(INFO) << "matching_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(geometric_verification_timings_, &mean, &sigma);
+  LOG(INFO) << "geometric_verification_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(source_to_target_timings_, &mean, &sigma);
+  LOG(INFO) << "source_to_target_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(update_timings_, &mean, &sigma);
+  LOG(INFO) << "update_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(n_segments_in_source_, &mean, &sigma);
+  double sum_source_segments = 0;
+  for (const auto& n: n_segments_in_source_) {
+    sum_source_segments += n;
+  }
+  LOG(INFO) << "Source segments sum " <<  sum_source_segments << " mean " << mean <<
+      " sigma " << sigma;
+
+  getMeanAndSigma(n_points_in_source_, &mean, &sigma);
+  double sum_source_points = 0;
+  for (const auto& n: n_points_in_source_) {
+    sum_source_points += n;
+  }
+  LOG(INFO) << "Source points sum " <<  sum_source_points << " mean " << mean <<
+      " sigma " << sigma;*/
+}
+
+void SegMatch::saveTimings() const {
+  /*double mean, sigma;
+  getMeanAndSigma(segmentation_and_description_timings_, &mean, &sigma);
+  LOG(INFO) << "segmentation_and_description_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(matching_timings_, &mean, &sigma);
+  LOG(INFO) << "matching_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(geometric_verification_timings_, &mean, &sigma);
+  LOG(INFO) << "geometric_verification_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(source_to_target_timings_, &mean, &sigma);
+  LOG(INFO) << "source_to_target_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(update_timings_, &mean, &sigma);
+  LOG(INFO) << "update_timings_  " << ": " << mean << " +/- " << sigma;
+
+  getMeanAndSigma(n_segments_in_source_, &mean, &sigma);
+  double sum_source_segments = 0;
+  for (const auto& n: n_segments_in_source_) {
+    sum_source_segments += n;
+  }
+  LOG(INFO) << "Source segments sum " <<  sum_source_segments << " mean " << mean <<
+      " sigma " << sigma;
+
+  getMeanAndSigma(n_points_in_source_, &mean, &sigma);
+  double sum_source_points = 0;
+  for (const auto& n: n_points_in_source_) {
+    sum_source_points += n;
+  }
+  LOG(INFO) << "Source points sum " <<  sum_source_points << " mean " << mean <<
+      " sigma " << sigma;*/
+
+  Eigen::MatrixXd matrix;
+  toEigenMatrixXd(segmentation_and_description_timings_, &matrix);
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_segmentation_and_description.csv");
+
+  toEigenMatrixXd(matching_timings_, &matrix);
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_matching.csv");
+
+  toEigenMatrixXd(geometric_verification_timings_, &matrix);
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_geometric_verification.csv");
+
+  toEigenMatrixXd(source_to_target_timings_, &matrix);
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_source_to_target_timings.csv");
+
+  toEigenMatrixXd(update_timings_, &matrix);
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_updates.csv");
+
+  matrix.resize(loops_timestamps_.size(), 1);
+  for (size_t i = 0u; i < loops_timestamps_.size(); ++i) {
+    matrix(i,0) = loops_timestamps_[i];
+  }
+  writeEigenMatrixXdCSV(matrix, "/tmp/timing_loops.csv");
 }
 
 } // namespace segmatch
