@@ -60,7 +60,7 @@ class OpenCvRandomForest {
 
   ClassifierParams params_;
 
-  static constexpr unsigned int kMinNumberSegmentInTargetCloud = 50u;
+  static constexpr unsigned int kMinNumberSegmentInTargetCloud = 5u;
 }; // class OpenCvRandomForest
 
 } // namespace segmatch

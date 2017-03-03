@@ -1,5 +1,7 @@
 #include "segmatch_ros/segmatch_worker.hpp"
 
+#include <unistd.h>
+
 #include <eigen_conversions/eigen_msg.h>
 #include <laser_slam/common.hpp>
 
@@ -56,6 +58,7 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
 
   if (params_.localize) {
     loadTargetCloud();
+    usleep(1000000);
     publishTargetRepresentation();
     publishTargetSegmentsCentroids();
   }
