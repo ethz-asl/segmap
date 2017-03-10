@@ -23,7 +23,7 @@ Finally build the *laser_mapper* package which will compile all *SegMatch* modul
 $ cd ~/catkin_ws
 $ catkin build -DCMAKE_BUILD_TYPE=Release laser_mapper
 ```
-Building dependencies will require some time according to which new package need to be built (eg. Building the `pcl_catkin` package can take up to two hours). See this link for installing [catkin_tools](http://catkin-tools.readthedocs.io/en/latest/installing.html). 
+Building dependencies will require some time according to which new packages need to be built (eg. Building the `pcl_catkin` package can take up to two hours). See this link for installing [catkin_tools](http://catkin-tools.readthedocs.io/en/latest/installing.html). 
 
 Consult the [wiki](https://github.com/ethz-asl/segmatch/wiki) for instructions on running the demonstrations.
 
