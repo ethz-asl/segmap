@@ -1,5 +1,8 @@
 #include "segmatch_ros/segmatch_worker.hpp"
 
+#include <unistd.h>
+
+#include <eigen_conversions/eigen_msg.h>
 #include <laser_slam/common.hpp>
 
 namespace segmatch_ros {
@@ -35,6 +38,9 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
       "/segmatch/target_segments_centroids", kPublisherQueueSize);
   source_segments_centroids_pub_ = nh.advertise<sensor_msgs::PointCloud2>(
       "/segmatch/source_segments_centroids", kPublisherQueueSize);
+  last_transformation_pub_ = nh.advertise<geometry_msgs::Transform>(
+      "/segmatch/last_transformation", 5, true);
+
   if (params_.export_segments_and_matches) {
     export_run_service_ = nh.advertiseService("export_run",
                                               &SegMatchWorker::exportRunServiceCall, this);
@@ -52,6 +58,7 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
 
   if (params_.localize) {
     loadTargetCloud();
+    usleep(1000000);
     publishTargetRepresentation();
     publishTargetSegmentsCentroids();
   }
@@ -184,6 +191,7 @@ void SegMatchWorker::publish() const {
   publishSourceRepresentation();
   publishSourceSegmentsCentroids();
   publishSegmentationPositions();
+  publishLastTransformation();
   // If closing loops, republish the target map.
   if (params_.close_loops) {
     publishTargetRepresentation();
@@ -299,6 +307,16 @@ void SegMatchWorker::publishLoopClosures() const {
   // Query the segmentation_poses_ at that time.
   publishLineSet(point_pairs, params_.world_frame, kLineScaleLoopClosures,
                  Color(0.0, 0.0, 1.0), loop_closures_pub_);
+}
+
+void SegMatchWorker::publishLastTransformation() const {
+  if (first_localization_occured) {
+    Eigen::Affine3d transformation;
+    segmatch_.getLastTransform(&(transformation.matrix()));
+    geometry_msgs::Transform transform_msg;
+    tf::transformEigenToMsg(transformation, transform_msg);
+    last_transformation_pub_.publish(transform_msg);
+  }
 }
 
 bool SegMatchWorker::exportRunServiceCall(std_srvs::Empty::Request& req,

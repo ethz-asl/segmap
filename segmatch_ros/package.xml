@@ -17,6 +17,7 @@
   <depend>cmake_modules</depend>
   <depend>doxygen_catkin</depend>
   <depend>eigen_catkin</depend>
+  <depend>eigen_conversions</depend>
   <depend>glog_catkin</depend>
   <depend>gtsam_catkin</depend>
   <depend>laser_slam</depend>

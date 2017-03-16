@@ -134,6 +134,8 @@ class SegMatch {
 
   void alignTargetMap();
 
+  void getLastTransform(Eigen::Matrix4d* out) const;
+
  private:
   void filterBoundarySegmentsOfSourceCloud(const PclPoint& center);
 
