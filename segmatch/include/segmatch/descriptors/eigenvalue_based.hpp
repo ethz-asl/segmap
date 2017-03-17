@@ -30,7 +30,7 @@ class EigenvalueBasedDescriptor : public Descriptor {
   virtual unsigned int dimension() const { return kDimension; };
 
  private:
-  static constexpr unsigned int kDimension = 7u;
+  static constexpr unsigned int kDimension = 8u;
 }; // class EigenvalueBasedDescriptor
 
 } // namespace segmatch

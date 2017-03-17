@@ -26,13 +26,19 @@
   <arg name="target_cloud" value="$(find laser_mapper)/demonstration_files/kitti/drive27_target_map.pcd"/>
   <rosparam param="/LaserMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
   
+  <!-- Callgrind profiling option -->
+  <arg name="enable_callgrind" default="false" />
+  <arg name="play_rate" value="0.005" if="$(arg enable_callgrind)"/>
+  <arg name="play_rate" value="1" unless="$(arg enable_callgrind)"/>
+  
   <!-- laser_mapper node -->
   <include file="$(find laser_mapper)/launch/laser_mapper.launch">
     <arg name="icp_configuration_file" value="$(find laser_mapper)/launch/kitti/icp_dynamic_outdoor.yaml"/>
     <arg name="icp_input_filters_file" value="$(find laser_mapper)/launch/kitti/input_filters_outdoor.yaml"/>
+    <arg name="enable_callgrind" value="$(arg enable_callgrind)"/>
   </include>
   
-    <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 333 --clock --pause $(arg bag_file)"/>	
+  <!-- rosbag player node -->
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r $(arg play_rate) -s 333 --clock --pause $(arg bag_file)"/>	
 
 </launch>

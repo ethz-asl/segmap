@@ -41,6 +41,23 @@ Eigen::MatrixXd Features::asEigenMatrix() const {
   return matrix;
 }
 
+Features Features::rotationInvariantFeaturesOnly() const {
+  Features result;
+  for (size_t i = 0u; i < size(); ++i) {
+    Feature feature;
+    for (size_t j = 0u; j < at(i).size(); j++) {
+      if (at(i).at(j).name != "scale_x" &&
+          at(i).at(j).name != "scale_y" &&
+          at(i).at(j).name != "scale_z" &&
+          at(i).at(j).name != "alignment") {
+        feature.push_back(at(i).at(j));
+      }
+    }
+    if (!feature.empty()) { result.push_back(feature); }
+  }
+  return result;
+}
+
 std::vector<std::string> Features::asVectorOfNames() const {
   std::vector<std::string> result;
   for (size_t i = 0u; i < size(); ++i) {

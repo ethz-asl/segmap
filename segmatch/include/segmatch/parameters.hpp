@@ -25,11 +25,11 @@ struct DescriptorsParameters {
   double point_feature_histograms_normals_search_radius = 0.5;
 
   // Autoencoder parameters.
-  std::string autoencoder_python_env = "python"; // Example: "home/your_profile/anaconda2/envs/ml/bin/python"
+  std::string autoencoder_python_env = "python"; // Example: "home/your_profile/anaconda2/envs/tensorflow/bin/python"
   std::string autoencoder_script_path = "MUST_BE_SET";
   std::string autoencoder_model_path = "MUST_BE_SET";
   std::string autoencoder_temp_folder_path = "/tmp/";
-  int autoencoder_latent_space_dimension = 10;
+  int autoencoder_latent_space_dimension = 15;
 }; // struct DescriptorsParameters
 
 struct SegmenterParameters {

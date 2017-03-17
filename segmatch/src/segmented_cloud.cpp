@@ -193,12 +193,6 @@ bool SegmentedCloud::findValidSegmentPtrById(const Id segment_id, Segment** resu
   return true;
 }
 
-Segment SegmentedCloud::getValidSegmentByIndex(const size_t index) const {
-  CHECK_LT(index, valid_segments_.size()) <<
-      "Attempted to access index out of bounds of valid_segments_";
-  return valid_segments_.at(index);
-}
-
 void SegmentedCloud::deleteSegmentsById(const std::vector<Id>& ids, size_t* n_removals) {
   if (n_removals != NULL) {
     *n_removals = 0;

@@ -7,6 +7,8 @@ from __future__ import print_function
 
 import numpy as np
 
+import itertools
+
 import tensorflow as tf
 from autoencoder import model
 import pickle
@@ -72,13 +74,12 @@ N_ROTATION_ANGLES = 12
 ROTATION_OFFSET = 0
 VAL_EVERY_N_STEPS = 1
 VAL_STEP_TOLERANCE = 3
+ROTATE_SEGMENTS_EVERY_STEP = True
+G_THRESHOLD = 0.80
+D_THRESHOLD = 0.45
 
 MP = model.ModelParams()
 MP.INPUT_SHAPE = [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE, 1]
-MP.HIDDEN_LAYERS = [{'shape': [400]}, {'shape': [400]}]
-MP.COERCED_LATENT_DIMS = []
-MP.DROPOUT = 0.8
-MP.LEARNING_RATE = 0.00001
 
 HOME_DIR = os.path.expanduser('~')
 DATA_DIR = "./database/"
@@ -87,8 +88,9 @@ RESTORE_MODEL = True
 SAVE_DIR = HOME_DIR + "/Desktop/autoencoder/"
 SAVE_FILE = "model.checkpoint"
 MP_FILENAME = "model_params.pckl"
-TENSORBOARD_DIR = HOME_DIR + "/tensorboard"
-SAVE_UNVALIDATED = False
+TENSORBOARD_DIR = "/tmp/tf_log"
+SAVE_DIR_NOVAL = "/tmp/unvalidated/"
+SAVE_UNVALIDATED = True
 CREATE_VISUALS = False
 DETAILED_STEP_TIMES = False
 
@@ -110,18 +112,15 @@ if SET_MARMOT_PARAMS:
     DATA_DIR = "/home/daniel/database/"
     RUN_NAME = "kitti18-20-27"
     SAVE_DIR = "/home/daniel/autoencoder-marmot/"
+    SAVE_UNVALIDATED = True
     TENSORBOARD_DIR = None
     CREATE_VISUALS = False
     
     MAX_STEPS = 1000000
     VAL_STEP_TOLERANCE = 10
-    N_ROTATION_ANGLES = 36
     
 if not RUN_AS_PY_SCRIPT:
-    #MP.CONVOLUTION_LAYERS = [{'type': 'conv3d', 'filter': [5, 5, 5,  1, 10], 'downsampling': {'type': 'max_pool3d', 'k': 2}}]
-    #MP.CONVOLUTION_LAYERS = []
-    #MP.LATENT_SHAPE = [2]
-    N_ROTATION_ANGLES = 6
+    MP.CONVOLUTION_LAYERS = []
     CREATE_VISUALS = True
 
 
@@ -136,18 +135,24 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "-SAVE_DIR":
         SAVE_DIR = argv.pop(0)
         print("SAVE_DIR set to " + SAVE_DIR)
+      elif arg == "-BATCH_SIZE":
+        BATCH_SIZE = int(argv.pop(0))
+        print("BATCH_SIZE set to " + str(BATCH_SIZE))
       elif arg == "--noconv":
         MP.CONVOLUTION_LAYERS = []
         print("CONVOLUTION LAYERS REMOVED")
+      elif arg == "--no_rotation":
+        ROTATE_SEGMENTS_EVERY_STEP = False
+        print("Disabling segment rotation.")
+      elif arg == "-LEARNING_RATE":
+        MP.LEARNING_RATE = float(argv.pop(0))
+        print("LEARNING_RATE set to " + str(MP.LEARNING_RATE))
       elif arg == "-LATENT_SHAPE":
         MP.LATENT_SHAPE = [int(argv.pop(0))]
         print("LATENT_SHAPE set to " + str(MP.LATENT_SHAPE))
-      elif arg == "-CLIP_GRADIENTS":
-        MP.CLIP_GRADIENTS = float(argv.pop(0))
-        print("CLIP_GRADIENTS set to " + str(MP.CLIP_GRADIENTS))
-      elif arg == "-N_ROTATION_ANGLES":
-        N_ROTATION_ANGLES = int(argv.pop(0))
-        print("N_ROTATION_ANGLES set to " + str(N_ROTATION_ANGLES))
+      elif arg == "-VAL_STEP_TOLERANCE":
+        VAL_STEP_TOLERANCE = int(argv.pop(0))
+        print("VAL_STEP_TOLERANCE set to " + str(VAL_STEP_TOLERANCE))
       elif arg == "-ROTATION_OFFSET":
         frac = list(map(float, argv.pop(0).split('/'))) + [1.0]
         ROTATION_OFFSET = frac[0]/frac[1]
@@ -155,16 +160,22 @@ if RUN_AS_PY_SCRIPT:
       elif arg == "--float64":
         MP.FLOAT_TYPE = tf.float64
         print("MP.FLOAT_TYPE set to " + str(MP.FLOAT_TYPE))
+      elif arg == "--not-vegan":
+        MP.ADVERSARIAL = False
+        MP.MUTUAL_INFO = False
+        print("Reverting to variational autoencoder model only.")
+      elif arg == "--vegan":
+        MP.ADVERSARIAL = True
+        MP.MUTUAL_INFO = True
+        print("Enabling adversarial and mutual info graphs.")
       else:
         print("Unknown argument: " + arg)
+        raise NotImplementedError
 
 
 # In[ ]:
 
 SAVE_PATH = SAVE_DIR+SAVE_FILE
-if SAVE_UNVALIDATED:
-  SAVE_DIR_NOVAL = SAVE_DIR+"unvalidated/"
-  SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
 
 
 # ## Load Segments and Features
@@ -221,6 +232,9 @@ if not RUN_AS_PY_SCRIPT:
     MP = stored_MP
   except FileNotFoundError:
     print("No stored model found. Creating a new model.")
+temp = MP.DISABLE_SUMMARY
+MP.DISABLE_SUMMARY = True if TENSORBOARD_DIR is None else False
+if MP.DISABLE_SUMMARY != temp: print("Summary", "enabled" if not MP.DISABLE_SUMMARY else "disabled")
 
 
 # In[ ]:
@@ -230,8 +244,10 @@ vae = model.Autoencoder(MP)
 
 # In[ ]:
 
+summary_writer = None
 if TENSORBOARD_DIR != None:
   summary_writer = tf.train.SummaryWriter(TENSORBOARD_DIR, vae.sess.graph)
+  print("Graph written to log.")
 
 
 # In[ ]:
@@ -241,14 +257,16 @@ if RESTORE_MODEL:
     vae.saver.restore(vae.sess, SAVE_PATH)
     print("Model restored.")
     print(MP.CONVOLUTION_LAYERS)
-  except:
+  except Exception as err:
     print("Could not load model: ", end="")
     try:
       stored_MP = pickle.load(open(SAVE_DIR+MP_FILENAME, 'rb'))
+    except FileNotFoundError:
+        print("no model folder.")
+    else:
       print("ERROR: mismatch between model params.")
       print("Stored model: "); print(stored_MP); print("New model: "); print(MP)
-    except:
-      print("no model folder.")
+      raise err
 
 
 # ## Create Voxelized Segment Dataset - With Rotated Copies
@@ -261,40 +279,15 @@ val = segments[:split_at]
 train = segments[split_at:]
 
 
-# Rotate the segments several times
-
 # In[ ]:
 
-print("Rotating segments")
-from voxelize import create_rotations
-train = create_rotations(train, N_ROTATION_ANGLES, ROTATION_OFFSET)
-val = create_rotations(val, 12, ROTATION_OFFSET)
-
-
-# Voxelize the training (original + rotated), val, and segment data.
-
-# In[ ]:
-
-print("Voxelizing training data")
 from voxelize import voxelize
-train_vox, train_scales = voxelize(train,VOXEL_SIDE)
-val_vox, val_scales   = voxelize(val ,VOXEL_SIDE)
+if not ROTATE_SEGMENTS_EVERY_STEP:
+  print("Voxelizing training data")
+  train_vox, _ = voxelize(train,VOXEL_SIDE)
 
-if train_vox[0].shape != MP.INPUT_SHAPE:
-  print("Reshaping")
-  train_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in train_vox]
-  val_vox=[np.reshape(vox, MP.INPUT_SHAPE) for vox in val_vox]
-
-if len(MP.COERCED_LATENT_DIMS) == 0:
-  print("Discarding scales")
-  train_scales=None
-  val_scales=None
-else:    
-  train_scales = [np.sort(scale)[::-1] for scale in train_scales]
-  val_scales = [np.sort(scale)[::-1] for scale in val_scales]
-  print("Sorting scales")
-
-del train # Save some memory
+  del train # Save some memory
+val_vox, _   = voxelize(val  ,VOXEL_SIDE)
 
 
 # In[ ]:
@@ -310,11 +303,11 @@ print("Using " + str(process.memory_info().rss/(1024.0*1024.0)) + "mB of memory"
 # In[ ]:
 
 from timeit import default_timer as timer
+from dynamic_average import Average
 from autoencoder.batchmaker import Batchmaker, progress_bar
 
-total_step_cost = None
+avg_step_cost = None
 step_cost_log = []
-total_val_cost = 0
 val_steps_since_last_improvement = 0
 step_start = timer()
 
@@ -325,87 +318,143 @@ except:
     val_cost_log = []
     
 # single step
-for step in range(MAX_STEPS):
-  # Validation
-  val_batchmaker = Batchmaker(val_vox, val_scales, BATCH_SIZE, MP)
-  if np.mod(step, VAL_EVERY_N_STEPS) == 0:
-    total_val_cost = 0
-    while True:
-      if val_batchmaker.is_depleted():
-        break
-      else:
-        batch_input_values, batch_target_values = val_batchmaker.next_batch()
-        cost_value = vae.cost_on_single_batch(batch_input_values, batch_target_values)
-        total_val_cost += cost_value
+try:
+    for step in range(MAX_STEPS):
+      if ROTATE_SEGMENTS_EVERY_STEP:
+          from voxelize import random_rotated
+          val = random_rotated(val)
+          train = random_rotated(train)
+          from voxelize import voxelize
+          train_vox, _ = voxelize(train,VOXEL_SIDE)
+          val_vox, _   = voxelize(val ,VOXEL_SIDE)  # Validation
+      val_batchmaker = Batchmaker(val_vox, BATCH_SIZE, MP)
+      if np.mod(step, VAL_EVERY_N_STEPS) == 0:
+        avg_val_cost = Average()
+        while True:
+          if val_batchmaker.is_depleted():
+            break
+          else:
+            batch_input_values = val_batchmaker.next_batch()
+            cost_value = vae.cost_on_single_batch(batch_input_values, summary_writer=summary_writer)
+            avg_val_cost.add(cost_value)
+            if PLOTTING_SUPPORT:
+              progress_bar(val_batchmaker)
+        print("Validation cost: "+str(avg_val_cost)+"  (Training cost: "+str(avg_step_cost)+")", end="")
+        try:
+          print(" Step Time: " + str(step_end-step_start))
+          if DETAILED_STEP_TIMES:
+            print(step_times)
+        except: 
+            print(" ")
+
+        val_cost_log.append(avg_val_cost.values)
+
+
         if PLOTTING_SUPPORT:
-          progress_bar(val_batchmaker)
-    print("Validation cost: "+str(total_val_cost)+"  (Training cost: "+str(total_step_cost)+")", end="")
-    try:
-      print(" Step Time: " + str(step_end-step_start))
-      if DETAILED_STEP_TIMES:
-        print(step_times)
-    except: 
-        print(" ")
-    
-    val_cost_log.append(total_val_cost)
-    
-    # Training Monitor
-    if len(val_cost_log) > 1:
-        # Save cost log.
-        import os
-        if not os.path.exists(SAVE_DIR):
-            os.makedirs(SAVE_DIR)
-            if SAVE_UNVALIDATED: os.makedirs(SAVE_DIR_NOVAL)
-            print("Created directory: %s" % SAVE_DIR)
-            with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
-              pickle.dump(MP, file, protocol=2)
-        np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
-        # Save if cost has improved. Otherwise increment counter.
-        if val_cost_log[-1] <  min(val_cost_log[:-1]):
-            val_steps_since_last_improvement = 0
-            # save model to disk
-            print("Saving ... ", end='')
-            save_path = vae.saver.save(vae.sess, SAVE_PATH)
-            print("Model saved in file: %s" % save_path)      
+          # Plot a few random samples
+          import matplotlib.pyplot as plt
+          n_samples = 1
+          import random
+          x_samples = random.sample(val_vox, n_samples)
+          x_samples = [np.reshape(sample, MP.INPUT_SHAPE) for sample in x_samples]
+          x_reconstruct = list(vae.encode_decode(x_samples))
+          try:
+            sample_history += x_samples
+            recons_history += x_reconstruct
+          except NameError:
+            sample_history = x_samples
+            recons_history = x_reconstruct
+          for i, (in_, out_) in enumerate(zip(sample_history, recons_history)):
+            plt.figure("reconstruction for step "+str(i), figsize=(8, 4))
+            plt.subplot(2, 1, 1)
+            plt.imshow(in_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+            plt.title("Top: val input - Bottom: Reconstruction")
+            plt.subplot(2, 1, 2)
+            plt.imshow(out_.reshape(VOXEL_SIDE, VOXEL_SIDE*VOXEL_SIDE), vmin=0, vmax=1, cmap='spectral')
+            plt.tight_layout()
+            plt.show()
+            plt.gcf().canvas.draw()
+
+        # Training Monitor
+        if len(val_cost_log) > 1:
+            # Save cost log.
+            import os
+            if not os.path.exists(SAVE_DIR):
+                os.makedirs(SAVE_DIR)
+                print("Created directory: %s" % SAVE_DIR)
+                with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
+                  pickle.dump(MP, file, protocol=2)
+            np.savetxt(SAVE_DIR+"val_cost_log.txt", val_cost_log)
+            # Save if cost has improved. Otherwise increment counter.
+            if np.less(val_cost_log[-1], np.min(val_cost_log[:-1], 0))[0]:
+                val_steps_since_last_improvement = 0
+                # save model to disk
+                print("Saving ... ", end='')
+                save_path = vae.saver.save(vae.sess, SAVE_PATH)
+                print("Model saved in file: %s" % save_path)      
+            else:
+                val_steps_since_last_improvement += 1  
+        # Stop training if val_cost hasn't improved in VAL_STEP_TOLERANCE steps
+        if val_steps_since_last_improvement > VAL_STEP_TOLERANCE:
+            print("Training stopped by validation monitor.")
+            break
+
+      # Train on batches
+      step_start = timer()
+      zero = timer() - timer()
+      step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
+      avg_step_cost = Average()
+      training_batchmaker = Batchmaker(train_vox, BATCH_SIZE, MP)
+      if MP.ADVERSARIAL:
+        train_order = 4*[vae.optimizer] + 4*[vae.generator_optimizer] + [vae.discriminator_optimizer]
+      elif MP.MUTUAL_INFO:
+        train_order = [vae.optimizer, vae.optimizer_with_MI]
+      else:
+        train_order = [vae.optimizer]
+      for train_target in itertools.cycle(train_order):
+        if MP.ADVERSARIAL:
+          if train_target is vae.discriminator_optimizer:
+            if cost_value[1] > G_THRESHOLD or cost_value[2] < D_THRESHOLD:
+              continue
+        if training_batchmaker.is_depleted():
+          break
         else:
-            val_steps_since_last_improvement += 1  
-    # Stop training if val_cost hasn't improved in VAL_STEP_TOLERANCE steps
-    if val_steps_since_last_improvement > VAL_STEP_TOLERANCE:
-        if SAVE_UNVALIDATED:
-            print("Saving ... ", end='')
-            save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
-            print("Unvalidated model saved in file: %s" % save_path)
-        print("Training stopped by validation monitor.")
-        break
-            
-  # Train on batches
-  step_start = timer()
-  zero = timer() - timer()
-  step_times = {'batchmaking': zero, 'training': zero, 'plotting': zero}
-  total_step_cost = 0
-  training_batchmaker = Batchmaker(train_vox, train_scales, BATCH_SIZE, MP)
-  while True:
-    if training_batchmaker.is_depleted():
-      break
-    else:
-      t_a = timer()  
-      batch_input_values, batch_target_values = training_batchmaker.next_batch()
-      t_b = timer()
-      # Train over 1 batch.
-      cost_value = vae.train_on_single_batch(batch_input_values, batch_target_values)
-      total_step_cost += cost_value
-      t_c = timer()
-      if PLOTTING_SUPPORT:
-        progress_bar(training_batchmaker)
-      t_d = timer()
-      step_times['batchmaking'] += t_b - t_a
-      step_times['training']    += t_c - t_b
-      step_times['plotting']    += t_d - t_c
-  step_cost_log.append(total_step_cost)
-  step_end = timer()
+          t_a = timer()  
+          batch_input_values = training_batchmaker.next_batch()
+          t_b = timer()
+          # Train over 1 batch.
+          cost_value = vae.train_on_single_batch(batch_input_values, train_target=train_target, summary_writer=summary_writer)
+          avg_step_cost.add(cost_value)
+          t_c = timer()
+          if PLOTTING_SUPPORT:
+            progress_bar(training_batchmaker)
+          t_d = timer()
+          step_times['batchmaking'] += t_b - t_a
+          step_times['training']    += t_c - t_b
+          step_times['plotting']    += t_d - t_c
+      step_cost_log.append(avg_step_cost.values)
+      step_end = timer()
+except KeyboardInterrupt:
+    print("Training interrupted.")
+else:
+    print("Training ended.")
+    
+if SAVE_UNVALIDATED:
+    SAVE_PATH_NOVAL = SAVE_DIR_NOVAL+SAVE_FILE
+    try: 
+        os.makedirs(SAVE_DIR_NOVAL)
+        print("Directory created", SAVE_DIR_NOVAL)
+    except:
+        print("")
+    print("Saving ... ", end='')
+    save_path = vae.saver.save(vae.sess, SAVE_PATH_NOVAL)
+    print("Unvalidated model saved in file: %s" % save_path)
 
 
-print("Training ended.")
+# In[ ]:
+
+if CREATE_VISUALS:
+  raise ValueError('Training ended.')
 
 
 # ## Visualize Autoencoder Performance
@@ -541,15 +590,18 @@ if not RUN_AS_PY_SCRIPT:
     y = [values[1] for values, class_ in zip(F2, C) if class_ == name]
     plt.scatter(x, y, c=c_, alpha=0.8,  lw = 0)
   box = plt.gca().get_position()
-  plt.gca().set_position([box.x0, box.y0, box.width * 0.6, box.height])
-  if len(classes) > 10: ncol = 2
+  plt.gca().set_position([box.x0, box.y0, box.width * 0.8, box.height])
+  ncol = 2 if len(classes_set) > 10 else 1
   plt.legend(classes_set, loc='center left', bbox_to_anchor=(1, 0.5), ncol=ncol)
+  plt.title('T-SNE')
+  plt.xlabel('x_dim')
+  plt.ylabel('y_dim')
   plt.show()
   try:
     plt.gcf().savefig(dir_+"t-sne.png")
   except:
     print("not saved.")
-  if F is features_nn:
+  if len(matches) > 0:
     print("Adding matches")
     # Dim all points
     plt.cla()
@@ -558,6 +610,9 @@ if not RUN_AS_PY_SCRIPT:
       y = [values[1] for values, class_ in zip(F2, C) if class_ == name]
       plt.scatter(x, y, c=c_, alpha=0.2,  lw = 0)
     plt.legend(classes_set, loc='center left', bbox_to_anchor=(1, 0.5), ncol=ncol)
+    plt.title('T-SNE')
+    plt.xlabel('x_dim')
+    plt.ylabel('y_dim')
     # Bring out matched points
     matched_ids = [id_ for match in matches for id_ in match]
     for c_, name in zip(cycle(cnames), classes_set):
@@ -579,7 +634,7 @@ if not RUN_AS_PY_SCRIPT:
 
 # In[ ]:
 
-RC_CONFIDENCE = 0.2
+RC_CONFIDENCE = 0.1
 ONEVIEW = True
 
 
@@ -587,7 +642,7 @@ ONEVIEW = True
 
 # Reconstructions
 if not RUN_AS_PY_SCRIPT:
-  N = 400
+  N = 100
   SV_ = segments_vox[:N]
   S_ = segments[:N]
   I_ = ids[:N]
@@ -603,6 +658,38 @@ if not RUN_AS_PY_SCRIPT:
     one_to_one_matches = [[id1, id2] for id1, id2 in zip(I_, reconstruction_ids)]
     visuals_of_matches(one_to_one_matches, S_+reconstruction, I_+reconstruction_ids, directory=dir_, oneview=ONEVIEW)
     clear_output()
+
+
+# In[ ]:
+
+# Exploring influence of first dimension on generated segments
+dim_ = 0
+if CREATE_VISUALS:
+  # Use a pre-existing segment as starting point
+  dir_ = "/tmp/online_matcher/visuals/gen_rotations/"
+  class_name = "car"
+  id_ = np.random.choice([id_ for id_, class_ in zip(ids, classes) if class_ == class_name])
+  class_segments = [np.array(segments)[ids.index(id_)]]
+  from voxelize import voxelize
+  class_segments_vox, class_voxel_scale = voxelize(class_segments, VOXEL_SIDE)
+  code, _ = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in class_segments_vox])
+  code = code[0]
+  
+  values = [code[dim_]] + list(np.linspace(-10.,10.,10))
+  gen_codes = []
+  for value in values:
+    gen_code = code
+    gen_code[dim_] = value
+    gen_codes.append(gen_code)
+  gen_ids = range(len(gen_codes))
+  
+  gen_segments_vox = vae.batch_decode(gen_codes)
+  gen_segments_vox = [np.reshape(vox, [VOXEL_SIDE, VOXEL_SIDE, VOXEL_SIDE]) for vox in gen_segments_vox]
+  from voxelize import unvoxelize
+  gen_segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in gen_segments_vox]
+  from visuals import visuals_of_segments
+  visuals_of_segments(gen_segments, gen_ids, directory=dir_, oneview=ONEVIEW)
+  clear_output()
 
 
 # In[ ]:
@@ -649,15 +736,16 @@ if CREATE_VISUALS:
 # In[ ]:
 
 #Gifs
-id_ = np.random.choice(ids)
-print(id_)
-segment = segments[ids.index(id_)]
-import visuals
-visuals.single_segment_as_gif(segment)
-visuals.single_segment_reconstruction_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_rotations_reconstruction_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_degeneration_as_gif(segment, vae, confidence=0.3)
-visuals.single_segment_confidence_as_gif(segment, vae)
+if CREATE_VISUALS:
+    id_ = np.random.choice(ids)
+    print(id_)
+    segment = segments[ids.index(id_)]
+    import visuals
+    visuals.single_segment_as_gif(segment)
+    visuals.single_segment_reconstruction_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_rotations_reconstruction_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_degeneration_as_gif(segment, vae, confidence=0.3)
+    visuals.single_segment_confidence_as_gif(segment, vae)
 
 
 # ## Class Signatures
@@ -733,9 +821,9 @@ if PLOTTING_SUPPORT:
     class_confusion = np.array(confusion_nn)[class_indices]
     plt.plot(np.mean(np.exp(class_confusion), axis=0), marker='_', color=color_, label=class_name)
     plt.hlines(np.mean(np.exp(class_confusion)),0,len(class_features[0])-1, linestyle='--', color=color_)
-plt.show()
-plt.legend()
-print("")
+  plt.show()
+  plt.legend()
+  print("")
 
 
 # ## Export Features
@@ -786,7 +874,7 @@ if EXPORT_FEATURES:
   update_features(fnames_nn, features_nn, updated_fnames, updated_features)
 
   # Scale features
-  sc_fnames = ['x_scale', 'y_scale', 'z_scale']
+  sc_fnames = ['scale_x', 'scale_y', 'scale_z']
   update_features(sc_fnames, features_voxel_scale, updated_fnames, updated_features)
 
 
@@ -815,4 +903,40 @@ if CREATE_VISUALS:
   from visuals import visuals_of_matches
   visuals_of_matches(matches, segments, ids, features=features_nn)
   clear_output()
+
+
+# ## Save or Convert Model
+
+# In[ ]:
+
+CONVERT_VARIABLE_NAMES = False
+name_to_var_dict = {}
+if CONVERT_VARIABLE_NAMES:
+  for var in vae.variables:
+    # Modify a few names
+    if 'LatentLayerWeights/' in var.name:
+      name = var.name.replace('LatentLayerWeights/', '')
+    elif 'ReconstructionLayerWeights/' in var.name:
+      name = var.name.replace('ReconstructionLayerWeights/', '')
+    # Leave other names unchanged
+    else:
+      name = var.name
+    name_to_var_dict[name] = var
+  temp_saver = tf.train.Saver(name_to_var_dict)
+  temp_saver.restore(vae.sess, SAVE_PATH)
+name_to_var_dict
+
+
+# In[ ]:
+
+# Save model and params
+if False:
+  vae.saver.save(vae.sess, SAVE_PATH)
+  with open(SAVE_DIR+MP_FILENAME, 'wb') as file:
+    pickle.dump(MP, file, protocol=2)
+
+
+# In[ ]:
+
+
 

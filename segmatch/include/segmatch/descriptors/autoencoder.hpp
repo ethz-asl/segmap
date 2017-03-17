@@ -23,7 +23,7 @@ class AutoencoderDescriptor : public Descriptor {
       LOG(FATAL) << "Could not execute autoencoder command";
     }
     char buff[512];
-    while (fgets(buff, sizeof(buff), script_process_pipe_)!=NULL) {
+    while (fgets(buff, sizeof(buff), script_process_pipe_) != NULL) {
       LOG(INFO) << buff;
       if (std::string(buff) == "__INIT_COMPLETE__\n") {
         break;
@@ -50,7 +50,7 @@ class AutoencoderDescriptor : public Descriptor {
 
  private:
   // TODO: the dimension is unknown.
-  static constexpr unsigned int kDimension = 18u;
+  static constexpr unsigned int kDimension = 22u;
 
   DescriptorsParameters params_;
 

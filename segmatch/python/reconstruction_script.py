@@ -15,6 +15,8 @@ model_path = sys.argv[1]
 segments_fifo_path = sys.argv[2]
 features_fifo_path = sys.argv[3]
 latent_space_dim = int(sys.argv[4])
+RC_CONFIDENCE = 0.2
+voxel_side = 24
 
 import os
 try:
@@ -42,19 +44,25 @@ try:
 except:
   raise ValueError("Could not load model.")
 
-print("__INIT_COMPLETE__")
-
-
+# Make FIFOs
 os.mkfifo(segments_fifo_path)
 os.mkfifo(features_fifo_path)
 
+print("__INIT_COMPLETE__")
+
 try:
-  while True:
+  if True:
     ## LOAD DATA ##
     ###############
-    print("Waiting for segments...")
-    from import_export import load_segments
-    segments, ids = load_segments(folder="", filename=segments_fifo_path)
+    print("Waiting for features...")
+    from import_export import load_features
+    features, fnames, ids = load_features(folder="", filename=features_fifo_path)
+    features = np.array(features)
+    print(fnames)
+    ae_features = features[:,:-7]
+    sc_features = features[:,-7:-1]
+    al_features = features[:,-1:]
+    xyz_scales  = sc_features[:,3:]
 
     ## PROFILING ##
     ###############
@@ -62,49 +70,28 @@ try:
     if PROFILING:
         from timeit import default_timer as timer
         total_start = timer()
-        align_start = timer()
+        reconstr_start = timer()
 
-    # Align
-    from voxelize import align
-    segments_aligned, alignment_features = align(segments)
-
-    if PROFILING:
-        align_end = timer()
-        vox_start = timer()
-
-    # Voxelize
-    voxel_side = 24
-    voxel_size = voxel_side * voxel_side * voxel_side
-    from voxelize import voxelize
-    segments_vox, xyz_scale_features = voxelize(segments_aligned,voxel_side)
+    ## RECONSTRUCT SEGMENTS ##
+    ##########################
+    segments_vox = vae.batch_decode(ae_features)
+    segments_vox = [np.reshape(vox, [voxel_side, voxel_side, voxel_side]) for vox in segments_vox]
+    from voxelize import unvoxelize, unalign
+    segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
+    segments = [segment*scale for (segment, scale) in zip(segments, xyz_scales)]
+    segments = unalign(segments, al_features)
 
     if PROFILING:
-        vox_end = timer()
-        predict_start = timer()
-
-    ## COMPUTE FEATURES ##
-    ######################
-    ae_features, ae_log_sigma_sq = vae.batch_encode([np.reshape(vox, MP.INPUT_SHAPE) for vox in segments_vox])
-    ae_features[:,:vae.MP.COERCED_LATENT_DIMS] = 0
-    ae_fnames = ['autoencoder_'+str(i) for i in range(latent_space_dim)]
-    sc_features = [sorted(xyz_scale) + list(xyz_scale) for xyz_scale in xyz_scale_features]
-    sc_fnames = ['scale_sml', 'scale_med', 'scale_lrg', 'scale_x', 'scale_y', 'scale_z']
-    al_features = alignment_features
-    al_fnames = ['alignment']
-    features = [list(ae) + list(sc) + list(al) for ae, sc, al in zip(ae_features, sc_features, al_features)]
-    fnames = ae_fnames + sc_fnames + al_fnames
-
-    if PROFILING:
-        predict_end = timer()
+        reconstr_end = timer()
         overhead_out_start = timer()
 
-    print("__DESC_COMPLETE__")
+    print("__RCST_COMPLETE__")
 
     ## OUTPUT DATA TO FILES ##
     ##########################
-    print("Writing features")
-    from import_export import write_features
-    write_features(ids, features, fnames, folder="", filename=features_fifo_path)
+    print("Writing segments")
+    from import_export import write_segments
+    write_segments(ids, segments, folder="", filename=segments_fifo_path)
 
     if PROFILING:
         overhead_out_end = timer()
@@ -112,12 +99,8 @@ try:
         print("Timings:")
         print("  Total - ", end='')
         print(total_end - total_start)
-        print("  Alignment - ", end='')
-        print(align_end - align_start)
-        print("  Voxelization - ", end='')
-        print(vox_end - vox_start)
-        print("  Predict - ", end='')
-        print(predict_end - predict_start)
+        print("  Reconstruction - ", end='')
+        print(reconstr_end - reconstr_start)
         print("  Overhead out - ", end='')
         print(overhead_out_end - overhead_out_start)
 except KeyboardInterrupt:

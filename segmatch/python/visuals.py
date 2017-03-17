@@ -12,7 +12,7 @@ def points2d(x, y, c,
     return out
 
 def visuals_of_segments(segments, ids, features=None,
-                        directory="/tmp/online_matcher/visuals/", black_and_white=False):
+                        directory="/tmp/online_matcher/visuals/", black_and_white=False, oneview=False):
     import os
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -20,7 +20,7 @@ def visuals_of_segments(segments, ids, features=None,
     for id_, segment in zip(ids, segments):
         seg_features = None if features is None else features[ids.index(id_)]
         img_path = directory+"segment"+str(id_)+".png"
-        single_segment_as_figure(segment, seg_features, black_and_white, fig).savefig(img_path)
+        single_segment_as_figure(segment, seg_features, black_and_white, fig, oneview).savefig(img_path)
         plt.close(plt.gcf())
 
 def visuals_of_matches(matches, segments, ids, features=None,

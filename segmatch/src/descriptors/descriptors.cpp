@@ -4,9 +4,9 @@
 #include <glog/logging.h>
 #include <laser_slam/common.hpp>
 
+#include "segmatch/descriptors/autoencoder.hpp"
 #include "segmatch/descriptors/eigenvalue_based.hpp"
 #include "segmatch/descriptors/ensemble_shape_functions.hpp"
-#include "segmatch/descriptors/autoencoder.hpp"
 
 namespace segmatch {
 

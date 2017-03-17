@@ -103,23 +103,23 @@ const std::string kSegmentsFilename = "segments_database.csv";
 const std::string kFeaturesFilename = "features_database.csv";
 const std::string kMatchesFilename = "matches_database.csv";
 
-bool export_session_data_to_database(const SegmentedCloud& segmented_cloud,
-                                     const UniqueIdMatches& id_matches) {
-  return export_segments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud) &&
-      export_features(kDatabaseDirectory + kFeaturesFilename, segmented_cloud) &&
-      export_matches(kDatabaseDirectory + kMatchesFilename, id_matches);
+bool exportSessionDataToDatabase(const SegmentedCloud& segmented_cloud,
+                                 const UniqueIdMatches& id_matches) {
+  return exportSegments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud) &&
+      exportFeatures(kDatabaseDirectory + kFeaturesFilename, segmented_cloud) &&
+      exportMatches(kDatabaseDirectory + kMatchesFilename, id_matches);
 }
 
-bool import_session_data_from_database(SegmentedCloud* segmented_cloud_ptr,
-                                       UniqueIdMatches* id_matches_ptr) {
-  return import_segments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud_ptr) &&
-      import_features(kDatabaseDirectory + kFeaturesFilename, segmented_cloud_ptr) &&
-      import_matches(kDatabaseDirectory + kMatchesFilename, id_matches_ptr);
+bool importSessionDataFromDatabase(SegmentedCloud* segmented_cloud_ptr,
+                                   UniqueIdMatches* id_matches_ptr) {
+  return importSegments(kDatabaseDirectory + kSegmentsFilename, segmented_cloud_ptr) &&
+      importFeatures(kDatabaseDirectory + kFeaturesFilename, segmented_cloud_ptr) &&
+      importMatches(kDatabaseDirectory + kMatchesFilename, id_matches_ptr);
 }
 
-bool ensure_directory_exists(const std::string& directory) {
+bool ensureDirectoryExists(const std::string& directory) {
   CHECK(directory.size() != 0u) << "Directory should not be an empty string.";
-  if (directory[0] == '/') {
+  if (directory[0u] == '/') {
     boost::filesystem::path path(directory);
     if(boost::filesystem::exists(path)) {
       return true;
@@ -130,29 +130,30 @@ bool ensure_directory_exists(const std::string& directory) {
     }
   } else {
     LOG(ERROR) << "Directory '" << directory << "' starts with invalid character: '" <<
-        directory[0] << "'"; 
+        directory[0u] << "'"; 
   }
   return false;
 }
 
-bool ensure_directory_exists_for_filename(const std::string& filename) {
+bool ensureDirectoryExistsForFilename(const std::string& filename) {
   size_t pos = filename.rfind("/");
   if (pos != std::string::npos) {
-    std::string directory = filename.substr(0, pos);
-    return ensure_directory_exists(directory);
+    std::string directory = filename.substr(0u, pos);
+    return ensureDirectoryExists(directory);
   } else {
     LOG(ERROR) << "Filename '" << filename << "' does not specify a directory.";
     return false;
   }
 }
 
-bool export_segments(const std::string& filename, const SegmentedCloud& segmented_cloud) {
-  ensure_directory_exists_for_filename(filename);
+bool exportSegments(const std::string& filename, const SegmentedCloud& segmented_cloud) {
+  ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
   if (output_file.is_open()) {
-    for (size_t i = 0u; i < segmented_cloud.getNumberOfValidSegments(); i++) {
-      Segment segment = segmented_cloud.getValidSegmentByIndex(i);
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
+        it != segmented_cloud.end(); ++it) {
+      Segment segment = it->second;
       for (size_t j = 0u; j < segment.point_cloud.size(); ++j) {
         output_file << segment.segment_id << " ";
         output_file << segment.point_cloud.points[j].x << " ";
@@ -170,13 +171,14 @@ bool export_segments(const std::string& filename, const SegmentedCloud& segmente
   }
 }
 
-bool export_features(const std::string& filename, const SegmentedCloud& segmented_cloud) {
-  ensure_directory_exists_for_filename(filename);
+bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented_cloud) {
+  ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
   if (output_file.is_open()) {
-    for (size_t i = 0u; i < segmented_cloud.getNumberOfValidSegments(); i++) {
-      Segment segment = segmented_cloud.getValidSegmentByIndex(i);
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
+        it != segmented_cloud.end(); ++it) {
+      Segment segment = it->second;
       output_file << segment.segment_id << " ";
       std::vector<FeatureValueType> values = segment.features.asVectorOfValues();
       std::vector<std::string> names = segment.features.asVectorOfNames();
@@ -195,40 +197,14 @@ bool export_features(const std::string& filename, const SegmentedCloud& segmente
   }
 }
 
-bool export_features_and_centroids(const std::string& filename,
-                                   const segmatch::SegmentedCloud& segmented_cloud) {
-  ensure_directory_exists_for_filename(filename);
-  std::ofstream output_file;
-  output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
-  if (output_file.is_open()) {
-    for (size_t i = 0u; i < segmented_cloud.getNumberOfValidSegments(); i++) {
-      Segment segment = segmented_cloud.getValidSegmentByIndex(i);
-
-      output_file << segment.centroid.x << ", ";
-      output_file << segment.centroid.y << ", ";
-      output_file << segment.centroid.z << ", ";
-
-      std::vector<FeatureValueType> values = segment.features.asVectorOfValues();
-      for (size_t j = 0u; j < values.size(); ++j) {
-        output_file << values.at(j);
-        if (j < values.size() - 1u) {
-          output_file << ", ";
-        } else {
-          output_file << std::endl;
-        }
-      }
-    }
-    output_file.close();
-    LOG(INFO) << "Features written to " << filename;
-    return true;
-  } else {
-    LOG(ERROR) << "Could not open file " << filename << " for writing features.";
-    return false;
-  }
+bool exportSegmentsAndFeatures(const std::string& filename_prefix,
+                               const SegmentedCloud& segmented_cloud) {
+  exportSegments(filename_prefix + "_segments.csv", segmented_cloud);
+  exportFeatures(filename_prefix + "_features.csv", segmented_cloud);
 }
 
-bool export_matches(const std::string& filename, const UniqueIdMatches& matches) {
-  ensure_directory_exists_for_filename(filename);
+bool exportMatches(const std::string& filename, const UniqueIdMatches& matches) {
+  ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
   if (output_file.is_open()) {
@@ -247,7 +223,7 @@ bool export_matches(const std::string& filename, const UniqueIdMatches& matches)
   }
 }
 
-bool import_segments(const std::string& filename, SegmentedCloud* segmented_cloud_ptr) {
+bool importSegments(const std::string& filename, SegmentedCloud* segmented_cloud_ptr) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   std::ifstream input_file;
   input_file.open(filename);
@@ -299,7 +275,7 @@ bool import_segments(const std::string& filename, SegmentedCloud* segmented_clou
   }
 }
 
-bool import_features(const std::string& filename, SegmentedCloud* segmented_cloud_ptr,
+bool importFeatures(const std::string& filename, SegmentedCloud* segmented_cloud_ptr,
                      const std::string& behavior_when_segment_has_features) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   std::ifstream input_file;
@@ -320,12 +296,14 @@ bool import_features(const std::string& filename, SegmentedCloud* segmented_clou
       } else {
         // Read features.
         Features features;
+        Feature feature;
         std::string name;
         while(line_as_stream >> name) {
           FeatureValueType value;
           line_as_stream >> value;
-          features.push_back(Feature(name, value));
+          feature.push_back(FeatureValue(name, value));
         }
+        features.push_back(feature);
         // Check wether segment already has features.
         if (!segment_ptr->features.empty()) {
           if (behavior_when_segment_has_features == "concatenate") {
@@ -352,7 +330,7 @@ bool import_features(const std::string& filename, SegmentedCloud* segmented_clou
   }
 }
 
-bool import_matches(const std::string& filename, UniqueIdMatches* matches_ptr) {
+bool importMatches(const std::string& filename, UniqueIdMatches* matches_ptr) {
   CHECK_NOTNULL(matches_ptr);
   if (!matches_ptr->empty()) {
     LOG(ERROR) << "Should not import matches into non-empty UniqueIdMatches object.";
