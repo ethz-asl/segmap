@@ -54,48 +54,19 @@ IdCounter IdOccurences::findHighestOccurence() const {
 }
 
 void Segment::calculateCentroid() {
-  if (point_cloud.points.empty()) { return; }
   std::feclearexcept(FE_ALL_EXCEPT);
   // Find the mean position of a segment.
+  double x_mean = 0.0;
+  double y_mean = 0.0;
+  double z_mean = 0.0;
   const size_t n_points = point_cloud.points.size();
-//   double x_mean = 0.0;
-//   double y_mean = 0.0;
-//   double z_mean = 0.0;
-//   for (size_t i = 0u; i < n_points; ++i) {
-//     x_mean += point_cloud.points[i].x / n_points;
-//     y_mean += point_cloud.points[i].y / n_points;
-//     z_mean += point_cloud.points[i].z / n_points;
-//   }
-//   centroid = PclPoint(x_mean, y_mean, z_mean);
-  double x_min = 0.0;
-  double y_min = 0.0;
-  double z_min = 0.0;
-  double x_max = 0.0;
-  double y_max = 0.0;
-  double z_max = 0.0;
   for (size_t i = 0u; i < n_points; ++i) {
-    PointI point = point_cloud.points[i];
-    if (i == 0u) {
-      x_min = point.x;
-      y_min = point.y;
-      z_min = point.z;
-      x_max = point.x;
-      y_max = point.y;
-      z_max = point.z;
-    } else {
-      if (point.x > x_max) { x_max = point.x; }
-      if (point.y > y_max) { y_max = point.y; }
-      if (point.z > z_max) { z_max = point.z; }
-      if (point.x < x_min) { x_min = point.x; }
-      if (point.y < y_min) { y_min = point.y; }
-      if (point.z < z_min) { z_min = point.z; }
-    }
+    x_mean += point_cloud.points[i].x / n_points;
+    y_mean += point_cloud.points[i].y / n_points;
+    z_mean += point_cloud.points[i].z / n_points;
   }
-  double x_median = (x_max + x_min) / 2.;
-  double y_median = (y_max + y_min) / 2.;
-  double z_median = (z_max + z_min) / 2.;
 
-  centroid = PclPoint(x_median, y_median, z_median);
+  centroid = PclPoint(x_mean, y_mean, z_mean);
 
   // Check that there were no overflows, underflows, or invalid float operations.
   if (std::fetestexcept(FE_OVERFLOW)) {
