@@ -204,18 +204,20 @@ static void extractBox(const PointPair& limit_points, float margin, PointICloud*
 }
 
 static void applyCylindricalFilter(const PclPoint& center, double radius_m,
-                                   double height_m, PointICloud* cloud) {
+                                   double height_above_m, double height_below_m,
+                                   PointICloud* cloud) {
   CHECK_NOTNULL(cloud);
   PointICloud filtered_cloud;
 
   const double radius_squared = pow(radius_m, 2.0);
-  const double height_halved_m = height_m / 2.0;
 
   for (size_t i = 0u; i < cloud->size(); ++i) {
     if ((pow(cloud->points[i].x - center.x, 2.0)
-        + pow(cloud->points[i].y - center.y, 2.0)) <= radius_squared &&
-        abs(cloud->points[i].z - center.z) <= height_halved_m) {
-      filtered_cloud.points.push_back(cloud->points[i]);
+        + pow(cloud->points[i].y - center.y, 2.0)) <= radius_squared) {
+      if (cloud->points[i].z < center.z + height_above_m &&
+          cloud->points[i].z > center.z - height_below_m) {
+        filtered_cloud.points.push_back(cloud->points[i]);
+      }
     }
   }
   filtered_cloud.width = 1;
@@ -412,6 +414,11 @@ static PclPoint se3ToPclPoint(const laser_slam::SE3& transform) {
   return point;
 }
 
+static double pointToPointDistance(const PclPoint& p1, const PclPoint& p2) {
+  return sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y) +
+              (p1.z-p2.z)*(p1.z-p2.z));
+}
+
 static void transformPointCloud(const SE3& transform, PointICloud* point_cloud) {
   CHECK_NOTNULL(point_cloud);
   const Eigen::Matrix4f transform_matrix = transform.getTransformationMatrix().cast<float>();
@@ -443,6 +450,23 @@ static laser_slam::Time findMostOccuringTime(const std::vector<laser_slam::Time>
     }
   }
   return most_occuring_timestamp;
+}
+
+static Id findMostOccuringId(const std::vector<Id>& ids) {
+  CHECK(!ids.empty());
+  std::map<Id, unsigned int> counts;
+  for (const auto& id: ids) {
+    counts[id]++;
+  }
+  unsigned int max_count = 0u;
+  Id most_occuring_id = 0u;
+  for (const auto& count: counts) {
+    if (count.second > max_count) {
+      max_count = count.second;
+      most_occuring_id = count.first;
+    }
+  }
+  return most_occuring_id;
 }
 
 static void applyRandomFilterToCloud(double ratio_of_points_to_keep,
