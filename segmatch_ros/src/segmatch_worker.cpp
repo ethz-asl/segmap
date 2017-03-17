@@ -137,12 +137,13 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
                                            latest_pose.time_ns);
         }
       } else if (params_.localize){
-        if (!filtered_matches.empty() && !first_localization_occured) {
-          first_localization_occured = true;
+        if (!filtered_matches.empty() && !first_localization_occured_) {
+          first_localization_occured_ = true;
           if (params_.align_target_map_on_first_loop_closure) {
             LOG(INFO) << "Aligning target map.";
             segmatch_.alignTargetMap();
             publishTargetRepresentation();
+            publishTargetSegmentsCentroids();
           }
         }
       }
@@ -159,7 +160,7 @@ bool SegMatchWorker::processSourceCloud(const PointICloud& source_cloud,
       }
 
       if (params_.localize) {
-        if (!first_localization_occured || !filtered_matches.empty()) {
+        if (!first_localization_occured_ || !filtered_matches.empty()) {
           publish();
         }
       }
