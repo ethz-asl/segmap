@@ -56,11 +56,12 @@ try:
     ###############
     print("Waiting for features...")
     from import_export import load_features
-    features, feature_names, ids = load_features(folder="", filename=features_fifo_path)
+    features, fnames, ids = load_features(folder="", filename=features_fifo_path)
     features = np.array(features)
-    print(feature_names)
-    ae_features = features[:,:-6]
-    sc_features = features[:,-6:]
+    print(fnames)
+    ae_features = features[:,:-7]
+    sc_features = features[:,-7:-1]
+    al_features = features[:,-1:]
     xyz_scales  = sc_features[:,3:]
 
     ## PROFILING ##
@@ -75,9 +76,10 @@ try:
     ##########################
     segments_vox = vae.batch_decode(ae_features)
     segments_vox = [np.reshape(vox, [voxel_side, voxel_side, voxel_side]) for vox in segments_vox]
-    from voxelize import unvoxelize
+    from voxelize import unvoxelize, unalign
     segments = [unvoxelize(vox > RC_CONFIDENCE) for vox in segments_vox]
     segments = [segment*scale for (segment, scale) in zip(segments, xyz_scales)]
+    segments = unalign(segments, al_features)
 
     if PROFILING:
         reconstr_end = timer()
