@@ -31,6 +31,10 @@ class SegMatchWorker {
 
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
+  void saveTimings() const {
+    segmatch_.saveTimings();
+  }
+
  private:
 
   void loadTargetCloud();
@@ -77,9 +81,9 @@ class SegMatchWorker {
   segmatch::SegmentedCloud segments_database_;
   segmatch::database::UniqueIdMatches matches_database_;
 
-  // Publishing parameters.
-  static constexpr float kLineScaleSegmentMatches = 0.3;
-  static constexpr float kLineScaleLoopClosures = 3.0;
+  std::unordered_map<unsigned int, segmatch::PointICloud> source_representations_;
+
+  unsigned int num_tracks_;
 
   static constexpr unsigned int kPublisherQueueSize = 50u;
 }; // SegMatchWorker

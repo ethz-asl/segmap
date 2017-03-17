@@ -22,10 +22,15 @@ namespace segmatch {
 
 struct SegMatchParams {
   double segmentation_radius_m;
+  double segmentation_height_above_m;
+  double segmentation_height_below_m;
+
   bool filter_boundary_segments;
   double boundary_radius_m;
   bool filter_duplicate_segments;
   double centroid_distance_threshold_m;
+  laser_slam::Time min_time_between_segment_for_matches_ns;
+  bool check_pose_lies_below_segments = false;
 
   DescriptorsParameters descriptors_params;
   SegmenterParameters segmenter_params;
@@ -49,16 +54,19 @@ class SegMatch {
   /// \brief Process a source cloud.
   void processAndSetAsSourceCloud(const PointICloud& source_cloud,
                                   const laser_slam::Pose& latest_pose,
-                                  const unsigned int track_id);
+                                  unsigned int track_id = 0u);
 
   /// \brief Process a target cloud.
   void processAndSetAsTargetCloud(const PointICloud& target_cloud);
 
   /// \brief Transfer the source cloud to the target cloud.
-  void transferSourceToTarget();
+  void transferSourceToTarget(unsigned int track_id = 0u,
+                              laser_slam::Time timestamp_ns = 0u);
 
   /// \brief Find matches between the source and the target clouds.
-  PairwiseMatches findMatches(PairwiseMatches* matches_after_first_stage = NULL);
+  PairwiseMatches findMatches(PairwiseMatches* matches_after_first_stage = NULL,
+                              unsigned int track_id = 0u,
+                              laser_slam::Time timestamp_ns = 0u);
 
   /// \brief Find nearest neighbours between the source and target segments.
   PairwiseMatches findNearestNeighbours() { };
@@ -67,22 +75,32 @@ class SegMatch {
   bool filterMatches(const PairwiseMatches& predicted_matches,
                      PairwiseMatches* filtered_matches_ptr,
                      laser_slam::RelativePose* loop_closure = NULL,
-                     std::vector<PointICloudPair>* matched_segment_clouds = NULL);
+                     std::vector<PointICloudPair>* matched_segment_clouds = NULL,
+                     unsigned int track_id = 0u,
+                     laser_slam::Time timestamp_ns = 0u);
 
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
   /// \brief Get the internal representation of the source cloud.
   void getSourceRepresentation(PointICloud* source_representation,
-                               const double& distance_to_raise = 0.0) const;
+                               const double& distance_to_raise = 0.0,
+                               unsigned int track_id = 0u) const;
 
   /// \brief Get the internal representation of the target cloud.
   void getTargetRepresentation(PointICloud* target_representation) const;
 
   void getTargetSegmentsCentroids(PointICloud* segments_centroids) const;
 
-  void getSourceSegmentsCentroids(PointICloud* segments_centroids) const;
+  void getSourceSegmentsCentroids(PointICloud* segments_centroids,
+                                  unsigned int track_id = 0u) const;
 
-  SegmentedCloud getSourceAsSegmentedCloud() const { return segmented_source_cloud_; };
+  SegmentedCloud getSourceAsSegmentedCloud(unsigned int track_id = 0u) const {
+    if (segmented_source_clouds_.find(track_id) != segmented_source_clouds_.end()) {
+      return segmented_source_clouds_.at(track_id);
+    } else {
+      return SegmentedCloud();
+    }
+  };
 
   SegmentedCloud getTargetAsSegmentedCloud() const { return segmented_target_cloud_; };
 
@@ -134,12 +152,20 @@ class SegMatch {
 
   void alignTargetMap();
 
- private:
-  void filterBoundarySegmentsOfSourceCloud(const PclPoint& center);
+  void displayTimings() const;
 
-  void filterDuplicateSegmentsOfTargetMap(const SegmentedCloud& cloud_to_be_added);
+  void saveTimings() const;
+
+ private:
+  void filterBoundarySegmentsOfSourceCloud(const PclPoint& center,
+                                           unsigned int track_id = 0u);
+
+  void filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_added);
 
   laser_slam::Time findTimeOfClosestSegmentationPose(const segmatch::Segment& segment) const;
+
+  void filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimum_distance_m,
+                                    unsigned int n_nearest_segments = 2u);
 
   SegMatchParams params_;
 
@@ -149,7 +175,9 @@ class SegMatch {
   //TODO(Renaud or Daniel): modify with base class when needed.
   std::unique_ptr<OpenCvRandomForest> classifier_;
 
-  SegmentedCloud segmented_source_cloud_;
+  std::unordered_map<unsigned int, SegmentedCloud> segmented_source_clouds_;
+  unsigned int last_processed_source_cloud_ = 0u;
+
   SegmentedCloud segmented_target_cloud_;
   std::vector<SegmentedCloud> target_queue_;
 
@@ -163,11 +191,21 @@ class SegMatch {
 
   Eigen::Matrix4f last_transformation_;
 
+  // Timings.
+  std::map<laser_slam::Time, double> segmentation_and_description_timings_;
+  std::map<laser_slam::Time, double> matching_timings_;
+  std::map<laser_slam::Time, double> geometric_verification_timings_;
+  std::map<laser_slam::Time, double> source_to_target_timings_;
+  std::map<laser_slam::Time, double> update_timings_;
+
+  std::vector<double> n_segments_in_source_;
+  std::vector<double> n_points_in_source_;
+
+  std::vector<double> loops_timestamps_;
+
   // Filtering parameters.
   static constexpr double kCylinderHeight_m = 40;
   static constexpr unsigned int kMaxNumberOfCloudToTransfer = 1u;
-
-  static constexpr laser_slam::Time kMinTimeBetweenSegmentForMatches_ns = 20000000000u;
 
   static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 20000000000u;
 

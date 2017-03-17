@@ -36,6 +36,11 @@ struct SegMatchWorkerParams {
 
   bool export_segments_and_matches = false;
 
+  bool publish_predicted_segment_matches = false;
+
+  double line_scale_loop_closures;
+  double line_scale_matches;
+
   std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
 
@@ -118,6 +123,11 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns + "/segmentation_radius_m",
               params.segmentation_radius_m);
+  nh.getParam(ns + "/segmentation_height_above_m",
+              params.segmentation_height_above_m);
+  nh.getParam(ns + "/segmentation_height_below_m",
+              params.segmentation_height_below_m);
+
   nh.getParam(ns + "/filter_boundary_segments",
               params.filter_boundary_segments);
   nh.getParam(ns + "/boundary_radius_m",
@@ -126,6 +136,14 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
               params.filter_duplicate_segments);
   nh.getParam(ns + "/centroid_distance_threshold_m",
               params.centroid_distance_threshold_m);
+  int min_time_between_segment_for_matches_s;
+  nh.getParam(ns + "/min_time_between_segment_for_matches_s",
+              min_time_between_segment_for_matches_s);
+  params.min_time_between_segment_for_matches_ns =
+      laser_slam::Time(min_time_between_segment_for_matches_s) * 1000000000u;
+  nh.getParam(ns + "/check_pose_lies_below_segments",
+              params.check_pose_lies_below_segments);
+
 
   // Descriptors parameters.
   nh.getParam(ns + "/Descriptors/descriptor_types",
@@ -281,6 +299,15 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/ratio_of_points_to_keep_when_publishing",
               params.ratio_of_points_to_keep_when_publishing);
+
+  nh.getParam(ns +"/publish_predicted_segment_matches",
+              params.publish_predicted_segment_matches);
+
+  nh.getParam(ns +"/line_scale_loop_closures",
+              params.line_scale_loop_closures);
+
+  nh.getParam(ns +"/line_scale_matches",
+              params.line_scale_matches);
 
   params.segmatch_params = getSegMatchParams(nh, ns);
 
