@@ -178,20 +178,6 @@ Time findTimeOfClosestPose(const Trajectory& poses,
   CHECK(!poses.empty());
   CHECK(!segments.empty());
 
-  // Get a time window of poses around a given time.
-  // Todo how to extend to multiple segments?
-  /*const Time half_window_size_ns = 60000000000u;
-  Trajectory poses_in_window;
-  for (const auto& pose: poses) {
-    if (pose.first <= center_time_ns + half_window_size_ns &&
-        pose.first + half_window_size_ns >= center_time_ns) {
-      poses_in_window.emplace(pose.first, pose.second);
-    }
-  }
-
-  LOG(INFO) << "Found " << poses_in_window.size() << " poses in time window. Total distances :";*/
-  // Calculate total distance from each pose to each segments centroid.
-
   // Compute center of segments.
   PclPoint segments_center;
   for (const auto& segment: segments) {
@@ -400,19 +386,13 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
 
       const Id source_track_id = findMostOccuringId(source_track_ids);
       const Id target_track_id = findMostOccuringId(target_track_ids);
-
-      //const Time source_most_occuring_time = findMostOccuringTime(source_segmentation_times);
-      const Time target_most_occuring_time = findMostOccuringTime(target_segmentation_times);
-
-      //LOG(INFO) << "source_most_occuring_time " << source_most_occuring_time;
-      //LOG(INFO) << "target_most_occuring_time " << target_most_occuring_time;
-
       LOG(INFO) << "source_track_id " << source_track_id << " target_track_id " <<
           target_track_id;
 
+      const Time target_most_occuring_time = findMostOccuringTime(target_segmentation_times);
+
       LOG(INFO) << "Finding source_track_time_ns and target_track_time_ns";
       Time source_track_time_ns, target_track_time_ns;
-
       if (source_track_id != target_track_id) {
         // Get the head of the source trajectory.
         Time trajectory_last_time_ns = segmentation_poses_[source_track_id].rbegin()->first;
@@ -502,32 +482,6 @@ bool SegMatch::filterMatches(const PairwiseMatches& predicted_matches,
       loop_closure->time_b_ns = source_track_time_ns;
       loop_closure->track_id_a = target_track_id;
       loop_closure->track_id_b = source_track_id;
-
-      // Save the most occuring time stamps as timestamps for loop closure.
-      //      loop_closure->time_a_ns = findMostOccuringTime(target_segmentation_times);
-      //      loop_closure->time_b_ns = findMostOccuringTime(source_segmentation_times);
-
-      // Get the track_id of segments created at that time.
-      //      bool found = false;
-      //      for (size_t i = 0u; i < source_segments.size(); ++i) {
-      //        if (!found && source_segmentation_times[i] == loop_closure->time_b_ns) {
-      //          found = true;
-      //          loop_closure->track_id_b = source_segments[i].track_id;
-      //        }
-      //      }
-      //      CHECK(found);
-      //      found = false;
-      //      for (size_t i = 0u; i < target_segments.size(); ++i) {
-      //        if (!found && target_segmentation_times[i] == loop_closure->time_a_ns) {
-      //          found = true;
-      //          loop_closure->track_id_a = target_segments[i].track_id;
-      //        }
-      //      }
-      //      CHECK(found);
-
-      /*if (loop_closure->track_id_a == loop_closure->track_id_b) {
-        CHECK(loop_closure->time_a_ns < loop_closure->time_b_ns);
-      }*/
 
       SE3 w_T_a_b = fromApproximateTransformationMatrix(transformation);
       loop_closure->T_a_b = w_T_a_b;
@@ -901,7 +855,6 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
           LOG(ERROR) << "Nearest neighbour search failed.";
         }
 
-
         for (unsigned int i = 1u; i < n_nearest_segments; ++i) {
           // Check if within distance.
           if (nearest_neighbour_squared_distance[i] <= minimum_distance_squared) {
@@ -955,72 +908,10 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimu
 }
 
 void SegMatch::displayTimings() const {
-  /*double mean, sigma;
-  getMeanAndSigma(segmentation_and_description_timings_, &mean, &sigma);
-  LOG(INFO) << "segmentation_and_description_timings_  " << ": " << mean << " +/- " << sigma;
 
-  getMeanAndSigma(matching_timings_, &mean, &sigma);
-  LOG(INFO) << "matching_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(geometric_verification_timings_, &mean, &sigma);
-  LOG(INFO) << "geometric_verification_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(source_to_target_timings_, &mean, &sigma);
-  LOG(INFO) << "source_to_target_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(update_timings_, &mean, &sigma);
-  LOG(INFO) << "update_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(n_segments_in_source_, &mean, &sigma);
-  double sum_source_segments = 0;
-  for (const auto& n: n_segments_in_source_) {
-    sum_source_segments += n;
-  }
-  LOG(INFO) << "Source segments sum " <<  sum_source_segments << " mean " << mean <<
-      " sigma " << sigma;
-
-  getMeanAndSigma(n_points_in_source_, &mean, &sigma);
-  double sum_source_points = 0;
-  for (const auto& n: n_points_in_source_) {
-    sum_source_points += n;
-  }
-  LOG(INFO) << "Source points sum " <<  sum_source_points << " mean " << mean <<
-      " sigma " << sigma;*/
 }
 
 void SegMatch::saveTimings() const {
-  /*double mean, sigma;
-  getMeanAndSigma(segmentation_and_description_timings_, &mean, &sigma);
-  LOG(INFO) << "segmentation_and_description_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(matching_timings_, &mean, &sigma);
-  LOG(INFO) << "matching_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(geometric_verification_timings_, &mean, &sigma);
-  LOG(INFO) << "geometric_verification_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(source_to_target_timings_, &mean, &sigma);
-  LOG(INFO) << "source_to_target_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(update_timings_, &mean, &sigma);
-  LOG(INFO) << "update_timings_  " << ": " << mean << " +/- " << sigma;
-
-  getMeanAndSigma(n_segments_in_source_, &mean, &sigma);
-  double sum_source_segments = 0;
-  for (const auto& n: n_segments_in_source_) {
-    sum_source_segments += n;
-  }
-  LOG(INFO) << "Source segments sum " <<  sum_source_segments << " mean " << mean <<
-      " sigma " << sigma;
-
-  getMeanAndSigma(n_points_in_source_, &mean, &sigma);
-  double sum_source_points = 0;
-  for (const auto& n: n_points_in_source_) {
-    sum_source_points += n;
-  }
-  LOG(INFO) << "Source points sum " <<  sum_source_points << " mean " << mean <<
-      " sigma " << sigma;*/
-
   Eigen::MatrixXd matrix;
   toEigenMatrixXd(segmentation_and_description_timings_, &matrix);
   writeEigenMatrixXdCSV(matrix, "/tmp/timing_segmentation_and_description.csv");

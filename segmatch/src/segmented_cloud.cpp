@@ -68,45 +68,6 @@ void Segment::calculateCentroid() {
 
   centroid = PclPoint(x_mean, y_mean, z_mean);
 
-//  double x_min, x_max, y_min, y_max, z_min, z_max;
-//  x_min = point_cloud.points[0].x;
-//  x_max = point_cloud.points[0].x;
-//  y_min = point_cloud.points[0].y;
-//  y_max = point_cloud.points[0].y;
-//  z_min = point_cloud.points[0].z;
-//  z_max = point_cloud.points[0].z;
-//
-//
-//  for (size_t i = 0u; i < n_points; ++i) {
-//    if (point_cloud.points[i].x < x_min) {
-//      x_min = point_cloud.points[i].x;
-//    }
-//
-//    if (point_cloud.points[i].x > x_max) {
-//      x_max = point_cloud.points[i].x;
-//    }
-//
-//    if (point_cloud.points[i].y < y_min) {
-//      y_min = point_cloud.points[i].y;
-//    }
-//
-//    if (point_cloud.points[i].y > y_max) {
-//      y_max = point_cloud.points[i].y;
-//    }
-//
-//    if (point_cloud.points[i].z < z_min) {
-//      z_min = point_cloud.points[i].z;
-//    }
-//
-//    if (point_cloud.points[i].z > z_max) {
-//      z_max = point_cloud.points[i].z;
-//    }
-//  }
-//
-//  centroid = PclPoint(x_min + (x_max - x_min) / 2.0,
-//                      y_min + (y_max - y_min) / 2.0,
-//                      z_min + (z_max - z_min) / 2.0);
-
   // Check that there were no overflows, underflows, or invalid float operations.
   if (std::fetestexcept(FE_OVERFLOW)) {
     LOG(ERROR) << "Overflow error in centroid computation.";

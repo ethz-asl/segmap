@@ -214,7 +214,6 @@ static void applyCylindricalFilter(const PclPoint& center, double radius_m,
   for (size_t i = 0u; i < cloud->size(); ++i) {
     if ((pow(cloud->points[i].x - center.x, 2.0)
         + pow(cloud->points[i].y - center.y, 2.0)) <= radius_squared) {
-
       if (cloud->points[i].z < center.z + height_above_m &&
           cloud->points[i].z > center.z - height_below_m) {
         filtered_cloud.points.push_back(cloud->points[i]);
