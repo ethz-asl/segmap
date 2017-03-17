@@ -1,6 +1,6 @@
 LaserMapper: { 
   world_frame: "map",
-  clear_local_map_after_loop_closure: true,
+  clear_local_map_after_loop_closure: false,
   
   publish_world_to_odom: true,
   tf_publication_rate_hz: 10,
@@ -12,6 +12,8 @@ LaserMapper: {
     minimum_distance_to_add_pose: 1,
     voxel_size_m: 0.10,
     minimum_point_number_per_voxel: 1,
+    
+    use_odometry_information: true,
     
     odom_frame: "world",
     sensor_frame: "velodyne",
@@ -43,15 +45,21 @@ LaserMapper: {
   
   export_segments_and_matches: false,
   publish_predicted_segment_matches: false,
+  
+  line_scale_loop_closures: 5.0,
+  line_scale_matches: 0.5,
 
   SegMatch: {
     segmentation_radius_m: 60.0,
+    segmentation_height_above_m: 999.0,
+    segmentation_height_below_m: 999.0,
 
     filter_boundary_segments: true,
-    boundary_radius_m: 59.0,
+    boundary_radius_m: 999.0,
     filter_duplicate_segments: true,
     centroid_distance_threshold_m: 2.0,
     min_time_between_segment_for_matches_s: 0,
+    check_pose_lies_below_segments: false,
 
     Segmenters: {
       segmenter_type: "EuclideanSegmenter", #RegionGrowingSegmenter
