@@ -22,7 +22,7 @@
 - git:
    local-name: gtsam_catkin
    uri: https://github.com/ethz-asl/gtsam_catkin.git
-   version: c9f95e76bba7126ede3f98a967b1ba43e1372c22
+   version: 4e01dee06ba18aa3eb2a4b81549336d1f829a4c2
 - git:
    local-name: libnabo
    uri: https://github.com/ethz-asl/libnabo.git
