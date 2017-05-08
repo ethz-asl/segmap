@@ -29,7 +29,6 @@
 - git:
    local-name: libpointmatcher
    uri: https://github.com/ethz-asl/libpointmatcher.git
-   version: 5f9d925
 - git:
    local-name: minkindr
    uri: https://github.com/ethz-asl/minkindr.git
