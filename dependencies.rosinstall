@@ -26,6 +26,7 @@
 - git:
    local-name: libnabo
    uri: https://github.com/ethz-asl/libnabo.git
+   version: 2cc265088d31cf81092ef39215236b9f8838f499
 - git:
    local-name: libpointmatcher
    uri: https://github.com/ethz-asl/libpointmatcher.git
