@@ -10,6 +10,7 @@
 #include <glog/logging.h>
 #include <kindr/minimal/quat-transformation.h>
 #include <laser_slam/common.hpp>
+#include <octomap/OcTree.h>
 #include <pcl/common/transforms.h>
 #include <pcl/correspondence.h>
 #include <pcl/io/pcd_io.h>
@@ -131,10 +132,46 @@ struct IdIndex {
   size_t index = 0u;
 };
 
+static std::string getFileExtension(const std::string& filename) {
+  auto str_iter = filename.rbegin();
+  for (; str_iter != filename.rend(); ++str_iter) {
+    if (*str_iter == '.') break;
+  }
+  return std::string(str_iter.base(), filename.rbegin().base());
+}
+
+static int loadBtFile(const std::string& filename, PointICloud* cloud) {
+  CHECK_NOTNULL(cloud)->clear();
+  octomap::OcTree octree(filename);
+  if (octree.size() == 0) return -1;
+
+  for (auto it = octree.begin_leafs(); it != octree.end_leafs(); ++it) {
+    if (octree.isNodeOccupied(*it)) {
+      PointI point;
+      point.x = it.getX();
+      point.y = it.getY();
+      point.z = it.getZ();
+      cloud->push_back(point);
+    }
+  }
+
+  return 0;
+}
+
 static void loadCloud(const std::string& filename, PointICloud* cloud) {
+  std::string file_extension = getFileExtension(filename);
+
   LOG(INFO) <<"Loading cloud: " << filename << ".";
-  CHECK_NE(pcl::io::loadPCDFile(filename, *cloud), -1) <<
-      "Failed to load cloud: " << filename << ".";
+  if (file_extension == "pcd") {
+    CHECK_NE(pcl::io::loadPCDFile(filename, *cloud), -1) <<
+        "Failed to load cloud: " << filename << ".";
+  }
+  else if (file_extension == "bt") {
+    CHECK_NE(loadBtFile(filename, cloud), -1) << "Failed to load octomap: " << filename << ".";
+  }
+  else {
+    LOG(FATAL) << "Unknown file extension: " << file_extension << ".";
+  }
 }
 
 struct Translation {

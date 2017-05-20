@@ -20,6 +20,7 @@
   <depend>laser_slam</depend>
   <depend>libopencv-dev</depend>
   <depend>minkindr</depend>
+  <depend>octomap_ros</depend>
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>
 </package>
