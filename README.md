@@ -2,7 +2,7 @@
 
 *SegMatch* is a reliable loop-closure detection algorithm based on the matching of 3D segments. The *SegMatch* code is open-source (BSD License) and has been tested under Ubuntu 14.04 and ROS Indigo. Please remember that this is on-going research code which is subject to changes in the future. Several new features and demonstrations will be added soon.
 
-Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmatch/wiki) for the algorithm description and for instructions on running demonstrations.
+Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmatch/wiki) for the algorithm description and for instructions on running demonstrations. We recently uploaded a second [video](https://www.youtube.com/watch?v=JJhEkIA1xSE) featuring *SegMatch* in a multi-robot configuration. 
 
 ### Compiling *SegMatch*
 The following configuration was tested under Ubuntu 14.04 and ROS indigo. Please see the final note if you want to compile under ROS Kinetic.
