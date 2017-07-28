@@ -40,10 +40,13 @@ We would be very grateful if you would contribute to the code base by reporting 
 
 Thank you for citing our *SegMatch* paper if you use any of this code: 
 ```
-@article{dube2016segmatch,
-  title={SegMatch: Segment based loop-closure for 3D point clouds},
+@inproceedings{segmatch2017,
+  title={SegMatch: Segment based place recognition in 3D point clouds},
   author={Dub{\'e}, Renaud and Dugas, Daniel and Stumm, Elena and Nieto, Juan and Siegwart, Roland and Cadena, Cesar},
-  journal={arXiv preprint arXiv:1609.07720},
-  year={2016}
+  booktitle={International Conference on Robotics and Automation (ICRA)},
+  pages={5266--5272},
+  year={2017},
+  organization={IEEE}
 }
+
 ```
