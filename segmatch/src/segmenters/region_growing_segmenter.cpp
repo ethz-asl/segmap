@@ -64,6 +64,10 @@ void RegionGrowingSegmenter::segment(const PointICloud& cloud,
       indices->push_back(i);
     }
   }
+  if (indices->size() == 0) {
+    LOG(INFO) << "No points with curvature < " << params_.rg_curvature_threshold << ".";
+    return;
+  }
   LOG(INFO) << "Number of indices " << indices->size();
   LOG(INFO) << "Number of normals " << normals->size();
 
