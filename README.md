@@ -11,6 +11,9 @@ First install the required system packages:
 ```
 $ sudo apt-get install libopencv-dev python-wstool doxygen
 ```
+
+SegMatch can be built using catkin_tools which can be installed from this [link](http://catkin-tools.readthedocs.io/en/latest/installing.html).
+
 Then use wstool for installing catkin dependencies:
 ```
 $ cd ~/catkin_ws/src
@@ -18,19 +21,20 @@ $ wstool init
 $ wstool merge segmatch/dependencies.rosinstall
 $ wstool update
 ```
+
+Note: If you are using ROS Kinetic, at this point you should run the following command in your catkin workspace prior to building the packages:
+```
+$ catkin config --merge-devel
+```
+
 Finally build the *laser_mapper* package which will compile all *SegMatch* modules:
 ```
 $ cd ~/catkin_ws
 $ catkin build -DCMAKE_BUILD_TYPE=Release laser_mapper
 ```
-See this link for installing [catkin_tools](http://catkin-tools.readthedocs.io/en/latest/installing.html). Building dependencies will require some time according to which new packages need to be built (eg. Building the `pcl_catkin` package can take up to two hours). Building `pcl_catkin` might fail if you do not have sufficient RAM. It can help to add `-j2` to catkin build in order to limit the parallel jobs and reduce memory usage.
+Building dependencies will require some time according to which new packages need to be built (eg. Building the `pcl_catkin` package can take up to two hours). Building `pcl_catkin` might fail if you do not have sufficient RAM. It can help to add `-j2` to catkin build in order to limit the parallel jobs and reduce memory usage.
 
 Consult the [wiki](https://github.com/ethz-asl/segmatch/wiki) for instructions on running the demonstrations.
-
-Note: If you are using ROS Kinetic, you might want to run the following command in your catkin workspace prior to building the packages:
-```
-$ catkin config --merge-devel
-```
 
 ### Contributing to *SegMatch*
 
