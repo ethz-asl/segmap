@@ -6,6 +6,8 @@
 
 ### News
 
+__*Note 20.4.2018: This repository is being renamed SegMap, in keeping with the latest iteration of the algorithm. For clarity: the name SegMatch will still be used to refer the the first iteration of the pipeline presented in the homonymous paper, while SegMap refers to the current algorithm iteration and corresponding research. The updated documentation and tutorials are coming soon, pending publication.*__
+
 We are in the process of updating this repository with the latest techniques described in our papers "*Incremental Segment-Based Localization in 3D Point Clouds*" and "*SegMap: 3D Segment Mapping using Data-Driven Descriptors*". Stay tuned!
 
 The instructions below refer to the original implementation of our *SegMatch* algorithm. Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmatch/wiki) for the algorithm description and for instructions on running demonstrations. We recently uploaded a second [video](https://www.youtube.com/watch?v=JJhEkIA1xSE) featuring *SegMatch* in a multi-robot configuration. 
