@@ -1,12 +1,12 @@
 ## *SegMap*
 
-*Segmap* is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The *SegMap* code is open-source (BSD License) and has been tested under Ubuntu 14.04 and ROS Indigo. 
+*SegMap* is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The *SegMap* code is open-source (BSD License) and has been tested under Ubuntu 14.04 and ROS Indigo. 
 
 Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmatch/wiki) for the algorithm description and for instructions on running demonstrations. 
 
 ### News
 
-We are in the process of updating this repository with the latest techniques described in our papers *Incremental Segment-Based Localization in 3D Point Clouds* and *SegMap: 3D Segment Mapping using Data-Driven Descriptors*. The instructions below refer to the original implementation of our *SegMatch* algorithm. More to come soon!
+We are in the process of updating this repository with the latest techniques described in our papers "*Incremental Segment-Based Localization in 3D Point Clouds*" and "*SegMap: 3D Segment Mapping using Data-Driven Descriptors*". The instructions below refer to the original implementation of our *SegMatch* algorithm. More to come soon!
 
 We recently uploaded a second [video](https://www.youtube.com/watch?v=JJhEkIA1xSE) featuring *SegMatch* in a multi-robot configuration. 
 
