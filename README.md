@@ -11,9 +11,10 @@ Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](http
 ### Compiling *SegMatch*
 The following configuration was tested under Ubuntu 14.04 and ROS indigo. Please see the final note if you want to compile under ROS Kinetic.
 
-First install the required system packages:
+First install the required system packages: (Remember to change the distro name for ros packages if yours is not kinetic)
 ```
-$ sudo apt-get install libopencv-dev python-wstool doxygen
+$ sudo apt-get install libeigen3-dev libflann-dev libopencv-dev python-wstool doxygen
+$ sudo apt-get install ros-kinetic-tf ros-kinetic-tf-conversions ros-kinetic-eigen-conversions ros-kinetic-pcl-conversions ros-kinetic-interactive-markers
 ```
 
 SegMatch can be built using catkin_tools which can be installed from this [link](http://catkin-tools.readthedocs.io/en/latest/installing.html).
