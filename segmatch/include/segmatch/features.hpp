@@ -12,6 +12,7 @@ namespace segmatch {
 typedef double FeatureValueType;
 
 struct FeatureValue {
+  FeatureValue() {}
   FeatureValue(std::string feature_name, FeatureValueType feature_value) :
     name(feature_name), value(feature_value) {}
   std::string name = "";
@@ -23,10 +24,7 @@ class Feature {
  public:
   Feature() {}
   ~Feature() {}
-  explicit Feature(const FeatureValue& feature_value) { push_back(feature_value); }
-  explicit Feature(const std::string& name, const FeatureValueType value) {
-    push_back(FeatureValue(name, value));
-  }
+  explicit Feature(const std::string& name) : name_(name) {}
 
   size_t size() const { return feature_values_.size(); }
   bool empty() { return feature_values_.empty(); }
@@ -40,8 +38,11 @@ class Feature {
 
   bool findValueByName(const std::string& name, FeatureValue* value) const;
 
+  std::string getName() const {return name_;}
+
  private:
   std::vector<FeatureValue> feature_values_;
+  std::string name_;
 }; // class Feature
 
 /// \brief A collection of features.
@@ -56,7 +57,9 @@ class Features {
   size_t size() const { return features_.size(); }
   const Feature& at(const size_t& index) const { return features_.at(index); }
   void clear() { features_.clear(); }
+  void clearByName(const std::string& name);
   bool empty() { return features_.empty(); }
+  void replaceByName(const Feature& new_feature);
 
   size_t sizeWhenFlattened() const;
   std::vector<FeatureValueType> asVectorOfValues() const;

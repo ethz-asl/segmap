@@ -5,6 +5,8 @@
 #include <boost/filesystem.hpp>
 #include <glog/logging.h>
 
+#include "segmatch/utilities.hpp"
+
 namespace segmatch {
 namespace database {
 
@@ -42,7 +44,7 @@ void UniqueIdMatches::addMatch(const Id id1, const Id id2) {
         id_match_list_.erase(id_match_list_.begin() + position2.row);
         CHECK(findId(id1, &position1));
         id_match_list_.at(position1.row).insert(id_match_list_.at(position1.row).begin(),
-                                               matches2_copy.begin(), matches2_copy.end());
+                                                matches2_copy.begin(), matches2_copy.end());
         return;
       } else {
         // Match already exists.
@@ -75,7 +77,7 @@ std::string UniqueIdMatches::asString() const {
   std::stringstream result;
   for (size_t i = 0u; i < id_match_list_.size(); ++i) {
     for (size_t j = 0u; j < id_match_list_.at(i).size(); ++j) {
-    result << id_match_list_.at(i).at(j) << " ";
+      result << id_match_list_.at(i).at(j) << " ";
     }
     result << std::endl;
   }
@@ -146,7 +148,8 @@ bool ensureDirectoryExistsForFilename(const std::string& filename) {
   }
 }
 
-bool exportSegments(const std::string& filename, const SegmentedCloud& segmented_cloud) {
+bool exportSegments(const std::string& filename, const SegmentedCloud& segmented_cloud,
+                    const bool export_all_views, bool export_reconstructions) {
   ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
@@ -154,12 +157,37 @@ bool exportSegments(const std::string& filename, const SegmentedCloud& segmented
     for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
         it != segmented_cloud.end(); ++it) {
       Segment segment = it->second;
-      for (size_t j = 0u; j < segment.point_cloud.size(); ++j) {
-        output_file << segment.segment_id << " ";
-        output_file << segment.point_cloud.points[j].x << " ";
-        output_file << segment.point_cloud.points[j].y << " ";
-        output_file << segment.point_cloud.points[j].z;
-        output_file << std::endl;
+      if (export_all_views) {
+        for (size_t i = 0u; i < segment.views.size(); ++i) {
+          PointCloud point_cloud;
+          if (export_reconstructions) {
+            point_cloud = segment.views[i].reconstruction;
+          } else {
+            point_cloud = segment.views[i].point_cloud;
+          }
+          for (const auto& point : point_cloud) {
+            output_file << segment.segment_id << " ";
+            output_file << i << " "; // Index of the view.
+            output_file << point.x << " ";
+            output_file << point.y << " ";
+            output_file << point.z;
+            output_file << std::endl;
+          }
+        }
+      } else {
+        PointCloud point_cloud;
+        if (export_reconstructions) {
+          point_cloud = segment.getLastView().reconstruction;
+        } else {
+          point_cloud = segment.getLastView().point_cloud;
+        }
+        for (const auto& point : point_cloud) {
+          output_file << segment.segment_id << " ";
+          output_file << point.x << " ";
+          output_file << point.y << " ";
+          output_file << point.z;
+          output_file << std::endl;
+        }
       }
     }
     output_file.close();
@@ -171,7 +199,8 @@ bool exportSegments(const std::string& filename, const SegmentedCloud& segmented
   }
 }
 
-bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented_cloud) {
+bool exportPositions(const std::string& filename, const SegmentedCloud& segmented_cloud,
+                     const bool export_all_views){
   ensureDirectoryExistsForFilename(filename);
   std::ofstream output_file;
   output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
@@ -179,14 +208,65 @@ bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented
     for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
         it != segmented_cloud.end(); ++it) {
       Segment segment = it->second;
-      output_file << segment.segment_id << " ";
-      std::vector<FeatureValueType> values = segment.features.asVectorOfValues();
-      std::vector<std::string> names = segment.features.asVectorOfNames();
-      for (size_t j = 0u; j < values.size(); ++j) {
-        output_file << names.at(j) << " ";
-        output_file << values.at(j) << " ";
+      if (export_all_views) {
+        for (size_t i = 0u; i < segment.views.size(); ++i) {
+          SE3::Position pos = segment.views[i].T_w_linkpose.getPosition();
+          output_file << segment.segment_id << " ";
+          output_file << i << " "; // Index of the view.
+          output_file << pos[0] << " ";
+          output_file << pos[1] << " ";
+          output_file << pos[2] << " ";
+          output_file << std::endl;
+        }
+      } else {
+        SE3::Position pos = segment.getLastView().T_w_linkpose.getPosition();
+        output_file << segment.segment_id << " ";
+        output_file << pos[0] << " ";
+        output_file << pos[1] << " ";
+        output_file << pos[2] << " ";
+        output_file << std::endl;
       }
-      output_file << std::endl;
+    }
+    output_file.close();
+    LOG(INFO) << segmented_cloud.getNumberOfValidSegments() << " segments written to " << filename;
+    return true;
+  } else {
+    LOG(ERROR) << "Could not open file " << filename << " for writing segment positions.";
+    return false;
+  }	
+}
+
+bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented_cloud,
+                    const bool export_all_views) {
+  ensureDirectoryExistsForFilename(filename);
+  std::ofstream output_file;
+  output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
+  if (output_file.is_open()) {
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
+        it != segmented_cloud.end(); ++it) {
+      Segment segment = it->second;
+      if (export_all_views) {
+        for (size_t i = 0u; i < segment.views.size(); ++i) {
+          output_file << segment.segment_id << " ";
+          output_file << i << " "; // Index of the view.
+          std::vector<FeatureValueType> values = segment.views[i].features.asVectorOfValues();
+          std::vector<std::string> names = segment.views[i].features.asVectorOfNames();
+          for (size_t j = 0u; j < values.size(); ++j) {
+            output_file << names.at(j) << " ";
+            output_file << values.at(j) << " ";
+          }
+          output_file << std::endl;
+        }
+      } else {
+        output_file << segment.segment_id << " ";
+        std::vector<FeatureValueType> values = segment.getLastView().features.asVectorOfValues();
+        std::vector<std::string> names = segment.getLastView().features.asVectorOfNames();
+        for (size_t j = 0u; j < values.size(); ++j) {
+          output_file << names.at(j) << " ";
+          output_file << values.at(j) << " ";
+        }
+        output_file << std::endl;
+      }
     }
     output_file.close();
     LOG(INFO) << "Features written to " << filename;
@@ -197,10 +277,64 @@ bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented
   }
 }
 
+bool exportSegmentsTimestamps(const std::string& filename,
+                              const SegmentedCloud& segmented_cloud,
+                              const bool export_all_views) {
+  ensureDirectoryExistsForFilename(filename);
+  std::ofstream output_file;
+  output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
+  if (output_file.is_open()) {
+    for (std::unordered_map<Id, Segment>::const_iterator it = segmented_cloud.begin();
+        it != segmented_cloud.end(); ++it) {
+      Segment segment = it->second;
+      if (export_all_views) {
+        for (size_t i = 0u; i < segment.views.size(); ++i) {
+          output_file << segment.segment_id << " ";
+          output_file << i << " "; // Index of the view.
+          output_file << segment.views[i].timestamp_ns << " ";
+          output_file << std::endl;
+        }
+      } else {
+        output_file << segment.segment_id << " ";
+        output_file << segment.getLastView().timestamp_ns << " ";
+        output_file << std::endl;
+      }
+    }
+    output_file.close();
+    LOG(INFO) << "Timestamps written to " << filename;
+    return true;
+  } else {
+    LOG(ERROR) << "Could not open file " << filename << " for writing timestamps.";
+    return false;
+  }
+}
+
+bool exportMergeEvents(const std::string& filename, const std::vector<MergeEvent>& merge_events) {
+  ensureDirectoryExistsForFilename(filename);
+  std::ofstream output_file;
+  output_file.open(filename, std::ofstream::out | std::ofstream::trunc);
+  if (output_file.is_open()) {
+    for (const auto& merge_event : merge_events) {
+      output_file << merge_event.timestamp_ns << " ";
+      output_file << merge_event.id_before << " ";
+      output_file << merge_event.id_after << " ";
+      output_file << std::endl;
+    }
+    output_file.close();
+    LOG(INFO) << "Merge events written to " << filename;
+    return true;
+  } else {
+    LOG(ERROR) << "Could not open file " << filename << " for writing merge events.";
+    return false;
+  }
+}
+
 bool exportSegmentsAndFeatures(const std::string& filename_prefix,
-                               const SegmentedCloud& segmented_cloud) {
-  exportSegments(filename_prefix + "_segments.csv", segmented_cloud);
-  exportFeatures(filename_prefix + "_features.csv", segmented_cloud);
+                               const SegmentedCloud& segmented_cloud,
+                               const bool export_all_views) {
+  exportSegments(filename_prefix + "_segments.csv", segmented_cloud, export_all_views);
+  exportFeatures(filename_prefix + "_features.csv", segmented_cloud, export_all_views);
+  exportSegmentsTimestamps(filename_prefix + "_timestamps.csv", segmented_cloud, export_all_views);
 }
 
 bool exportMatches(const std::string& filename, const UniqueIdMatches& matches) {
@@ -232,35 +366,38 @@ bool importSegments(const std::string& filename, SegmentedCloud* segmented_cloud
     // Get the current line.
     std::string line;
     Segment segment;
+    segment.views.emplace_back(SegmentView());
     while(getline(input_file, line)) {
       std::istringstream line_as_stream(line);
       // Read first number as segment id.
       Id line_id;
       line_as_stream >> line_id;
+
       // If id has changed, save segment and create new one.
-      if (line_id != segment.segment_id && !segment.empty()) {
+      if (segment.segment_id != kNoId && line_id != segment.segment_id && !segment.empty()) {
         // Ensure that ids remain unique.
         if (segmented_cloud_ptr->findValidSegmentPtrById(segment.segment_id, NULL)) {
           LOG(WARNING) << "Did not import segment of id " << segment.segment_id <<
-            ". A segment with that id already exists.";
+              ". A segment with that id already exists.";
         } else {
           segmented_cloud_ptr->addValidSegment(segment);
           ++segments_count;
         }
         segment.clear();
+        segment.views.emplace_back(SegmentView());
       }
       segment.segment_id = line_id;
-      PointI point;
+      PclPoint point;
       line_as_stream >> point.x;
       line_as_stream >> point.y;
       line_as_stream >> point.z;
-      segment.point_cloud.push_back(point);
+      segment.getLastView().point_cloud.push_back(point);
     }
     // After the loop: Store the last segment.
     if (segment.hasValidId()) {
       if (segmented_cloud_ptr->findValidSegmentPtrById(segment.segment_id, NULL)) {
         LOG(WARNING) << "Did not import segment of id " << segment.segment_id <<
-          ". A segment with that id already exists.";
+            ". A segment with that id already exists.";
       } else {
         segmented_cloud_ptr->addValidSegment(segment);
         ++segments_count;
@@ -276,7 +413,7 @@ bool importSegments(const std::string& filename, SegmentedCloud* segmented_cloud
 }
 
 bool importFeatures(const std::string& filename, SegmentedCloud* segmented_cloud_ptr,
-                     const std::string& behavior_when_segment_has_features) {
+                    const std::string& behavior_when_segment_has_features) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   std::ifstream input_file;
   input_file.open(filename);
@@ -305,18 +442,18 @@ bool importFeatures(const std::string& filename, SegmentedCloud* segmented_cloud
         }
         features.push_back(feature);
         // Check wether segment already has features.
-        if (!segment_ptr->features.empty()) {
+        if (!segment_ptr->getLastView().features.empty()) {
           if (behavior_when_segment_has_features == "concatenate") {
-            segment_ptr->features += features;
+            segment_ptr->getLastView().features += features;
           } else if (behavior_when_segment_has_features == "replace") {
-            segment_ptr->features = features;
+            segment_ptr->getLastView().features = features;
           }else /* behavior_when_segment_has_features == "abort" */ {
             LOG(FATAL) << "Segment " << segment_id <<
                 " into which features are being imported already has features, " <<
                 "and tolerance has not been set. Aborting.";
           }
         } else {
-          segment_ptr->features = features;
+          segment_ptr->getLastView().features = features;
         }
         ++segments_count;
       }

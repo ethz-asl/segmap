@@ -1,0 +1,10 @@
+/**
+
+\mainpage Segmatch
+
+\e SegMatch is a reliable loop-closure detection algorithm based on the matching of
+3D segments. The \e SegMatch code is open-source (BSD License) and has been tested under
+Ubuntu 14.04 and ROS Indigo. Please remember that this is on-going research code
+which is subject to changes in the future.
+
+*/

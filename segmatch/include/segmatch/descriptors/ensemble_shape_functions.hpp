@@ -30,6 +30,8 @@ class EnsembleShapeFunctions : public Descriptor {
 
   unsigned int dimension() const { return kSignatureDimension; };
 
+  virtual void exportData() const { };
+
  private:
   pcl::ESFEstimation<PclPoint, pcl::ESFSignature640> esf_estimator_;
 

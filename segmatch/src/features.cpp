@@ -49,7 +49,12 @@ Features Features::rotationInvariantFeaturesOnly() const {
       if (at(i).at(j).name != "scale_x" &&
           at(i).at(j).name != "scale_y" &&
           at(i).at(j).name != "scale_z" &&
-          at(i).at(j).name != "alignment") {
+          at(i).at(j).name != "scale_sml" &&
+          at(i).at(j).name != "scale_med" &&
+          at(i).at(j).name != "scale_lrg" &&
+          at(i).at(j).name != "alignment" &&
+          at(i).at(j).name != "origin_dx" &&
+          at(i).at(j).name != "origin_dy") {
         feature.push_back(at(i).at(j));
       }
     }
@@ -67,5 +72,27 @@ std::vector<std::string> Features::asVectorOfNames() const {
   }
   return result;
 }
+
+void Features::clearByName(const std::string& name) {
+  auto removal_predicate = [&](const Feature& feature) {
+    return feature.getName() == name;
+  };
+  features_.erase(std::remove_if(features_.begin(), features_.end(), removal_predicate),
+                  features_.end());
+}
+
+void Features::replaceByName(const Feature& new_feature) {
+  bool found = false;
+  for (auto& feature : features_) {
+    if (feature.getName() == new_feature.getName()) {
+      found = true;
+      feature = new_feature;
+      break;
+    }
+  }
+  if (!found) features_.push_back(new_feature);
+}
+
+
 
 } // namespace segmatch

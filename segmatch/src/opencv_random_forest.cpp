@@ -1,28 +1,16 @@
 #include "segmatch/opencv_random_forest.hpp"
 
+#include <laser_slam/benchmarker.hpp>
 #include <laser_slam/common.hpp>
+#include <ros/console.h>
 
 using namespace Nabo;
 using namespace Eigen;
-using namespace cv;
-using namespace segmatch;
-
-void convertEigenToOpenCvMat(const Eigen::MatrixXd& eigen_mat,
-                             Mat* open_cv_mat) {
-  CHECK_NOTNULL(open_cv_mat);
-  for (size_t i = 0u; i < eigen_mat.rows(); ++i) {
-    for (size_t j = 0u; j < eigen_mat.cols(); ++j) {
-      open_cv_mat->at<float>(i, j) = eigen_mat(i, j);
-    }
-  }
-}
 
 namespace segmatch {
 
 OpenCvRandomForest::OpenCvRandomForest(const ClassifierParams& params)
     : params_(params) {
-  rtrees_.load(params.classifier_filename.c_str());
-
   inverted_max_eigen_double_.resize(1, 7);
   inverted_max_eigen_float_.resize(1, 7);
   for (int i = 0; i < 7; ++i) {
@@ -31,10 +19,6 @@ OpenCvRandomForest::OpenCvRandomForest(const ClassifierParams& params)
     inverted_max_eigen_float_(0, i) = float(
         1.0 / params.max_eigen_features_values[i]);
   }
-  std::cout << "inverted_max_eigen_double_ " << std::endl
-            << inverted_max_eigen_double_ << std::endl;
-  std::cout << "inverted_max_eigen_float_ " << std::endl
-            << inverted_max_eigen_float_ << std::endl;
 }
 
 OpenCvRandomForest::~OpenCvRandomForest() {
@@ -49,7 +33,6 @@ void OpenCvRandomForest::resetParams(const ClassifierParams& params) {
   LOG(INFO) << "classifier_filename: " << params_.classifier_filename;
 
   params_ = params;
-  rtrees_.load(params.classifier_filename.c_str());
 }
 
 void histogramIntersection(const Eigen::MatrixXd& h1, const Eigen::MatrixXd& h2,
@@ -148,7 +131,6 @@ void OpenCvRandomForest::computeFeaturesDistance(const Eigen::MatrixXd& f1,
 PairwiseMatches OpenCvRandomForest::findCandidates(
     const SegmentedCloud& source_cloud,
     PairwiseMatches* matches_after_first_stage) {
-  laser_slam::Clock clock;
   if (matches_after_first_stage != NULL) {
     matches_after_first_stage->clear();
   }
@@ -163,29 +145,38 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
 
   double time_in_compute_distance = 0;
 
-  if (params_.n_nearest_neighbours > 0 && params_.enable_two_stage_retrieval) {
+  /*if (params_.n_nearest_neighbours > 0 && params_.enable_two_stage_retrieval) {
     if (params_.apply_hard_threshold_on_feature_distance) {
       LOG(INFO)<< "Two stage retrieval with hard threshold and " <<
-      target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
+      target_cloud_.getNumberOfValidSegments() << " segments in the target cloud and " <<
+      source_cloud.getNumberOfValidSegments() << "  segments in the source cloud.";
     } else {
       LOG(INFO) << "Two stage retrieval with RF and " <<
-      target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
+      target_cloud_.getNumberOfValidSegments() << " segments in the target cloud and " <<
+      source_cloud.getNumberOfValidSegments() << "  segments in the source cloud.";
     }
   } else if (params_.n_nearest_neighbours > 0) {
     LOG(INFO) << "Finding candidates with libnabo knn and " <<
-    target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
+    target_cloud_.getNumberOfValidSegments() << " segments in the target cloud and " <<
+    source_cloud.getNumberOfValidSegments() << "  segments in the source cloud.";
   } else {
     LOG(INFO) << "Finding candidates with RF and " <<
-    target_cloud_.getNumberOfValidSegments() << " segments in the target cloud.";
-  }
+    target_cloud_.getNumberOfValidSegments() << " segments in the target cloud and " <<
+    source_cloud.getNumberOfValidSegments() << "  segments in the source cloud.";
+  }*/
 
   if (params_.n_nearest_neighbours > 0) {
-
     for (std::unordered_map<Id, Segment>::const_iterator it_source = source_cloud.begin();
         it_source != source_cloud.end(); ++it_source) {
+
+      if (params_.do_not_use_cars) {
+        if (it_source->second.empty()) continue;  
+        if (it_source->second.getLastView().semantic == 1u) continue;
+      }
+
       Segment source_segment = it_source->second;
       Eigen::MatrixXd features_source = 
-          source_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
+          source_segment.getLastView().features.rotationInvariantFeaturesOnly().asEigenMatrix();
 
       VectorXf q;
       if (params_.normalize_eigen_for_knn) {
@@ -205,14 +196,16 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
       nns_->knn(q, indices, dists2, n_nearest_neighbours);
 
       for (size_t i = 0u; i < n_nearest_neighbours; ++i) {
-        PairwiseMatch match(source_segment.segment_id,
-                            target_segment_ids_[indices[i]],
-                            source_segment.centroid,
-                            target_segment_centroids_[indices[i]], 1.0);
-        match.features1_ = features_source;
-        match.features2_ = target_segment_features_[indices[i]];
+        if (source_segment.segment_id != target_segment_ids_[indices[i]]) {
+          PairwiseMatch match(source_segment.segment_id,
+                              target_segment_ids_[indices[i]],
+                              source_segment.getLastView().centroid,
+                              target_segment_centroids_[indices[i]], 1.0);
+          match.features1_ = features_source;
+          match.features2_ = target_segment_features_[indices[i]];
 
-        candidates_after_first_stage.push_back(match);
+          candidates_after_first_stage.push_back(match);
+        }
       }
     }
 
@@ -237,56 +230,12 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
             candidates.push_back(candidate);
           }
         }
-
+        /*LOG(INFO) << "candidates_after_first_stage.size() " <<
+            candidates_after_first_stage.size() << " candidates.size() " <<
+            candidates.size();*/
       } else {
         // Two stage knn and RF.
-
-        const unsigned int feature_dimension = candidates_after_first_stage[0]
-            .features1_.cols();
-        Eigen::MatrixXd F1(candidates_after_first_stage.size(),
-                           feature_dimension);
-        Eigen::MatrixXd F2(candidates_after_first_stage.size(),
-                           feature_dimension);
-
-        for (size_t i = 0u; i < candidates_after_first_stage.size(); ++i) {
-          PairwiseMatch candidate = candidates_after_first_stage[i];
-          F1.block(i, 0, 1, feature_dimension) = candidate.features1_;
-          F2.block(i, 0, 1, feature_dimension) = candidate.features2_;
-        }
-
-        Eigen::MatrixXd dF;
-        computeFeaturesDistance(F1, F2, &dF);
-        const unsigned int feature_dim_after_dist = dF.cols();
-
-        for (size_t i = 0u; i < candidates_after_first_stage.size(); ++i) {
-          PairwiseMatch candidate = candidates_after_first_stage[i];
-          Mat features(1, feature_dim_after_dist, CV_32FC1);
-          convertEigenToOpenCvMat(dF.block(i, 0, 1, feature_dim_after_dist),
-                                  &features);
-          const float confidence = rtrees_.predict_prob(features);
-          if (confidence > params_.threshold_to_accept_match) {
-            candidates.push_back(
-                PairwiseMatch(candidate.ids_.first, candidate.ids_.second,
-                              candidate.centroids_.first,
-                              candidate.centroids_.second, confidence));
-          }
-        }
-
-        //        for (size_t i = 0u; i < candidates_after_first_stage.size(); ++i) {
-        //          PairwiseMatch candidate = candidates_after_first_stage[i];
-        //          Eigen::MatrixXd diff_features;
-        //          computeFeaturesDistance(candidate.features1_, candidate.features2_, &diff_features);
-        //
-        //          Mat features(1, diff_features.cols(), CV_32FC1);
-        //          convertEigenToOpenCvMat(diff_features, &features);
-        //
-        //          const float confidence = rtrees_.predict_prob(features);
-        //          if (confidence > params_.threshold_to_accept_match) {
-        //            candidates.push_back(PairwiseMatch(candidate.ids_.first, candidate.ids_.second,
-        //                                               candidate.centroids_.first, candidate.centroids_.second,
-        //                                               confidence));
-        //          }
-        //        }
+        CHECK(false) << "RF is not implemented anymore.";
       }
     } else {
       // knn only.
@@ -294,147 +243,34 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
     }
   } else {
     // RF only.
-    for (std::unordered_map<Id, Segment>::const_iterator it_source = source_cloud.begin();
-        it_source != source_cloud.end(); ++it_source) {
-      Segment source_segment = it_source->second;
-      Eigen::MatrixXd features_source = source_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
-
-      for (std::unordered_map<Id, Segment>::const_iterator it_target = target_cloud_.begin();
-          it_target != source_cloud.end(); ++it_target) {
-        Segment target_segment = it_target->second;
-        Eigen::MatrixXd features_target =
-            target_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix();
-
-        Eigen::MatrixXd diff_features;
-        computeFeaturesDistance(features_source, features_target,
-                                &diff_features);
-
-        Mat features(1, diff_features.cols(), CV_32FC1);
-        convertEigenToOpenCvMat(diff_features, &features);
-
-        const float confidence = rtrees_.predict_prob(features);
-        if (confidence > params_.threshold_to_accept_match) {
-          candidates.push_back(
-              PairwiseMatch(source_segment.segment_id,
-                            target_segment.segment_id, source_segment.centroid,
-                            target_segment.centroid, confidence));
-        }
-      }
-    }
+    CHECK(false) << "RF is not implemented anymore.";
   }
 
-  clock.takeTime();
-  LOG(INFO)<< "Found " << candidates.size() << " candidates in "
-  << clock.getRealTime() << "ms with " << time_in_compute_distance <<
-  " ms in computing distance." << std::endl;
+  //LOG(INFO)<< "Found " << candidates.size() << " candidates.";
   return candidates;
 }
 
 void OpenCvRandomForest::train(const Eigen::MatrixXd& features,
                                const Eigen::MatrixXd& labels) {
-  const unsigned int n_training_samples = features.rows();
-  const unsigned int descriptors_dimension = features.cols();
-  LOG(INFO)<< "Training RF with " << n_training_samples << " of dimension "
-  << descriptors_dimension << ".";
-
-  Mat opencv_features(n_training_samples, descriptors_dimension, CV_32FC1);
-  Mat opencv_labels(n_training_samples, 1, CV_32FC1);
-  //TODO Functionalize.
-  for (unsigned int i = 0u; i < n_training_samples; ++i) {
-    for (unsigned int j = 0u; j < descriptors_dimension; ++j) {
-      opencv_features.at<float>(i, j) = features(i, j);
-    }
-    opencv_labels.at<float>(i, 0) = labels(i, 0);
-  }
-
-  float priors[] = { params_.rf_priors[0], params_.rf_priors[1] };
-
-  // Random forest parameters.
-  CvRTParams rtrees_params = CvRTParams(
-      params_.rf_max_depth, params_.rf_min_sample_ratio * n_training_samples,
-      params_.rf_regression_accuracy, params_.rf_use_surrogates,
-      params_.rf_max_categories, priors, params_.rf_calc_var_importance,
-      params_.rf_n_active_vars, params_.rf_max_num_of_trees,
-      params_.rf_accuracy,
-      CV_TERMCRIT_EPS);
-
-  rtrees_.train(opencv_features, CV_ROW_SAMPLE, opencv_labels, cv::Mat(),
-                cv::Mat(), cv::Mat(), cv::Mat(), rtrees_params);
-  ROS_INFO_STREAM("Tree count: " << rtrees_.get_tree_count() << ".");
-
-  if (params_.rf_calc_var_importance) {
-    Mat variable_importance = rtrees_.getVarImportance();
-    Size variable_importance_size = variable_importance.size();
-    CHECK_EQ(variable_importance_size.height, 1.0)<< "Height of variable importance is not 1.";
-    CHECK_EQ(variable_importance_size.width, descriptors_dimension)<<
-    "Width of variable importance is the features dimension.";
-
-    // TODO(renaud): Remove this cout (just for debugging).
-    std::cout << "Variable importance: ";
-    for (unsigned int i = 0; i < descriptors_dimension; ++i) {
-      std::cout << variable_importance.at<float>(i) << " ";
-    }
-    std::cout << std::endl;
-  }
-
-  // TODO if desired, re-implement negative mining.
+  CHECK(false) << "RF is not implemented anymore.";
 }
 
 void OpenCvRandomForest::test(const Eigen::MatrixXd& features,
                               const Eigen::MatrixXd& labels,
                               Eigen::MatrixXd* probabilities) const {
-  laser_slam::Clock clock;
-  const unsigned int n_samples = features.rows();
-  const unsigned int descriptors_dimension = features.cols();
-  LOG(INFO)<< "Testing the random forest with " << n_samples
-  << " samples of dimension " << descriptors_dimension << ".";
-
-  if (probabilities != NULL) {
-    probabilities->resize(n_samples, 1);
-  }
-
-  if (n_samples > 0u) {
-    unsigned int tp = 0u, fp = 0u, tn = 0u, fn = 0u;
-    for (unsigned int i = 0u; i < n_samples; ++i) {
-      Mat opencv_sample(1, descriptors_dimension, CV_32FC1);
-      for (unsigned int j = 0u; j < descriptors_dimension; ++j) {
-        opencv_sample.at<float>(j) = features(i, j);
-      }
-      double probability = rtrees_.predict_prob(opencv_sample);
-      if (probability >= params_.threshold_to_accept_match) {
-        if (labels(i, 0) == 1.0) {
-          ++tp;
-        } else {
-          ++fp;
-        }
-      } else {
-        if (labels(i, 0) == 0.0) {
-          ++tn;
-        } else {
-          ++fn;
-        }
-      }
-      if (probabilities != NULL) {
-        (*probabilities)(i, 0) = probability;
-      }
-    }
-    displayPerformances(tp, tn, fp, fn);
-  }
-  clock.takeTime();
-  LOG(INFO)<< "Took " << clock.getRealTime() << "ms to test.";
+  CHECK(false) << "RF is not implemented anymore.";
 }
 
 void OpenCvRandomForest::save(const std::string& filename) const {
-  LOG(INFO)<< "Saving the classifier to: " << filename << ".";
-  rtrees_.save(filename.c_str());
+  CHECK(false) << "RF is not implemented anymore.";
 }
 
 void OpenCvRandomForest::load(const std::string& filename) {
-  LOG(INFO)<< "Loading a classifier from: " << filename << ".";
-  rtrees_.load(filename.c_str());
+  CHECK(false) << "RF is not implemented anymore.";
 }
 
 void OpenCvRandomForest::setTarget(const SegmentedCloud& target_cloud) {
+  BENCHMARK_BLOCK("SM.Worker.UpdateTarget.SetClassifierTarget");
   if (target_cloud.empty()) {
     return;
   }
@@ -445,19 +281,51 @@ void OpenCvRandomForest::setTarget(const SegmentedCloud& target_cloud) {
   target_segment_centroids_.clear();
   target_segment_features_.clear();
 
-  target_matrix_.resize(target_cloud.getNumberOfValidSegments(),
+  // TODO RD Solve the need for cleaning empty segments and clean here.
+  unsigned int n_non_empty_views = 0;
+  for (std::unordered_map<Id, Segment>::const_iterator it = target_cloud.begin();
+      it != target_cloud.end(); ++it) {
+      if (!it->second.empty()) {
+          ++n_non_empty_views;
+      }
+  }
+  
+  if (n_non_empty_views != target_cloud.getNumberOfValidSegments()) { 
+      LOG(INFO) << "Some segments had empty views";
+  }
+  
+  target_matrix_.resize(n_non_empty_views,
                         params_.knn_feature_dim);
+
+  if (params_.do_not_use_cars) {
+    // Find the number of segments which do not represent cars.
+    unsigned int n_non_car = 0;
+    for (std::unordered_map<Id, Segment>::const_iterator it = target_cloud.begin();
+        it != target_cloud.end(); ++it) {
+        if (!it->second.empty()) {
+            if(it->second.getLastView().semantic != 1u) {
+                ++n_non_car;
+            } 
+        }
+    }
+    target_matrix_.resize(n_non_car,
+                          params_.knn_feature_dim);
+  }
 
   unsigned int i = 0u;
   for (std::unordered_map<Id, Segment>::const_iterator it = target_cloud.begin();
       it != target_cloud.end(); ++it) {
     Segment target_segment = it->second;
-    target_matrix_.block(i, 0, 1, params_.knn_feature_dim) = target_segment
-        .features.rotationInvariantFeaturesOnly().asEigenMatrix().block(0, 0, 1, params_.knn_feature_dim)
-        .cast<float>();
+    if (target_segment.empty()) continue;
+    if (params_.do_not_use_cars && target_segment.getLastView().semantic == 1u) continue;
+
+    target_matrix_.block(i, 0, 1, params_.knn_feature_dim) =
+        target_segment.getLastView().features.rotationInvariantFeaturesOnly().asEigenMatrix().block(
+            0, 0, 1, params_.knn_feature_dim).cast<float>();
     target_segment_ids_.push_back(target_segment.segment_id);
-    target_segment_centroids_.push_back(target_segment.centroid);
-    target_segment_features_.push_back(target_segment.features.rotationInvariantFeaturesOnly().asEigenMatrix());
+    target_segment_centroids_.push_back(target_segment.getLastView().centroid);
+    target_segment_features_.push_back(
+        target_segment.getLastView().features.rotationInvariantFeaturesOnly().asEigenMatrix());
     ++i;
   }
 

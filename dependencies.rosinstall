@@ -22,13 +22,14 @@
 - git:
    local-name: gtsam_catkin
    uri: https://github.com/ethz-asl/gtsam_catkin.git
-   version: 4e01dee06ba18aa3eb2a4b81549336d1f829a4c2
 - git:
    local-name: libnabo
    uri: https://github.com/ethz-asl/libnabo.git
+   version: 2cc265088d31cf81092ef39215236b9f8838f499
 - git:
    local-name: libpointmatcher
    uri: https://github.com/ethz-asl/libpointmatcher.git
+   version: 5f9d925
 - git:
    local-name: minkindr
    uri: https://github.com/ethz-asl/minkindr.git
@@ -43,13 +44,8 @@
    uri: https://github.com/ethz-asl/ethzasl_icp_mapping.git
    version: indigo_devel
 - git:
-   local-name: GTSAM
-   uri: https://bitbucket.org/gtborg/gtsam.git
-   version: b66dda2fe5ed2cf9e801119e481530e4cf13a94e
-- git:
    local-name: catkin_simple
    uri: https://github.com/catkin/catkin_simple.git
 - git:
    local-name: pcl_catkin
    uri: https://github.com/ethz-asl/pcl_catkin.git
-

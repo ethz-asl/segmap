@@ -1,6 +1,8 @@
 #ifndef SEGMATCH_ROS_COMMON_HPP_
 #define SEGMATCH_ROS_COMMON_HPP_
 
+#include <math.h>
+
 #include <interactive_markers/interactive_marker_server.h>
 #include <laser_slam/common.hpp>
 #include <nav_msgs/Path.h>
@@ -9,6 +11,7 @@
 #include <pcl/point_types.h>
 #include <ros/ros.h>
 #include <segmatch/common.hpp>
+#include <segmatch/utilities.hpp>
 #include <segmatch/parameters.hpp>
 #include <segmatch/segmatch.hpp>
 #include <segmatch/segmented_cloud.hpp>
@@ -40,8 +43,6 @@ struct SegMatchWorkerParams {
 
   double line_scale_loop_closures;
   double line_scale_matches;
-
-  std::string autoencoder_reconstructor_script_path = "";
 }; // struct SegMatchWorkerParams
 
 
@@ -143,7 +144,24 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
       laser_slam::Time(min_time_between_segment_for_matches_s) * 1000000000u;
   nh.getParam(ns + "/check_pose_lies_below_segments",
               params.check_pose_lies_below_segments);
+  nh.getParam(ns + "/radius_for_normal_estimation_m",
+              params.radius_for_normal_estimation_m);
+  nh.getParam(ns + "/normal_estimator_type",
+              params.normal_estimator_type);
 
+  // Local map parameters.
+  nh.getParam(ns + "/LocalMap/voxel_size_m",
+              params.local_map_params.voxel_size_m);
+  nh.getParam(ns + "/LocalMap/min_points_per_voxel",
+              params.local_map_params.min_points_per_voxel);
+  nh.getParam(ns + "/LocalMap/radius_m",
+              params.local_map_params.radius_m);
+  nh.getParam(ns + "/LocalMap/min_vertical_distance_m",
+              params.local_map_params.min_vertical_distance_m);
+  nh.getParam(ns + "/LocalMap/max_vertical_distance_m",
+              params.local_map_params.max_vertical_distance_m);
+  nh.getParam(ns + "/LocalMap/neighbors_provider_type",
+              params.local_map_params.neighbors_provider_type);
 
   // Descriptors parameters.
   nh.getParam(ns + "/Descriptors/descriptor_types",
@@ -157,50 +175,24 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
               params.descriptors_params.point_feature_histograms_search_radius);
   nh.getParam(ns + "/Descriptors/point_feature_histograms_normals_search_radius",
               params.descriptors_params.point_feature_histograms_normals_search_radius);
-  nh.getParam(ns + "/Descriptors/autoencoder_python_env",
-              params.descriptors_params.autoencoder_python_env);
-  nh.getParam(ns + "/Descriptors/autoencoder_script_path",
-              params.descriptors_params.autoencoder_script_path);
-  nh.getParam(ns + "/Descriptors/autoencoder_model_path",
-              params.descriptors_params.autoencoder_model_path);
-  nh.getParam(ns + "/Descriptors/autoencoder_temp_folder_path",
-              params.descriptors_params.autoencoder_temp_folder_path);
-  nh.getParam(ns + "/Descriptors/autoencoder_latent_space_dimension",
-              params.descriptors_params.autoencoder_latent_space_dimension);
+  nh.getParam(ns + "/Descriptors/cnn_model_path",
+              params.descriptors_params.cnn_model_path);
+  nh.getParam(ns + "/Descriptors/semantics_nn_path",
+              params.descriptors_params.semantics_nn_path);
 
   // Segmenter parameters.
   nh.getParam(ns + "/Segmenters/segmenter_type",
               params.segmenter_params.segmenter_type);
-  nh.getParam(ns + "/Segmenters/don_segmenter_small_scale",
-              params.segmenter_params.don_segmenter_small_scale);
-  nh.getParam(ns + "/Segmenters/don_segmenter_large_scale",
-              params.segmenter_params.don_segmenter_large_scale);
-  nh.getParam(ns + "/Segmenters/don_segmenter_don_threshold",
-              params.segmenter_params.don_segmenter_don_threshold);
-  nh.getParam(ns + "/Segmenters/don_segmenter_distance_tolerance",
-              params.segmenter_params.don_segmenter_distance_tolerance);
-
-  nh.getParam(ns + "/Segmenters/rg_min_cluster_size",
-              params.segmenter_params.rg_min_cluster_size);
-  nh.getParam(ns + "/Segmenters/rg_max_cluster_size",
-              params.segmenter_params.rg_max_cluster_size);
-  nh.getParam(ns + "/Segmenters/rg_knn_for_normals",
-              params.segmenter_params.rg_knn_for_normals);
-  nh.getParam(ns + "/Segmenters/rg_radius_for_normals",
-              params.segmenter_params.rg_radius_for_normals);
-  nh.getParam(ns + "/Segmenters/rg_knn_for_growing",
-              params.segmenter_params.rg_knn_for_growing);
-  nh.getParam(ns + "/Segmenters/rg_smoothness_threshold_deg",
-              params.segmenter_params.rg_smoothness_threshold_deg);
-  nh.getParam(ns + "/Segmenters/rg_curvature_threshold",
-              params.segmenter_params.rg_curvature_threshold);
-
-  nh.getParam(ns + "/Segmenters/ec_tolerance",
-              params.segmenter_params.ec_tolerance);
-  nh.getParam(ns + "/Segmenters/ec_max_cluster_size",
-              params.segmenter_params.ec_max_cluster_size);
-  nh.getParam(ns + "/Segmenters/ec_min_cluster_size",
-              params.segmenter_params.ec_min_cluster_size);
+  nh.getParam(ns + "/Segmenters/min_cluster_size",
+              params.segmenter_params.min_cluster_size);
+  nh.getParam(ns + "/Segmenters/max_cluster_size",
+              params.segmenter_params.max_cluster_size);
+  nh.getParam(ns + "/Segmenters/radius_for_growing",
+              params.segmenter_params.radius_for_growing);
+  nh.getParam(ns + "/Segmenters/sc_smoothness_threshold_deg",
+              params.segmenter_params.sc_smoothness_threshold_deg);
+  nh.getParam(ns + "/Segmenters/sc_curvature_threshold",
+              params.segmenter_params.sc_curvature_threshold);
 
   // Classifier parameters.
   nh.getParam(ns + "/Classifier/classifier_filename",
@@ -229,6 +221,9 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
   nh.getParam(ns + "/Classifier/rf_accuracy",
               params.classifier_params.rf_accuracy);
 
+  nh.getParam(ns + "/Classifier/do_not_use_cars",
+              params.classifier_params.do_not_use_cars);
+
   // Convenience copy to find the correct feature distance according to
   // descriptors types.
   nh.getParam(ns + "/Descriptors/descriptor_types",
@@ -254,10 +249,14 @@ static segmatch::SegMatchParams getSegMatchParams(const ros::NodeHandle& nh,
 
 
   // Geometric Consistency Parameters.
+  nh.getParam(ns + "/GeometricConsistency/recognizer_type",
+              params.geometric_consistency_params.recognizer_type);
   nh.getParam(ns + "/GeometricConsistency/resolution",
               params.geometric_consistency_params.resolution);
   nh.getParam(ns + "/GeometricConsistency/min_cluster_size",
               params.geometric_consistency_params.min_cluster_size);
+  nh.getParam(ns + "/GeometricConsistency/max_consistency_distance_for_caching",
+              params.geometric_consistency_params.max_consistency_distance_for_caching);
 
   return params;
 }
@@ -293,9 +292,6 @@ static SegMatchWorkerParams getSegMatchWorkerParams(const ros::NodeHandle& nh,
 
   nh.getParam(ns +"/export_segments_and_matches",
               params.export_segments_and_matches);
-
-  nh.getParam(ns +"/autoencoder_reconstructor_script_path",
-              params.autoencoder_reconstructor_script_path);
 
   nh.getParam(ns +"/ratio_of_points_to_keep_when_publishing",
               params.ratio_of_points_to_keep_when_publishing);
@@ -414,6 +410,104 @@ static void drawCovarianceEllipsoids(const std::string& frame,
     marker_array.markers.push_back(marker);
   }
   publisher.publish(marker_array);
+}
+
+struct BoundingBox {
+  segmatch::PclPoint centroid;
+  double alignment, scale_x_m, scale_y_m, scale_z_m;
+};
+
+static segmatch::PclPoint rotateAroundZAxis(const segmatch::PclPoint& p,
+                                            const segmatch::PclPoint& o,
+                                            double angle_rad) {
+  segmatch::PclPoint q;
+  q.x = o.x + cos(angle_rad) * (p.x - o.x) - sin(angle_rad) * (p.y - o.y);
+  q.y = o.y + sin(angle_rad) * (p.x - o.x) + cos(angle_rad) * (p.y - o.y);
+  q.z = p.z;
+  return q;
+}
+
+static geometry_msgs::Point toPointMsg(const segmatch::PclPoint& p) {
+  geometry_msgs::Point p_msg;
+  p_msg.x = p.x;
+  p_msg.y = p.y;
+  p_msg.z = p.z;
+  return p_msg;
+}
+
+static void publishBoundingBoxes(const std::vector<BoundingBox>& bounding_boxes,
+                                 const std::string& frame, const ros::Publisher& publisher,
+                                 const Color& color, double distance_to_lower_boxes_m = 0.0) {
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = frame;
+  marker.header.stamp = ros::Time();
+  marker.ns = "bounding_boxes";
+  marker.type = visualization_msgs::Marker::LINE_LIST;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.lifetime = ros::Duration();
+  marker.color.a = 1.0;
+  marker.color.r = color.r;
+  marker.color.g = color.g;
+  marker.color.b = color.b;
+  marker.scale.x = 0.2;
+  marker.id = 0u;
+
+  for (const auto& box: bounding_boxes) {
+    segmatch::PclPoint centroid = box.centroid;
+
+    centroid.z -= distance_to_lower_boxes_m;
+
+    const double scale_x_m = box.scale_x_m / 2.0;
+    const double scale_y_m = box.scale_y_m / 2.0;
+    const double scale_z_m = box.scale_z_m / 2.0;
+
+    const double angle_rad =  box.alignment;
+
+    // Centroid and direction.
+    marker.points.push_back(toPointMsg(centroid));
+    segmatch::PclPoint p_dir(centroid);
+    p_dir.x += scale_x_m;
+    marker.points.push_back(toPointMsg(rotateAroundZAxis(p_dir, centroid, angle_rad)));
+
+    segmatch::PclPoint p1(centroid);
+    p1.x -= scale_x_m;
+    p1.y += scale_y_m;
+    p1.z -= scale_z_m;
+
+    segmatch::PclPoint p2(centroid);
+    p2.x -= scale_x_m;
+    p2.y -= scale_y_m;
+    p2.z -= scale_z_m;
+
+    segmatch::PclPoint p3(centroid);
+    p3.x += scale_x_m;
+    p3.y -= scale_y_m;
+    p3.z -= scale_z_m;
+
+    segmatch::PclPoint p4(centroid);
+    p4.x += scale_x_m;
+    p4.y += scale_y_m;
+    p4.z -= scale_z_m;
+
+    segmatch::PclPoint p5(p1);
+    p5.z += scale_z_m * 2.0;
+
+    segmatch::PclPoint p6(p2);
+    p6.z += scale_z_m * 2.0;
+
+    segmatch::PclPoint p7(p3);
+    p7.z += scale_z_m * 2.0;
+
+    segmatch::PclPoint p8(p4);
+    p8.z += scale_z_m * 2.0;
+
+    for (auto pp: {&p1, &p2, &p2, &p3, &p3, &p4, &p4, &p1,
+      &p5, &p6, &p6, &p7, &p7, &p8, &p8, &p5,
+      &p1, &p5, &p2, &p6, &p3, &p7, &p4, &p8}) {
+      marker.points.push_back(toPointMsg(rotateAroundZAxis(*pp, centroid, angle_rad)));
+    }
+  }
+  publisher.publish(marker);
 }
 
 } // namespace segmatch_ros

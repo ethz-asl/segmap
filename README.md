@@ -1,44 +1,40 @@
 ## *SegMap*
 
-*SegMap* is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The *SegMap* code is open-source (BSD License) and has been tested under Ubuntu 14.04 and ROS Indigo. 
+*SegMap* is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The *SegMap* code is open-source (BSD License) and has been tested under Ubuntu 14.04 & 16.04 and ROS Indigo & Kinetic. 
 
 ### News
 
 __*Note 20.4.2018: This repository has been renamed SegMap, to reflect the latest development presented in our paper "*SegMap: 3D Segment Mapping using Data-Driven Descriptors*". For clarity: in the instructions below, the name *SegMatch* will still be used to refer the the first iteration of the pipeline presented in the original *SegMatch* paper. The updated documentation and tutorials are coming soon!*__
 
-Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmap/wiki) for the algorithm description and for instructions on running demonstrations. We recently uploaded a second [video](https://www.youtube.com/watch?v=JJhEkIA1xSE) featuring *SegMatch* in a multi-robot configuration. 
+Please consult our [paper](https://arxiv.org/pdf/1609.07720v1.pdf), [video](https://www.youtube.com/watch?v=iddCgYbgpjE) and [wiki](https://github.com/ethz-asl/segmatch/wiki) for the algorithm description and for instructions on running demonstrations. We recently uploaded a second [video](https://www.youtube.com/watch?v=JJhEkIA1xSE) featuring *SegMatch* in a multi-robot configuration. 
 
 ### Compiling *SegMatch*
 The following configuration was tested under Ubuntu 14.04 and ROS indigo. Please see the final note if you want to compile under ROS Kinetic.
 
 First install the required system packages:
 ```
-$ sudo apt-get install libopencv-dev python-wstool doxygen
+$ sudo apt-get install python-wstool doxygen
 ```
-
-SegMatch can be built using catkin_tools which can be installed from this [link](http://catkin-tools.readthedocs.io/en/latest/installing.html).
-
 Then use wstool for installing catkin dependencies:
 ```
 $ cd ~/catkin_ws/src
 $ wstool init
-$ wstool merge segmatch/dependencies.rosinstall
+$ wstool merge segmap/dependencies.rosinstall
 $ wstool update
 ```
+Finally build the *segmapper* package which will compile all *SegMatch* modules:
+```
+$ cd ~/catkin_ws
+$ catkin build -DCMAKE_BUILD_TYPE=Release segmapper
+```
+See this link for installing [catkin_tools](http://catkin-tools.readthedocs.io/en/latest/installing.html). Building dependencies will require some time according to which new packages need to be built (eg. Building the `pcl_catkin` package can take up to two hours). Building `pcl_catkin` might fail if you do not have sufficient RAM. It can help to add `-j2` to catkin build in order to limit the parallel jobs and reduce memory usage.
 
-Note: If you are using ROS Kinetic, at this point you should run the following command in your catkin workspace prior to building the packages:
+Consult the [wiki](https://github.com/ethz-asl/segmatch/wiki) for instructions on running the demonstrations.
+
+Note: If you are using ROS Kinetic, you might want to run the following command in your catkin workspace prior to building the packages:
 ```
 $ catkin config --merge-devel
 ```
-
-Finally build the *laser_mapper* package which will compile all *SegMatch* modules:
-```
-$ cd ~/catkin_ws
-$ catkin build -DCMAKE_BUILD_TYPE=Release laser_mapper
-```
-Building dependencies will require some time according to which new packages need to be built (eg. Building the `pcl_catkin` package can take up to two hours). Building `pcl_catkin` might fail if you do not have sufficient RAM. It can help to add `-j2` to catkin build in order to limit the parallel jobs and reduce memory usage.
-
-Consult the [wiki](https://github.com/ethz-asl/segmatch/wiki) for instructions on running the demonstrations.
 
 ### Contributing to *SegMatch*
 
@@ -56,5 +52,4 @@ Thank you for citing our *SegMatch* paper if you use any of this code:
   year={2017},
   organization={IEEE}
 }
-
 ```

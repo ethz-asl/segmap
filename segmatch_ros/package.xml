@@ -4,11 +4,12 @@
   <version>0.0.1</version>
   <description>segmatch_ros</description>
   
-  <author email="rdube@ethz.ch">Renaud Dubé</author>
-  <author email="dugasd@students.ethz.ch">Daniel Dugas</author>
+  <author email="renaudube@gmail.com">Renaud Dubé</author>
+  <author email="dugasd@ethz.ch">Daniel Dugas</author>
   <author email="mattia.gollub@hotmail.ch">Mattia G. Gollub</author>
+  <author email="andrei.cramariuc@gmail.com">Andrei Cramariuc</author>
   
-  <maintainer email="rdube@ethz.ch">Renaud Dubé</maintainer>
+  <maintainer email="renaudube@gmail.com">Renaud Dubé</maintainer>
   
   <license>BSD</license>
 

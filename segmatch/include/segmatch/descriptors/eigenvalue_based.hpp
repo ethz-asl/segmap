@@ -29,6 +29,8 @@ class EigenvalueBasedDescriptor : public Descriptor {
   /// \brief Get the descriptor's dimension.
   virtual unsigned int dimension() const { return kDimension; };
 
+  virtual void exportData() const { };
+
  private:
   static constexpr unsigned int kDimension = 8u;
 }; // class EigenvalueBasedDescriptor

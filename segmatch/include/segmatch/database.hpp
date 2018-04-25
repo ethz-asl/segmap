@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include <segmatch/segmented_cloud.hpp>
+#include "segmatch/segmented_cloud.hpp"
 
 namespace segmatch {
 namespace database {
@@ -36,7 +36,15 @@ class UniqueIdMatches {
   std::vector<std::vector<Id> > id_match_list_;
 }; // class UniqueIdMatches
 
-
+struct MergeEvent {
+  MergeEvent(laser_slam::Time time_ns, Id id_b, Id id_a) :
+    timestamp_ns(time_ns),
+    id_before(id_b),
+    id_after(id_a) {}
+  laser_slam::Time timestamp_ns;
+  Id id_before;
+  Id id_after;
+};
 
 bool exportSessionDataToDatabase(const SegmentedCloud& segmented_cloud,
                                  const UniqueIdMatches& id_matches);
@@ -47,13 +55,24 @@ bool ensureDirectoryExists(const std::string& directory);
 bool ensureDirectoryExistsForFilename(const std::string& filename);
 
 bool exportSegments(const std::string& filename,
-                    const SegmentedCloud& segmented_cloud);
+                    const SegmentedCloud& segmented_cloud,
+                    bool export_all_views = false,
+                    bool export_reconstructions = false);
+bool exportPositions(const std::string& filename,
+                     const SegmentedCloud& segmented_cloud,
+                     bool export_all_views = false);
 bool exportFeatures(const std::string& filename,
-                    const SegmentedCloud& segmented_cloud);
+                    const SegmentedCloud& segmented_cloud,
+                    bool export_all_views = false);
 bool exportSegmentsAndFeatures(const std::string& filename_prefix,
-                               const SegmentedCloud& segmented_cloud);
+                               const SegmentedCloud& segmented_cloud,
+                               bool export_all_views = false);
+bool exportSegmentsTimestamps(const std::string& filename,
+                              const SegmentedCloud& segmented_cloud,
+                              bool export_all_views = false);
 bool exportMatches(const std::string& filename, const UniqueIdMatches& matches);
-
+bool exportMergeEvents(const std::string& filename,
+                       const std::vector<MergeEvent>& merge_events);
 bool importSegments(const std::string& filename,
                     SegmentedCloud* segmented_cloud_ptr);
 bool importFeatures(const std::string& filename,

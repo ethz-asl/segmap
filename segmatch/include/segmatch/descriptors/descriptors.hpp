@@ -12,11 +12,10 @@ namespace segmatch {
 
 class Descriptor {
  public:
+  Descriptor();
+  ~Descriptor();
   /// \brief Describe the segment by modifying its internal Features object.
-  void describe(Segment* segment_ptr) {
-    // TODO(daniel): the segment passed as const actually gets modified.
-    describe(*segment_ptr, &segment_ptr->features);
-  }
+  void describe(Segment* segment_ptr);
 
   /// \brief Describe the segment by modifying a Features object.
   virtual void describe(const Segment& segment, Features* features) = 0;
@@ -26,6 +25,8 @@ class Descriptor {
 
   /// \brief Get the descriptor's dimension.
   virtual unsigned int dimension() const = 0;
+
+  virtual void exportData() const = 0;
 }; // class Descriptor
 
 class Descriptors {
@@ -35,20 +36,21 @@ class Descriptors {
   ~Descriptors();
 
   /// \brief Describe the segment by modifying its internal Features object.
-  void describe(Segment* segment_ptr) {
-    // TODO(daniel): the segment passed as const actually gets modified.
-    describe(*segment_ptr, &segment_ptr->features);
-  }
+  void describe(Segment* segment_ptr);
 
   /// \brief Describe the segment by modifying a Features object.
   void describe(const Segment& segment, Features* features);
 
   /// \brief Describe all the segments in a segmented cloud with all the descriptors.
-  void describe(SegmentedCloud* segmented_cloud_ptr,
-                std::vector<double>* timings = NULL);
+  void describe(SegmentedCloud* segmented_cloud_ptr);
 
   /// \brief Get the total dimension of the descriptors.
   unsigned int dimension() const;
+
+  /// \brief Export descriptors related data.
+  void exportData() const {
+    for (const auto& descriptor : descriptors_) descriptor->exportData();
+  };
 
  private:
   std::vector<std::unique_ptr<Descriptor> > descriptors_;
