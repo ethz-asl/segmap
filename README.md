@@ -15,7 +15,7 @@ The following configuration was tested under Ubuntu 14.04 and ROS indigo. Please
 
 First install the required system packages:
 ```
-$ sudo apt-get install python-wstool doxygen
+$ sudo apt-get install python-wstool doxygen autoconf
 ```
 Then use wstool for installing catkin dependencies:
 ```
