@@ -27,9 +27,6 @@ struct DescriptorsParameters {
   double point_feature_histograms_search_radius = 0.8;
   double point_feature_histograms_normals_search_radius = 0.5;
 
-  // Autoencoder parameters.
-  std::string autoencoder_model_path = "MUST_BE_SET";
-
   // CNN parameters.
   std::string cnn_model_path = "MUST_BE_SET";
   std::string semantics_nn_path = "MUST_BE_SET";

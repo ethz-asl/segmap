@@ -7,10 +7,6 @@
   <!-- Bag file path -->  
   <arg name="bag_file" value="$(find segmapper)/demonstration_files/kitti/2011_10_03_drive_27.bag"/>
 	
-  <!-- load Random Forest -->
-  <arg name="classifier" value="$(find segmapper)/demonstration_files/kitti/random_forest_eigen_25trees.xml"/>
-  <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Classifier/classifier_filename" subst_value="True">$(arg classifier)</rosparam>
-  
   <!-- Rviz visualization config file path -->
   <arg name="rviz_config_file" value="$(find segmapper)/demonstration_files/kitti/kitti_localization.rviz"/>
 

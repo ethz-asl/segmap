@@ -125,7 +125,7 @@ SegMapper: {
   Benchmarker: {
     save_statistics_only: false,
     enable_live_output: false,
-    results_directory: "/tmp/segmatch_benchmark/kitti_localization"
+    results_directory: "/tmp/segmap_benchmark/kitti_localization"
   }
 }
 

@@ -143,7 +143,6 @@ void SegMatch::processCloud(MapCloud& cloud,
     normals = &normal_estimator->getNormals();
   }
 
-  laser_slam::Clock clock;
   std::vector<Id> segment_ids;
   std::vector<std::pair<Id, Id>> renamed_segments;
   std::vector<bool> is_point_modified(cloud.size(), false);
@@ -632,7 +631,6 @@ void SegMatch::alignTargetMap() {
 
 void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimum_distance_m,
                                             unsigned int n_nearest_segments) {
-  laser_slam::Clock clock;
   std::vector<Id> duplicate_segments_ids;
   std::vector<Id> segment_ids;
 
@@ -675,7 +673,6 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimu
             cloud.findValidSegmentPtrById(
                 segment_ids[nearest_neighbour_indice[i]], &other_segment);
 
-
             // Keep the oldest segment.
             // But keep newest features.
             const size_t min_time_between_segments_for_removing = 20000000000u;
@@ -687,22 +684,15 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimu
                   continue;
                 }
 
-
                 id_to_remove = it->second.segment_id;
-
 
                 // Add id to remove if not already in the list.
                 if (std::find(duplicate_segments_ids.begin(), duplicate_segments_ids.end(),
                               id_to_remove) == duplicate_segments_ids.end()) {
                   duplicate_segments_ids.push_back(id_to_remove);
-                  /*LOG(INFO) << " A Removing " << it->second.track_id << " " << it->second.segment_id << " " << it->second.getLastView().timestamp_ns <<
-                  " keeping " << other_segment->track_id << " " << other_segment->segment_id << " " << other_segment->getLastView().timestamp_ns << " ";*/
-
 
                 }
-                //LOG(INFO) <<  " segment " << other_segment->segment_id << " had feature " << other_segment->getLastView().features.at(0).at(0).value << ".";
                 other_segment->getLastView().features = it->second.getLastView().features;
-                //LOG(INFO) <<  " and now " << other_segment->getLastView().features.at(0).at(0).value << ".";
                 break;
               } else {
                 if (it->second.track_id != other_segment->track_id &&
@@ -711,15 +701,7 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimu
                 }
 
                 id_to_remove = other_segment->segment_id;
-
-                /*LOG(INFO) << " B Removing " << other_segment->track_id << " " << other_segment->segment_id << " " << other_segment->getLastView().timestamp_ns <<
-                  " keeping " << it->second.track_id << " " << it->second.segment_id << " " << it->second.getLastView().timestamp_ns << " ";*/
-
-
-
-                //LOG(INFO) <<  " segment " << it->second.segment_id << " had feature " << it->second.getLastView().features.at(0).at(0).value << ".";
                 it->second.getLastView().features = other_segment->getLastView().features;
-                //LOG(INFO) <<  " and now " << it->second.getLastView().features.at(0).at(0).value << ".";
               }
             } else if (it->second.getLastView().point_cloud.size()
                 > other_segment->getLastView().point_cloud.size()) {
@@ -748,7 +730,6 @@ void SegMatch::filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimu
   // Remove duplicates.
   size_t n_removals;
   cloud.deleteSegmentsById(duplicate_segments_ids, &n_removals);
-  clock.takeTime();
 }
 
 void SegMatch::displayTimings() const {
