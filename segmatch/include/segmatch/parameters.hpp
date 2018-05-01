@@ -1,6 +1,9 @@
 #ifndef SEGMATCH_PARAMETERS_HPP_
 #define SEGMATCH_PARAMETERS_HPP_
 
+#include <string>
+#include <vector>
+
 namespace segmatch {
 
 // TODO: Check that parameter values are reasonable when setting them.
@@ -24,36 +27,21 @@ struct DescriptorsParameters {
   double point_feature_histograms_search_radius = 0.8;
   double point_feature_histograms_normals_search_radius = 0.5;
 
-  // Autoencoder parameters.
-  std::string autoencoder_python_env = "python"; // Example: "home/your_profile/anaconda2/envs/tensorflow/bin/python"
-  std::string autoencoder_script_path = "MUST_BE_SET";
-  std::string autoencoder_model_path = "MUST_BE_SET";
-  std::string autoencoder_temp_folder_path = "/tmp/";
-  int autoencoder_latent_space_dimension = 15;
+  // CNN parameters.
+  std::string cnn_model_path = "MUST_BE_SET";
+  std::string semantics_nn_path = "MUST_BE_SET";
 }; // struct DescriptorsParameters
 
 struct SegmenterParameters {
-  std::string segmenter_type = "DonSegmenter";
+  // Region growing segmenter parameters.
+  std::string segmenter_type = "IncrementalEuclideanDistance";
+  int min_cluster_size;
+  int max_cluster_size;
+  float radius_for_growing;
 
-  // DonSegmenter parameters.
-  double don_segmenter_small_scale = 0.5;
-  double don_segmenter_large_scale = 2;
-  double don_segmenter_don_threshold = 0.2;
-  double don_segmenter_distance_tolerance = 1.0;
-
-  // Region growing parameters.
-  int rg_min_cluster_size;
-  int rg_max_cluster_size;
-  int rg_knn_for_normals;
-  double rg_radius_for_normals;
-  int rg_knn_for_growing;
-  double rg_smoothness_threshold_deg;
-  double rg_curvature_threshold;
-
-  // Euclidean segmenter parameters.
-  double ec_tolerance;
-  int ec_max_cluster_size;
-  int ec_min_cluster_size;
+  // Parameters specific for the SmoothnessConstraint growing policy.
+  float sc_smoothness_threshold_deg;
+  float sc_curvature_threshold;
 }; // struct SegmenterParameters
 
 struct ClassifierParams {
@@ -85,6 +73,8 @@ struct ClassifierParams {
   bool normalize_eigen_for_hard_threshold;
   std::vector<double> max_eigen_features_values;
 
+  bool do_not_use_cars;
+
 }; // struct ClassifierParams
 
 struct CorrespondeceParams {
@@ -94,10 +84,15 @@ struct CorrespondeceParams {
 }; // struct CorrespondeceParams
 
 struct GeometricConsistencyParams {
+  // Type of recognizer.
+  std::string recognizer_type;
   // Higher resolutions lead to higher tolerances.
   double resolution = 0.2;
   // Minimum number of matches necessary to consider cluster.
   int min_cluster_size = 10;
+  // Maximum consistency distance between two matches in order for them to be cached as candidates.
+  // Used in the incremental recognizer only.
+  float max_consistency_distance_for_caching = 10.0f;
 }; // struct GeometricConsistencyParams
 
 struct GroundTruthParameters {

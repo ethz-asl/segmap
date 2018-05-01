@@ -29,13 +29,14 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
   std::feclearexcept(FE_ALL_EXCEPT);
 
   // Find the variances.
-  const size_t kNPoints = segment.point_cloud.points.size();
+  const SegmentView& segment_view = segment.getLastView();
+  const size_t kNPoints = segment_view.point_cloud.points.size();
   PointCloud variances;
   for (size_t i = 0u; i < kNPoints; ++i) {
     variances.push_back(PclPoint());
-    variances.points[i].x = segment.point_cloud.points[i].x - segment.centroid.x;
-    variances.points[i].y = segment.point_cloud.points[i].y - segment.centroid.y;
-    variances.points[i].z = segment.point_cloud.points[i].z - segment.centroid.z;
+    variances.points[i].x = segment_view.point_cloud.points[i].x - segment_view.centroid.x;
+    variances.points[i].y = segment_view.point_cloud.points[i].y - segment_view.centroid.y;
+    variances.points[i].z = segment_view.point_cloud.points[i].z - segment_view.centroid.z;
   }
 
   // Find the covariance matrix. Since it is symmetric, we only bother with the upper diagonal.
@@ -97,7 +98,7 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
 
   const double kNPointsMax = 13200 * kNormalizationPercentile;
 
-  Feature eigenvalue_feature;
+  Feature eigenvalue_feature("eigenvalue");
   eigenvalue_feature.push_back(FeatureValue("linearity", (e1 - e2) / e1 / kLinearityMax));
   eigenvalue_feature.push_back(FeatureValue("planarity", (e2 - e3) / e1 / kPlanarityMax));
   eigenvalue_feature.push_back(FeatureValue("scattering", e3 / e1 / kScatteringMax));
@@ -107,9 +108,9 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
                                             (e1 * std::log(e1)) + (e2 * std::log(e2)) + (e3 * std::log(e3)) / kEigenEntropyMax));
   eigenvalue_feature.push_back(FeatureValue("change_of_curvature", e3 / sum_of_eigenvalues / kChangeOfCurvatureMax));
 
-  PointI point_min, point_max;
+  PclPoint point_min, point_max;
 
-  pcl::getMinMax3D(segment.point_cloud, point_min, point_max);
+  pcl::getMinMax3D(segment.getLastView().point_cloud, point_min, point_max);
 
   double diff_x, diff_y, diff_z;
 
@@ -123,10 +124,8 @@ void EigenvalueBasedDescriptor::describe(const Segment& segment, Features* featu
     eigenvalue_feature.push_back(FeatureValue("pointing_up", 0.0));
   }
 
-  // eigenvalue_feature.push_back(FeatureValue("n_points", kNPoints / kNPointsMax));
-
   CHECK_EQ(eigenvalue_feature.size(), kDimension) << "Feature has the wrong dimension";
-  features->push_back(eigenvalue_feature);
+  features->replaceByName(eigenvalue_feature);
 
   // Check that there were no overflows, underflows, or invalid float operations.
   if (std::fetestexcept(FE_OVERFLOW)) {

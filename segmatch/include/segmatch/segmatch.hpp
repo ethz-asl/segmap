@@ -13,10 +13,13 @@
 
 #include "segmatch/common.hpp"
 #include "segmatch/descriptors/descriptors.hpp"
+#include "segmatch/database.hpp"
+#include "segmatch/local_map.hpp"
 #include "segmatch/opencv_random_forest.hpp"
 #include "segmatch/parameters.hpp"
-#include "segmatch/segmenters/segmenters.hpp"
+#include "segmatch/recognizers/correspondence_recognizer.hpp"
 #include "segmatch/segmented_cloud.hpp"
+#include "segmatch/segmenters/segmenter.hpp"
 
 namespace segmatch {
 
@@ -32,6 +35,12 @@ struct SegMatchParams {
   laser_slam::Time min_time_between_segment_for_matches_ns;
   bool check_pose_lies_below_segments = false;
 
+  /// \brief The method used for estimating the point normals.
+  std::string normal_estimator_type;
+  /// \brief Radius of the neighborhood considered for the estimation of the point normals.
+  float radius_for_normal_estimation_m;
+
+  LocalMapParameters local_map_params;
   DescriptorsParameters descriptors_params;
   SegmenterParameters segmenter_params;
   ClassifierParams classifier_params;
@@ -40,11 +49,14 @@ struct SegMatchParams {
 
 class SegMatch {
  public:
+  /// \brief Type of the local map.
+  typedef LocalMap<PclPoint, MapPoint> LocalMapT;
+
   explicit SegMatch(const SegMatchParams& params);
   SegMatch();
   ~SegMatch();
 
-  /// \brief Init SegMatch.
+  /// \brief Initialize SegMatch.
   void init(const SegMatchParams& params,
             unsigned int num_tracks = 1u);
 
@@ -52,12 +64,12 @@ class SegMatch {
   void setParams(const SegMatchParams& params);
 
   /// \brief Process a source cloud.
-  void processAndSetAsSourceCloud(const PointICloud& source_cloud,
+  void processAndSetAsSourceCloud(LocalMapT& local_map,
                                   const laser_slam::Pose& latest_pose,
                                   unsigned int track_id = 0u);
 
   /// \brief Process a target cloud.
-  void processAndSetAsTargetCloud(const PointICloud& target_cloud);
+  void processAndSetAsTargetCloud(MapCloud& target_cloud);
 
   /// \brief Transfer the source cloud to the target cloud.
   void transferSourceToTarget(unsigned int track_id = 0u,
@@ -68,16 +80,25 @@ class SegMatch {
                               unsigned int track_id = 0u,
                               laser_slam::Time timestamp_ns = 0u);
 
-  /// \brief Find nearest neighbours between the source and target segments.
-  PairwiseMatches findNearestNeighbours() { };
+  /// \brief Filter the matches, removing the ones whose segments are too close in time and thus
+  /// are likely to be self-matches.
+  /// \param predicted_matches The predicted matches that need to be filtered.
+  /// \param track_id ID of the robot for which matches are processed.
+  /// \returns The filtered matches.
+  PairwiseMatches filterMatches(const PairwiseMatches& predicted_matches, unsigned int track_id);
 
-  /// \brief Find the most promising group of consistent matches.
-  bool filterMatches(const PairwiseMatches& predicted_matches,
-                     PairwiseMatches* filtered_matches_ptr,
-                     laser_slam::RelativePose* loop_closure = NULL,
-                     std::vector<PointICloudPair>* matched_segment_clouds = NULL,
-                     unsigned int track_id = 0u,
-                     laser_slam::Time timestamp_ns = 0u);
+  /// \brief Try to recognize the local map in the target map.
+  /// \param predicted_matches The predicted matches between segments in the local cloud and
+  /// segments in the target map.
+  /// \param track_id ID of the robot for which matches are processed.
+  /// \param timestamp_ns Timestamp of the current pose.
+  /// \param loop_closure Pointer to a structure where the details of the loop closure are
+  /// returned.
+  /// \returns The matches accepted by the recognition. If empty, the local map couldn't be
+  /// recognized.
+  const PairwiseMatches& recognize(const PairwiseMatches& predicted_matches, unsigned int track_id,
+                                   laser_slam::Time timestamp_ns = 0u,
+                                   laser_slam::RelativePose* loop_closure = nullptr);
 
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
@@ -87,9 +108,22 @@ class SegMatch {
                                unsigned int track_id = 0u) const;
 
   /// \brief Get the internal representation of the target cloud.
-  void getTargetRepresentation(PointICloud* target_representation) const;
+  void getTargetRepresentation(PointICloud* target_representation,
+                               bool get_compressed = false) const;
+
+  void getSourceReconstruction(PointICloud* source_reconstruction,
+                               unsigned int track_id = 0u) const;
+  
+  void getTargetReconstruction(PointICloud* target_reconstruction,
+                               bool get_compressed = false) const;
 
   void getTargetSegmentsCentroids(PointICloud* segments_centroids) const;
+
+  void getSourceSemantics(PointICloud* source_semantics,
+                          const double& distance_to_raise = 0.0,
+                          unsigned int track_id = 0u) const;
+
+  void getTargetSegmentsCentroidsWithTrajIdAsIntensity(PointICloud* segments_centroids) const;
 
   void getSourceSegmentsCentroids(PointICloud* segments_centroids,
                                   unsigned int track_id = 0u) const;
@@ -112,8 +146,7 @@ class SegMatch {
                       std::vector<int64_t>* collector_times) const;
 
   /// \brief Process a cloud and return the segmented cloud.
-  void processCloud(const PointICloud& source_cloud, SegmentedCloud* segmented_cloud,
-                    std::vector<double>* timings = NULL);
+  void processCloud(MapCloud& cloud, SegmentedCloud* segmented_cloud);
 
   /// \brief Get the descriptors dimension.
   unsigned int getDescriptorsDimension() const { return descriptors_->dimension(); };
@@ -156,26 +189,30 @@ class SegMatch {
 
   void saveTimings() const;
 
+  void exportDescriptorsData() const { descriptors_->exportData(); };
+
+  std::vector<database::MergeEvent> getMergeEvents() { return merge_events_; }
+
  private:
-  void filterBoundarySegmentsOfSourceCloud(const PclPoint& center,
-                                           unsigned int track_id = 0u);
-
-  void filterDuplicateSegmentsOfTargetMap(SegmentedCloud* cloud_to_be_added);
-
   laser_slam::Time findTimeOfClosestSegmentationPose(const segmatch::Segment& segment) const;
 
-  void filterNearestSegmentsInCloud(SegmentedCloud* cloud, double minimum_distance_m,
+  void filterNearestSegmentsInCloud(SegmentedCloud& cloud, double minimum_distance_m,
                                     unsigned int n_nearest_segments = 2u);
 
   SegMatchParams params_;
 
-  std::unique_ptr<Segmenter> segmenter_;
+  std::unique_ptr<Segmenter<MapPoint>> segmenter_;
   std::unique_ptr<Descriptors> descriptors_;
+  // Create one recognizer per track, since the incremental recognizer caches track-specific data.
+  std::vector<std::unique_ptr<CorrespondenceRecognizer>> recognizers_;
 
   //TODO(Renaud or Daniel): modify with base class when needed.
   std::unique_ptr<OpenCvRandomForest> classifier_;
 
   std::unordered_map<unsigned int, SegmentedCloud> segmented_source_clouds_;
+  // Segments that have been renamed in the last segmentation step (e.g. because of merging). Each
+  // pair contains the original and new IDs of the renamed segments.
+  std::unordered_map<unsigned int, std::vector<std::pair<Id, Id>>> renamed_segments_;
   unsigned int last_processed_source_cloud_ = 0u;
 
   SegmentedCloud segmented_target_cloud_;
@@ -191,17 +228,9 @@ class SegMatch {
 
   Eigen::Matrix4f last_transformation_;
 
-  // Timings.
-  std::map<laser_slam::Time, double> segmentation_and_description_timings_;
-  std::map<laser_slam::Time, double> matching_timings_;
-  std::map<laser_slam::Time, double> geometric_verification_timings_;
-  std::map<laser_slam::Time, double> source_to_target_timings_;
-  std::map<laser_slam::Time, double> update_timings_;
-
-  std::vector<double> n_segments_in_source_;
-  std::vector<double> n_points_in_source_;
-
   std::vector<double> loops_timestamps_;
+
+  std::vector<database::MergeEvent> merge_events_;
 
   // Filtering parameters.
   static constexpr double kCylinderHeight_m = 40;

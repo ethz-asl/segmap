@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>	
+	
+<launch>
+  <!-- ICP configuration file -->
+  <arg name="icp_configuration_file" default="$(find segmapper)/launch/icp_dynamic_indoor.yaml"/>
+  <!-- Input filters file -->
+  <arg name="icp_input_filters_file" default="$(find segmapper)/launch/input_filters_indoor.yaml"/>
+  
+  <!-- Enable callgrind profiling -->
+  <arg name="enable_callgrind" default="false"/>
+  <arg name="callgrind_ouput_path" value="/tmp/segmatch-callgrind.out"/>
+  <arg name="launch_prefix" value="valgrind --tool=callgrind --callgrind-out-file=$(arg callgrind_ouput_path) --instr-atstart=no" if="$(arg enable_callgrind)"/> 
+  <arg name="launch_prefix" value="" unless="$(arg enable_callgrind)"/>
+
+  <!-- segmapper node -->
+  <node name="segmapper" pkg="segmapper" type="segmapper_node" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)">
+    <param name="icp_configuration_file" value="$(arg icp_configuration_file)"/>
+    <param name="icp_input_filters_file" value="$(arg icp_input_filters_file)"/>
+  </node>
+
+</launch>

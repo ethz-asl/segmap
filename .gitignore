@@ -1,7 +1,21 @@
 # Specific Files #
 ##################
-laser_mapper/demonstration_files
-python/database
+segmapper/demonstration_files
+segmatch/python/database
+segmatch/python/classifier/model_cpp
+segmatch/python/classifier/tf_cpp*
+segmatch/python/classifier/ae_baseline*
+segmatch/python/classifier/semantics_nn*
+segmatch/python/classifier/acc_data.p
+segmatch/python/classifier/acc_relative_to_size.pdf
+segmatch/python/classifier/roc.pdf
+segmatch/python/classifier/roc_data.p
+segmatch/python/classifier/reconstructions/
+segmatch/python/classifier/debug/
+segmatch/python/classifier/models/
+segmatch/python/classifier/tensorboard/
+segmatch/python/classifier/reconstructions*
+
 *.ckpt
 *.meta
 *.csv
@@ -41,6 +55,7 @@ build/
 *~
 *.bak
 *.swp
+*swp
 *.swo
 
 # Vim Tags #
@@ -58,3 +73,13 @@ tags
 # Matlab data #
 ###############
 matlab/data
+segmatch/matlab/figures
+*~
+
+# Python generated files #
+##########################
+*.h5
+*.log
+*.png
+*.pkl
+

@@ -1,0 +1,7 @@
+/**
+
+\mainpage Segmap
+
+\e SegMap is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The \e SegMap code is open-source (BSD License) and has been tested under Ubuntu 14.04 & 16.04 and ROS Indigo & Kinetic.
+
+*/

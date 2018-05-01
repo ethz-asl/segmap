@@ -1,175 +1,82 @@
 #include "segmatch/segmented_cloud.hpp"
 
-#include <cfenv>
 #include <utility>
+
+#include <laser_slam/benchmarker.hpp>
 
 namespace segmatch {
 
 extern bool g_too_many_segments_to_store_ids_in_intensity(false);
 
-IdOccurences::IdOccurences() {}
-
-void IdOccurences::clear() {
-  /* TODO: make sure to delete all Id_counters allocated with new */
-  occurences_.clear();
-}
-
-size_t IdOccurences::size() const {
-  return occurences_.size();
-}
-
-void IdOccurences::addOccurence(Id id_to_add) {
-  bool found_in_occurences = false;
-  if (id_to_add == kNoId) { return; }
-  // If id_to_add is in the list, increment it.
-  for (size_t i = 0u; i < occurences_.size(); ++i) {
-    if (id_to_add == occurences_[i].id) {
-      found_in_occurences = true;
-      occurences_[i].count++;
-      break;
-    }
-  }
-  // If id_to_add is not in the occurences, add it.
-  if (!found_in_occurences) {
-    IdCounter* temp = new IdCounter;
-    temp->id = id_to_add;
-    temp->count = 1;
-    occurences_.push_back(*temp);
-  }
-}
-
-IdCounter IdOccurences::findHighestOccurence() const {
-  // Reinitialize highest_occurence.
-  IdCounter highest_occurence;
-  highest_occurence.id = kNoId;
-  highest_occurence.count = 0;
-  // Find highest occurence and store it.
-  for (size_t i = 0u; i < occurences_.size(); ++i) {
-    if (occurences_[i].count > highest_occurence.count) {
-      highest_occurence.id = occurences_[i].id;
-      highest_occurence.count = occurences_[i].count;
-    }
-  }
-  return highest_occurence;
-}
-
-void Segment::calculateCentroid() {
-  std::feclearexcept(FE_ALL_EXCEPT);
-  // Find the mean position of a segment.
-  double x_mean = 0.0;
-  double y_mean = 0.0;
-  double z_mean = 0.0;
-  const size_t n_points = point_cloud.points.size();
-  for (size_t i = 0u; i < n_points; ++i) {
-    x_mean += point_cloud.points[i].x / n_points;
-    y_mean += point_cloud.points[i].y / n_points;
-    z_mean += point_cloud.points[i].z / n_points;
-  }
-
-  centroid = PclPoint(x_mean, y_mean, z_mean);
-
-  // Check that there were no overflows, underflows, or invalid float operations.
-  if (std::fetestexcept(FE_OVERFLOW)) {
-    LOG(ERROR) << "Overflow error in centroid computation.";
-  } else if (std::fetestexcept(FE_UNDERFLOW)) {
-    LOG(ERROR) << "Underflow error in centroid computation.";
-  } else if (std::fetestexcept(FE_INVALID)) {
-    LOG(ERROR) << "Invalid Flag error in centroid computation.";
-  } else if (std::fetestexcept(FE_DIVBYZERO)) {
-    LOG(ERROR) << "Divide by zero error in centroid computation.";
-  }
+void SegmentView::calculateCentroid() {
+  centroid = segmatch::calculateCentroid(point_cloud);
 }
 
 /// \brief Generates a new Id number. Overall, no two valid segments should have the same Id.
 Id SegmentedCloud::getNextId(const Id& begin_counting_from_this_id) {
-  static Id current_id = 0;
   if (begin_counting_from_this_id == 0) {
     // Normal behavior.
-    return ++current_id;
+    return ++current_id_;
   } else {
     // Used when you want to start counting segments at an arbitrary number.
-    CHECK(current_id == 0) <<
+    CHECK(current_id_ == 0) <<
         "Initializing the current_id after Ids have been assigned is forbidden. " <<
         "Check that the current_id is only initialized at the start of your code," <<
         "Otherwise collisions can occur.";
-    current_id = begin_counting_from_this_id;
-    LOG(INFO) << "Initialized the segment ids. Counting begins at id " << current_id << ".";
+    current_id_ = begin_counting_from_this_id;
+    LOG(INFO) << "Initialized the segment ids. Counting begins at id " << current_id_ << ".";
     return 0;
   }
 }
 
-void SegmentedCloud::addSegmentedCloud(const SegmentedCloud& segmented_cloud_to_add) {
-  if (!segmented_cloud_to_add.empty()) {
-    valid_segments_.insert(segmented_cloud_to_add.valid_segments_.begin(),
-                           segmented_cloud_to_add.valid_segments_.end());
+void SegmentedCloud::addSegmentedCloud(
+    const SegmentedCloud& segmented_cloud_to_add,
+    const std::vector<std::pair<Id, Id>>& renamed_segments) {
+  for (const auto& id_segment : segmented_cloud_to_add) {
+    addValidSegment(id_segment.second);
   }
-}
 
-void SegmentedCloud::addSegments(const pcl::IndicesClusters& segments_to_add,
-                                 const pcl::PointCloud<pcl::PointNormal>& reference_cloud,
-                                 const bool also_copy_normals_data) {
-  // Loop over clusters.
-  for (size_t i = 0u; i < segments_to_add.size(); ++i) {
-    std::vector<int> indices = segments_to_add[i].indices;
+  for (const auto& renamed_segment : renamed_segments) {
+    // Find segments affected by renaming
+    Segment& deleted_segment = valid_segments_[renamed_segment.first];
+    Segment& final_segment = valid_segments_[renamed_segment.second];
 
-    // Create the segment.
-    Segment segment;
+    // TODO How should we deal with the view of the segment being renamed when keeping multiple
+    // views?
+    // If necessary, add the deleted segment as a view of the final one.
+    // if (!keep_only_last_view_ && !deleted_segment.views.empty()) {
+    //   final_segment.views.push_back(deleted_segment.views.front());
+    // }
 
-    // Assign the segment an id.
-    segment.segment_id = getNextId();
-
-    // Copy points into segment.
-    for (size_t j = 0u; j < indices.size(); ++j) {
-      const size_t index = indices[j];
-      CHECK_LT(index, reference_cloud.points.size()) <<
-          "Indice is larger than the reference cloud size when adding segments. " <<
-          "Check that the given reference cloud corresponds to the cluster indices.";
-      pcl::PointNormal reference_point = reference_cloud.points[index];
-
-      // Store point inside the segment.
-      PointI point;
-      point.x = reference_point.x;
-      point.y = reference_point.y;
-      point.z = reference_point.z;
-      segment.point_cloud.push_back(point);
-
-      // Copy DoN and normals into segment.
-      if (also_copy_normals_data) {
-        // Store normals.
-        pcl::Normal normal;
-        normal.normal_x = reference_point.normal_x;
-        normal.normal_y = reference_point.normal_y;
-        normal.normal_z = reference_point.normal_z;
-        normal.curvature = reference_point.curvature;
-        segment.normals.push_back(normal);
-      }
-    }
-
-    // Store segment ID in the intensity channel.
-    // 16777216 is the largest int that can be cast to float and back.
-    if (segment.segment_id >= 16777216) {
-      LOG_IF(ERROR, !g_too_many_segments_to_store_ids_in_intensity) <<
-          "Segment Id being passed to point intensity is larger than float values " <<
-          "allow. from this point on, intensity will no longer be usable to store segment ids";
-      g_too_many_segments_to_store_ids_in_intensity = true;
-    }
-    for (size_t j = 0u; j < segment.point_cloud.size(); ++j) {
-      segment.point_cloud.points[j].intensity = segment.segment_id;
-    }
-
-    segment.calculateCentroid();
-    valid_segments_.insert(std::make_pair(segment.segment_id, segment));
+    // Delete the old segment
+    valid_segments_.erase(renamed_segment.first);
   }
-}
-
-void SegmentedCloud::addValidSegments(const pcl::IndicesClusters& segments_to_add,
-                                      const pcl::PointCloud<pcl::PointNormal>& reference_cloud) {
-  addSegments(segments_to_add, reference_cloud);
+  cleanEmptySegments(); 
 }
 
 void SegmentedCloud::addValidSegment(const Segment& segment_to_add) {
   CHECK(segment_to_add.hasValidId());
-  valid_segments_.insert(std::make_pair(segment_to_add.segment_id, segment_to_add));
+  //TODO(Renaud) unexpected behavior if the segment had more than one view.
+  CHECK_EQ(segment_to_add.views.size(), 1u);
+  Segment& segment_in_cloud = valid_segments_[segment_to_add.segment_id];
+  if (keep_only_last_view_ || segment_in_cloud.empty()) {
+    segment_in_cloud = segment_to_add;
+  } else  if (static_cast<double>(segment_to_add.views[0u].point_cloud.size()) >=
+      min_change_to_add_new_view * static_cast<double>(
+          segment_in_cloud.getLastView().point_cloud.size())) {
+    segment_in_cloud.views.push_back(segment_to_add.views[0u]);
+  } else {
+    segment_in_cloud.getLastView().features = segment_to_add.views[0u].features;
+    segment_in_cloud.getLastView().semantic = segment_to_add.views[0u].semantic;
+    segment_in_cloud.getLastView().centroid = segment_to_add.views[0u].centroid;
+    segment_in_cloud.getLastView().timestamp_ns = segment_to_add.views[0u].timestamp_ns;
+    segment_in_cloud.getLastView().T_w_linkpose = segment_to_add.views[0u].T_w_linkpose;
+    segment_in_cloud.getLastView().n_occupied_voxels =
+        segment_to_add.views[0u].n_occupied_voxels;
+    segment_in_cloud.getLastView().n_points_when_last_described =
+        segment_to_add.views[0u].n_points_when_last_described;
+  }
+  cleanEmptySegments();
 }
 
 size_t SegmentedCloud::getNumberOfValidSegments() const {
@@ -206,9 +113,24 @@ void SegmentedCloud::deleteSegmentsById(const std::vector<Id>& ids, size_t* n_re
   }
 }
 
+void SegmentedCloud::deleteSegmentsExcept(const std::vector<Id>& segment_ids_to_keep) {
+  std::vector<Id> segment_ids_to_remove;
+  for (const auto& id_segment : valid_segments_) {
+    if (std::find(segment_ids_to_keep.begin(), segment_ids_to_keep.end(),
+                  id_segment.first) == segment_ids_to_keep.end()) {
+      segment_ids_to_remove.push_back(id_segment.first);
+    }
+  }
+  deleteSegmentsById(segment_ids_to_remove);
+  cleanEmptySegments();
+}
+
+
 void SegmentedCloud::calculateSegmentCentroids() {
-  for (auto& segment: valid_segments_) {
-    segment.second.calculateCentroid();
+  for (auto& id_segment : valid_segments_) {
+    for (auto& view : id_segment.second.views) {
+      view.calculateCentroid();
+    }
   }
 }
 
@@ -217,65 +139,30 @@ void SegmentedCloud::clear() {
   valid_segments_.clear();
 }
 
-PointICloud SegmentedCloud::validSegmentsAsPointCloud(
-    std::vector<Id>* segment_id_for_each_point_ptr) const {
-  if (segment_id_for_each_point_ptr != NULL) {
-    segment_id_for_each_point_ptr->clear();
-  }
-  PointICloud result;
-  for (const auto& id_segment: valid_segments_) {
-    result += id_segment.second.point_cloud;
-    // Export the segment ids if desired.
-    if (segment_id_for_each_point_ptr != NULL) {
-      for (size_t j = 0u; j < id_segment.second.point_cloud.size(); ++j) {
-        segment_id_for_each_point_ptr->push_back(id_segment.first);
-      }
-      CHECK(segment_id_for_each_point_ptr->size() == result.size()) <<
-          "Each point should have a single segment id.";
-    }
-  }
-  return result;
-}
-
-PointICloud SegmentedCloud::validSegmentsAsPointCloudFromIds(
-    const std::vector<Id>& ids, std::vector<Id>* segment_id_for_each_point_ptr) const {
-  if (segment_id_for_each_point_ptr != NULL) {
-    segment_id_for_each_point_ptr->clear();
-  }
-  PointICloud cloud;
-  for (size_t i = 0u; i < ids.size(); ++i) {
-    Segment segment;
-    CHECK(findValidSegmentById(ids[i], &segment)) << "Segment not found.";
-    cloud += segment.point_cloud;
-    // Export the segment ids if desired.
-    if (segment_id_for_each_point_ptr != NULL) {
-      for (size_t j = 0u; j < segment.point_cloud.size(); ++j) {
-        segment_id_for_each_point_ptr->push_back(segment.segment_id);
-      }
-      CHECK(segment_id_for_each_point_ptr->size() == cloud.size()) <<
-          "Each point should have a single segment id.";
-    }
-  }
-  return cloud;
-}
-
 PointCloud SegmentedCloud::centroidsAsPointCloud(
-    std::vector<Id>* segment_id_for_each_point_ptr) const {
-  if (segment_id_for_each_point_ptr != NULL) {
-    segment_id_for_each_point_ptr->clear();
-  }
+    std::vector<Id>& segment_id_for_each_point) const {
+
   PointCloud result;
+  result.width = getNumberOfValidSegments();
+  result.height = 1;
   for (const auto& id_segment: valid_segments_) {
-    result.push_back(id_segment.second.centroid);
+      
+    if(!id_segment.second.empty()) {
+    PclPoint new_point = id_segment.second.getLastView().centroid;
+    result.points.push_back(new_point);
     // Export the segment ids if desired.
-    if (segment_id_for_each_point_ptr != NULL) {
-      segment_id_for_each_point_ptr->push_back(id_segment.first);
+    
+    segment_id_for_each_point.push_back(id_segment.first);
+    } else {
+        LOG(INFO) << "was empty";
     }
   }
-  if (segment_id_for_each_point_ptr != NULL) {
-    CHECK(segment_id_for_each_point_ptr->size() == result.size()) <<
+  result.width = result.points.size();
+
+
+    CHECK(segment_id_for_each_point.size() == result.size()) <<
         "Each point should have a single segment id.";
-  }
+  
   return result;
 }
 
@@ -288,9 +175,9 @@ PointCloud SegmentedCloud::centroidsAsPointCloud(
   PointCloud result;
   for (const auto& id_segment: valid_segments_) {
     Segment segment = id_segment.second;
-    if (laser_slam::distanceBetweenTwoSE3(segment.T_w_linkpose, center) <=
+    if (laser_slam::distanceBetweenTwoSE3(segment.getLastView().T_w_linkpose, center) <=
         maximum_linkpose_distance) {
-      result.push_back(segment.centroid);
+      result.push_back(segment.getLastView().centroid);
       // Export the segment ids if desired.
       if (segment_id_for_each_point_ptr != NULL) {
         segment_id_for_each_point_ptr->push_back(segment.segment_id);
@@ -316,7 +203,7 @@ bool SegmentedCloud::findNearestSegmentsToPoint(const PclPoint& point,
 
   // Get centroid cloud with ids.
   std::vector<Id> segment_ids;
-  PointCloud centroid_cloud = this->centroidsAsPointCloud(&segment_ids);
+  PointCloud centroid_cloud = this->centroidsAsPointCloud(segment_ids);
 
   //TODO deal properly with that case.
   //  CHECK_GE(segment_ids.size(), n_nearest_segments);
@@ -349,115 +236,15 @@ bool SegmentedCloud::findNearestSegmentsToPoint(const PclPoint& point,
   return true;
 }
 
-/*
- * \brief Find which segments overlap.
- * Two points overlap if they are within 'overlap_radius' of each other.
- * overlap_radius's unit is the same as the point cloud (meters, millimeters)
- */
-
-//TODO to speed up that expensive function, we could, for each segment in the source cloud,
-// find the N (=3?) closest segments in the target cloud, by comparing the distance of the centroids.
-// Then build a cloud from these N closest segment and do the nearest neighbours on this.
-// See functions findClosestSegmentsByCentroid and validSegmentsAsPointCloudFromIds.
-bool SegmentedCloud::computeSegmentOverlaps(const SegmentedCloud& target_segmented_cloud,
-                                            const float overlap_radius,
-                                            const unsigned int number_nearest_segments,
-                                            double maximum_centroid_distance_m,
-                                            Overlaps* overlaps) const {
-  LOG(INFO) << "Computing segment overlaps.";
-  CHECK_NOTNULL(overlaps)->clear();
-  PointICloud target_cloud = target_segmented_cloud.validSegmentsAsPointCloud();
-  if (validSegmentsAsPointCloud().empty() || target_cloud.empty()) {
-    LOG(WARNING) << "One of the segmented cloud is empty. Found no overlaps.";
-    return false;
-  }
-
-  // Initialize the detailed vector of offenders for each segments.
-  overlaps->detailed_offenders_.resize(getNumberOfValidSegments());
-
-  // Loop over valid segments in this SegmentedCloud.
-  const float overlap_radius_squared = overlap_radius * overlap_radius;
-
-  unsigned int i = 0u;
-  for (const auto& id_segment: valid_segments_) {
-    Segment current_segment = id_segment.second;
-    IdOccurences id_occurences_in_segment_overlap;
-
-    // Find the nearest segments by centroid.
-    std::vector<Id> nearest_segments_ids;
-    std::vector<double> nearest_segments_distances;
-    target_segmented_cloud.findNearestSegmentsToPoint(current_segment.centroid,
-                                                      number_nearest_segments,
-                                                      maximum_centroid_distance_m,
-                                                      &nearest_segments_ids,
-                                                      &nearest_segments_distances);
-
-    std::vector<Id> nearest_segments_cloud_segment_ids;
-    PointICloud nearest_segments_cloud = target_segmented_cloud.validSegmentsAsPointCloudFromIds(
-        nearest_segments_ids, &nearest_segments_cloud_segment_ids);
-
-    // Loop over every point in the segment.
-    unsigned int n_tested_points = 0;
-    for (size_t j = 0u; j < current_segment.point_cloud.size(); j += 10) {
-      PointI point = current_segment.point_cloud.at(j);
-
-      Id segment_id_of_nearest_neighbour = kNoId;
-
-      // Find the nearest neighbours in nearest_segments_cloud if it is not empty due to
-      // parameter maximum_centroid_distance_m.
-      if (nearest_segments_cloud.size() > 0u) {
-        size_t nn_index;
-        float squared_distance;
-        CHECK(findNearestNeighbour(point, nearest_segments_cloud, &nn_index, &squared_distance));
-
-        // Ignore the nearest neighbour if it is outside overlap_radius.
-        if (squared_distance <= overlap_radius_squared) {
-          CHECK_LT(static_cast<size_t>(nn_index),
-                   nearest_segments_cloud.points.size());
-          segment_id_of_nearest_neighbour  = nearest_segments_cloud_segment_ids.at(nn_index);
-          id_occurences_in_segment_overlap.addOccurence(segment_id_of_nearest_neighbour);
-        }
-      }
-
-
-      // Store the overlapping point's segment ID.
-      overlaps->detailed_offenders_.at(i).push_back(segment_id_of_nearest_neighbour);
-
-      ++n_tested_points;
-    }
-
-    // Find and store current segment's worst offender.
-    IdCounter worst_offender = id_occurences_in_segment_overlap.findHighestOccurence();
-    worst_offender.total_count = n_tested_points;
-    overlaps->worst_offenders_.push_back(worst_offender);
-
-    // Logging.
-    if (worst_offender.id != kNoId) {
-      LOG(INFO) << "Worst offender for " << current_segment.segment_id << ": "
-          << worst_offender.id << " with "
-          << 100.0 * worst_offender.count/worst_offender.total_count
-          << "% (" << worst_offender.count << "/"
-          << worst_offender.total_count << ") overlapping points";
-    } else {
-      LOG(INFO) << "Worst offender for " << current_segment.segment_id << ": None.";
-    }
-    ++i;
-  }
-
-  CHECK(overlaps->worst_offenders_.size() == getNumberOfValidSegments());
-  CHECK(overlaps->detailed_offenders_.size() == getNumberOfValidSegments());
-  return true;
-}
-
 void SegmentedCloud::setTimeStampOfSegments(const laser_slam::Time& timestamp_ns) {
   for (auto& id_segment: valid_segments_) {
-    id_segment.second.timestamp_ns = timestamp_ns;
+    id_segment.second.getLastView().timestamp_ns = timestamp_ns;
   }
 }
 
 void SegmentedCloud::setLinkPoseOfSegments(const laser_slam::SE3& link_pose) {
   for (auto& id_segment: valid_segments_) {
-    id_segment.second.T_w_linkpose = link_pose;
+    id_segment.second.getLastView().T_w_linkpose = link_pose;
   }
 }
 
@@ -469,18 +256,53 @@ void SegmentedCloud::setTrackId(unsigned int track_id) {
 
 void SegmentedCloud::updateSegments(const std::vector<laser_slam::Trajectory>& trajectories) {
   for (auto& id_segment: valid_segments_) {
-    SE3 new_pose = trajectories.at(id_segment.second.track_id).at(id_segment.second.timestamp_ns);
+    SE3 new_pose = trajectories.at(id_segment.second.track_id).at(id_segment.second.getLastView().timestamp_ns);
 
-    SE3 transformation = new_pose * id_segment.second.T_w_linkpose.inverse();
+    SE3 transformation = new_pose * id_segment.second.getLastView().T_w_linkpose.inverse();
     // Transform the point cloud.
-    transformPointCloud(transformation, &id_segment.second.point_cloud);
+    transformPointCloud(transformation, &id_segment.second.getLastView().point_cloud);
+
+    // Transform the reconstruction.
+    transformPointCloud(transformation, &id_segment.second.getLastView().reconstruction);
+    transformPointCloud(transformation, &id_segment.second.getLastView().reconstruction_compressed);
 
     // Transform the segment centroid.
-    transformPclPoint(transformation, &id_segment.second.centroid);
+    transformPclPoint(transformation, &id_segment.second.getLastView().centroid);
 
     // Update the link pose.
-    id_segment.second.T_w_linkpose = new_pose;
+    id_segment.second.getLastView().T_w_linkpose = new_pose;
   }
 }
+
+size_t SegmentedCloud::getCloseSegmentPairsCount(const float max_distance) const {
+  size_t num_close_segments = 0u;
+  float min_distance = std::numeric_limits<float>::max();
+  for (const auto& segment_1 : valid_segments_) {
+    for (const auto& segment_2 : valid_segments_) {
+      if (segment_1.first < segment_2.first) {
+        float distance = (
+            segment_1.second.getLastView().centroid.getVector3fMap() -
+            segment_2.second.getLastView().centroid.getVector3fMap()).norm();
+        min_distance = std::min(min_distance, distance);
+        if (distance <= max_distance) ++num_close_segments;
+      }
+    }
+  }
+
+  LOG(INFO) << "Minimum segment distance " << min_distance;
+  BENCHMARK_RECORD_VALUE("SegmentedCloud.MinSegmentsDistance", min_distance);
+  BENCHMARK_RECORD_VALUE("SegmentedCloud.NumCloseSegments", num_close_segments);
+  return num_close_segments;
+}
+
+void SegmentedCloud::cleanEmptySegments() {
+  std::vector<Id> ids_to_remove;
+  for (const auto& segment : valid_segments_) {
+      if (segment.second.empty()) ids_to_remove.push_back(segment.first);
+  }
+  deleteSegmentsById(ids_to_remove);
+}
+
+Id SegmentedCloud::current_id_ = 0;
 
 } // namespace segmatch

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(segmatch_ros)
 
-add_definitions(-std=c++11)
+add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
 
 find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
     roscpp

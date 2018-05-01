@@ -4,11 +4,18 @@
 #include <glog/logging.h>
 #include <laser_slam/common.hpp>
 
-#include "segmatch/descriptors/autoencoder.hpp"
 #include "segmatch/descriptors/eigenvalue_based.hpp"
 #include "segmatch/descriptors/ensemble_shape_functions.hpp"
 
 namespace segmatch {
+
+Descriptor::Descriptor() {}
+
+Descriptor::~Descriptor() {}
+
+void Descriptor::describe(Segment* segment_ptr) {
+  describe(*segment_ptr, &segment_ptr->getLastView().features);
+}
 
 // Descriptors methods definition
 Descriptors::Descriptors() {
@@ -28,13 +35,15 @@ Descriptors::Descriptors(const DescriptorsParameters& parameters) {
           new EigenvalueBasedDescriptor(parameters)));
     } else if (parameters.descriptor_types[i] == "EnsembleShapeFunctions") {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new EnsembleShapeFunctions(parameters)));
-    } else if (parameters.descriptor_types[i] == "Autoencoder") {
-      descriptors_.push_back(std::unique_ptr<Descriptor>(new AutoencoderDescriptor(parameters)));
     } else {
       CHECK(false) << "The descriptor '" << parameters.descriptor_types[i] <<
           "' was not implemented.";
     }
   }
+}
+
+void Descriptors::describe(Segment* segment_ptr) {
+  describe(*segment_ptr, &segment_ptr->getLastView().features);
 }
 
 void Descriptors::describe(const Segment& segment, Features* features) {
@@ -45,22 +54,11 @@ void Descriptors::describe(const Segment& segment, Features* features) {
   }
 }
 
-void Descriptors::describe(SegmentedCloud* segmented_cloud_ptr,
-                           std::vector<double>* timings) {
-  if (timings != NULL) {
-    timings->clear();
-  }
+void Descriptors::describe(SegmentedCloud* segmented_cloud_ptr) {
   CHECK_NOTNULL(segmented_cloud_ptr);
   CHECK_GT(descriptors_.size(), 0) << "Description impossible without a descriptor.";
   for (size_t i = 0u; i < descriptors_.size(); ++i) {
-    laser_slam::Clock clock_descriptor;
     descriptors_[i]->describe(segmented_cloud_ptr);
-    if (timings != NULL) {
-      clock_descriptor.takeTime();
-      timings->push_back(clock_descriptor.getRealTime());
-      LOG(INFO) << "Decriptor " << i << " took " << clock_descriptor.getRealTime() << " ms.";
-      clock_descriptor.start();
-    }
   }
 }
 

@@ -2,8 +2,6 @@
 #define SEGMATCH_OPENCV_RANDOM_FOREST_HPP_
 
 #include <nabo/nabo.h>
-#include <opencv2/core/core.hpp>
-#include <opencv2/ml/ml.hpp>
 
 #include "segmatch/common.hpp"
 #include "segmatch/parameters.hpp"
@@ -11,8 +9,7 @@
 
 namespace segmatch {
 
-//TODO(Renaud or Daniel) Implement a base class when another classifier should be
-// evaluated
+//TODO Renaud matching needs major refactoring.
 class OpenCvRandomForest {
  public:
   explicit OpenCvRandomForest(const ClassifierParams& params);
@@ -44,8 +41,6 @@ class OpenCvRandomForest {
   void normalizeEigenFeatures(Eigen::MatrixXf* f);
 
  private:
-  CvRTrees rtrees_;
-
   std::vector<Id> target_segment_ids_;
   std::vector<PclPoint> target_segment_centroids_;
   std::vector<Eigen::MatrixXd> target_segment_features_;
