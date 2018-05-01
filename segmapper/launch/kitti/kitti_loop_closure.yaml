@@ -76,7 +76,7 @@ SegMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.60,
-     n_nearest_neighbours: 100,
+     n_nearest_neighbours: 120,
      knn_feature_dim: 7,
      enable_two_stage_retrieval: true,
      apply_hard_threshold_on_feature_distance: true,

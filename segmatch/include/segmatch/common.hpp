@@ -76,8 +76,10 @@ class PairwiseMatch {
   Eigen::MatrixXd features2_;
   PointPair centroids_;
 };
-typedef std::vector<PairwiseMatch> PairwiseMatches;
 
+typedef std::vector<PairwiseMatch,
+    Eigen::aligned_allocator<PairwiseMatch> > PairwiseMatches;
+    
 struct Translation {
   Translation(double x_in, double y_in, double z_in) :
     x(x_in), y(y_in), z(z_in) {}
