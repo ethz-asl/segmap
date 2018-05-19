@@ -6,8 +6,6 @@
 #include <string>
 
 #include <laser_slam/common.hpp>
-#include <opencv2/core/core.hpp>
-#include <opencv2/ml/ml.hpp>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 
@@ -206,7 +204,7 @@ class SegMatch {
   // Create one recognizer per track, since the incremental recognizer caches track-specific data.
   std::vector<std::unique_ptr<CorrespondenceRecognizer>> recognizers_;
 
-  //TODO(Renaud or Daniel): modify with base class when needed.
+  //TODO(Renaud or Daniel): rename.
   std::unique_ptr<OpenCvRandomForest> classifier_;
 
   std::unordered_map<unsigned int, SegmentedCloud> segmented_source_clouds_;
