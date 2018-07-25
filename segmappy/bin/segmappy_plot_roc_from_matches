@@ -1,0 +1,223 @@
+#!/usr/bin/env python
+from __future__ import print_function
+import numpy as np
+import random
+import os
+from sklearn import metrics
+import pickle
+
+USE_LAST_SAMPLE_ONLY = False
+ALWAYS_AGAINST_LAST = False
+MIN_DISTANCE_NEGATIVES = 20.0
+
+import ensure_segmappy_is_installed
+from segmappy.tools.roccurve import get_roc_pairs, get_roc_curve
+
+from segmappy import Config
+from segmappy import Dataset
+from segmappy import Generator
+from segmappy.tools.classifiertools import get_default_preprocessor
+
+# read config file
+configfile = "default_training.ini"
+config = Config(configfile)
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--ae_model")
+args = parser.parse_args()
+config.ae_model = args.ae_model
+
+# load dataset and preprocessor
+preprocessor = get_default_preprocessor(config)
+
+dataset = Dataset(
+    folder=config.cnn_test_folder,
+    base_dir=config.base_dir,
+    keep_match_thresh=0.7,
+    require_change=0.1,
+    require_relevance=0.05,
+)
+
+segments, positions, classes, n_classes, features, _, _ = dataset.load(
+    preprocessor=preprocessor
+)
+duplicate_classes = dataset.duplicate_classes
+
+preprocessor.init_segments(segments, classes, positions=positions)
+
+# get roc positive and negative pairs
+pair_ids, pair_labels = get_roc_pairs(
+    segments,
+    classes,
+    duplicate_classes,
+    USE_LAST_SAMPLE_ONLY,
+    ALWAYS_AGAINST_LAST,
+    MIN_DISTANCE_NEGATIVES,
+)
+
+# cnn features
+print("Generating cnn features")
+gen_test = Generator(
+    preprocessor,
+    range(len(segments)),
+    n_classes,
+    train=False,
+    batch_size=config.batch_size,
+    shuffle=False,
+)
+
+import tensorflow as tf
+tf.reset_default_graph()
+
+# restore variable names from previous session
+saver = tf.train.import_meta_graph(
+    os.path.join(config.cnn_model_folder, "model.ckpt.meta")
+)
+
+# get key tensorflow variables
+cnn_graph = tf.get_default_graph()
+
+cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
+scales = cnn_graph.get_tensor_by_name("scales:0")
+descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+
+cnn_features = []
+with tf.Session() as sess:
+    saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
+
+    for batch in range(gen_test.n_batches):
+        batch_segments, _ = gen_test.next()
+
+        batch_descriptors = sess.run(
+            descriptor,
+            feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
+        )
+
+        for batch_descriptor in batch_descriptors:
+            cnn_features.append(batch_descriptor)
+
+cnn_features = np.array(cnn_features)
+
+# ae features
+if config.ae_model:
+    print("Generating AE features")
+    tf.reset_default_graph()
+
+    # restore variable names from previous session
+    saver = tf.train.import_meta_graph(config.ae_model + ".meta")
+
+    # get key tensorflow variables
+    ae_graph = tf.get_default_graph()
+
+    ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
+    ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+    scales = ae_graph.get_tensor_by_name("scales:0")
+
+    ae_features = []
+    with tf.Session() as sess:
+        saver.restore(sess, config.ae_model)
+
+        for batch in range(gen_test.n_batches):
+            batch_segments, _ = gen_test.next()
+
+            batch_descriptors = sess.run(
+                ae_descriptor,
+                feed_dict={
+                    ae_input: batch_segments,
+                    scales: preprocessor.last_scales,
+                },
+            )
+
+            for batch_descriptor in batch_descriptors:
+                ae_features.append(batch_descriptor)
+
+    ae_features = np.array(ae_features)
+
+# eigen features
+eigen_features = features[:, :7]
+
+# plot the ROCs
+fpr_eigen, tpr_eigen, roc_auc_eigen = get_roc_curve(
+    eigen_features,
+    pair_ids,
+    pair_labels
+)
+
+fpr_cnn, tpr_cnn, roc_auc_cnn = get_roc_curve(
+    cnn_features,
+    pair_ids,
+    pair_labels
+)
+
+if config.ae_model:
+    fpr_ae, tpr_ae, roc_auc_ae = get_roc_curve(
+        ae_features,
+        pair_ids,
+        pair_labels
+    )
+
+import matplotlib as mpl
+
+mpl.use("Agg")
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+fig_width_pt = 252
+inches_per_pt = 1.0 / 72.27  # Convert pt to inch
+fig_width = fig_width_pt * inches_per_pt  # width in inches
+fig_height = fig_width
+fig_size = [fig_width, fig_height]
+
+fig_roc = plt.figure(figsize=(fig_width, fig_height))
+
+fontsize = 9
+params = {
+    "backend": "ps",
+    "axes.labelsize": fontsize,
+    "font.size": fontsize,
+    "legend.fontsize": fontsize,
+    "xtick.labelsize": fontsize,
+    "ytick.labelsize": fontsize,
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": "Computer Modern Roman",
+    "figure.figsize": fig_size,
+}
+plt.rcParams.update(params)
+
+lw = 0.7
+plt.plot(
+    fpr_eigen,
+    tpr_eigen,
+    color="green",
+    lw=lw,
+    label="Eigen (area = %0.2f)" % roc_auc_eigen,
+)
+
+if config.ae_model:
+    plt.plot(
+        fpr_ae,
+        tpr_ae,
+        color="orange",
+        lw=lw,
+        label="AE (area = %0.2f)" % roc_auc_ae
+    )
+
+plt.plot(
+    fpr_cnn,
+    tpr_cnn,
+    color="red",
+    lw=lw,
+    label="\\textit{SegMap} (area = %0.2f)" % roc_auc_cnn,
+)
+
+plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.0])
+plt.xlabel("False Positive Rate [-]")
+plt.ylabel("True Positive Rate [-]")
+plt.legend(loc="lower right")
+
+fig_roc.savefig("roc.pdf")
