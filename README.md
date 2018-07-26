@@ -97,7 +97,7 @@ $ source ~/segmappyenv/bin/activate
 
 ## Running segmapper Examples
 
-make sure to source the SegMap workspace before running the segmapper demonstrations:
+Make sure to source the SegMap workspace before running the segmapper demonstrations:
 ```
 $ source ~/segmap_ws/devel/setup.bash
 ```
