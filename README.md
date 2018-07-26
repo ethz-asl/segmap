@@ -1,12 +1,12 @@
 ## *SegMap* 
 
-*SegMap* is a reliable loop-closure detection algorithm based on the matching of 3D segments. The *SegMap* code is open-source (BSD License) and has been tested under Ubuntu 14.04, 16.04 and ROS Indigo, Kinetic. Please remember that this is on-going research code which is subject to changes in the future.
+SegMap is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The SegMap code is open-source (BSD License) and has been tested under Ubuntu 14.04, 16.04 and ROS Indigo, Kinetic. Please remember that this is on-going research code which is subject to changes in the future.
 
 ### Related Publications
 
-R. Dubé, A. Cramariuc, D. Dugas, J. Nieto, R. Siegwart, and C. Cadena. **"SegMap: 3D Segment Mapping using Data-Driven Descriptors."** *Robotics: Science and Systems (RSS), 2018.* [pdf](https://arxiv.org/pdf/1804.09557.pdf)
+R. Dubé, A. Cramariuc, D. Dugas, J. Nieto, R. Siegwart, and C. Cadena. **"SegMap: 3D Segment Mapping using Data-Driven Descriptors."** *Robotics: Science and Systems (RSS), 2018.* [pdf](http://www.roboticsproceedings.org/rss14/p03.pdf) - [video](https://youtu.be/CMk4w4eRobg)
 
-R. Dubé, D. Dugas, E. Stumm, J. Nieto, R. Siegwart, and C. Cadena. **"SegMatch: Segment based place recognition in 3d point clouds."** *Robotics and Automation (ICRA), 2017 IEEE International Conference on Robotics and Automation.* [pdf](https://arxiv.org/pdf/1609.07720.pdf)
+R. Dubé, D. Dugas, E. Stumm, J. Nieto, R. Siegwart, and C. Cadena. **"SegMatch: Segment Based Place Recognition in 3D Point Clouds."** *IEEE International Conference on Robotics and Automation, 2017.* [pdf](https://arxiv.org/pdf/1609.07720.pdf) - [video](https://youtu.be/iddCgYbgpjE)
 
 ## Features
 
@@ -28,7 +28,7 @@ The SegMap repository contains the following modules:
 - segmappy: Python library for training and evaluating the neural network models.
 
 This section provides a step by step guide to installing the full flavor of SegMap.
-Advanced: it is also possible to use the segmap C++ library standalone in a C++ project, or integrate the C++ library and ROS interface in a ROS project.
+Advanced: it is also possible to use the SegMap C++ library standalone in a C++ project, or integrate the C++ library and ROS interface in a ROS project.
 
 ### Dependencies
 
@@ -80,7 +80,7 @@ $ catkin build tensorflow_ros_cpp
 
 ### Build SegMap
 
-Finally, build the *segmapper* package which will compile all dependencies and *SegMap* modules:
+Finally, build the *segmapper* package which will compile all dependencies and SegMap modules:
 ```
 $ cd ~/segmap_ws
 $ catkin build segmapper
@@ -88,7 +88,7 @@ $ catkin build segmapper
 
 #### (Optional) Install SegmapPy python package
 
-Installing segmappy allows you to train data-driven models yourself to use with segmap.
+Installing segmappy allows you to train data-driven models yourself to use with SegMap.
 ```
 $ cd src/segmap/segmappy/
 $ source ~/segmappyenv/bin/activate
@@ -97,25 +97,25 @@ $ source ~/segmappyenv/bin/activate
 
 ## Running segmapper Examples
 
-make sure to source the segmap workspace before running the segmapper demonstrations:
+make sure to source the SegMap workspace before running the segmapper demonstrations:
 ```
 $ source ~/segmap_ws/devel/setup.bash
 ```
 
 #### Download demonstration files
 
-To download all necessary files, copy the contents of the [segmap_data](http://robotics.ethz.ch/~asl-datasets/segmap/segmap_data/) into ```~/.segmap/```.
+To download all necessary files, copy the content of the [segmap_data](http://robotics.ethz.ch/~asl-datasets/segmap/segmap_data/) into ```~/.segmap/```.
 
 #### Run online SLAM example
 
-The online SLAM example can be run with
+An online SLAM example can be run with
 ```
 $ roslaunch segmapper kitti_loop_closure.launch
 ```
 
 #### Run localization against known map example 
 
-The localization example can be run with
+A localization example can be run with
 ```
 $ roslaunch segmapper kitti_localization.launch
 ```
@@ -123,7 +123,7 @@ $ roslaunch segmapper kitti_localization.launch
 
 #### Run online SLAM with CNN example
 
-The online SLAM example with data-driven descriptor can be run with
+An online SLAM example with data-driven descriptor can be run with
 ```
 $ roslaunch segmapper cnn_kitti_loop_closure.launch
 ```
@@ -137,7 +137,16 @@ SegMap is released under [BSD 3-Clause License](https://github.com/ethz-asl/segm
 
 Thank you for citing the related publication if you use SegMap in academic work:
 ```
-@inproceedings{dube2017segmatch,
+@inproceedings{segmap2018,
+  title={{SegMap}: 3D Segment Mapping using Data-Driven Descriptors},
+  author={Dub{\'e}, Renaud and Cramariuc, Andrei and Dugas, Daniel and Nieto, Juan and Siegwart, Roland and Cadena, Cesar},
+  booktitle={Robotics: Science and Systems (RSS)},
+  year={2018}
+}
+```
+
+```
+@inproceedings{segmatch2017,
   title={SegMatch: Segment based place recognition in 3d point clouds},
   author={Dub{\'e}, Renaud and Dugas, Daniel and Stumm, Elena and Nieto, Juan and Siegwart, Roland and Cadena, Cesar},
   booktitle={Robotics and Automation (ICRA), 2017 IEEE International Conference on},
@@ -149,4 +158,4 @@ Thank you for citing the related publication if you use SegMap in academic work:
 
 ## Contributing to *SegMap*
 
-We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMatch) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch. Thank you!
+We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch. Thank you!
