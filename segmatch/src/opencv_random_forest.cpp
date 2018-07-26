@@ -196,6 +196,10 @@ PairwiseMatches OpenCvRandomForest::findCandidates(
       nns_->knn(q, indices, dists2, n_nearest_neighbours);
 
       for (size_t i = 0u; i < n_nearest_neighbours; ++i) {
+        if (indices[i] == 0) {
+          // TODO RD Sometimes all the indices are 0. Investigate this. 
+          break;
+        }
         if (source_segment.segment_id != target_segment_ids_[indices[i]]) {
           PairwiseMatch match(source_segment.segment_id,
                               target_segment_ids_[indices[i]],

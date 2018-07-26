@@ -8,6 +8,7 @@ add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
 
 cs_add_library(${PROJECT_NAME} 
   src/database.cpp
+  src/descriptors/cnn.cpp
   src/descriptors/descriptors.cpp
   src/descriptors/eigenvalue_based.cpp
   src/descriptors/ensemble_shape_functions.cpp
