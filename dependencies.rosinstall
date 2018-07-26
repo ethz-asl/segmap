@@ -4,28 +4,35 @@
 - git:
    local-name: eigen_catkin
    uri: https://github.com/ethz-asl/eigen_catkin.git
+   version: 00b5eb2
 - git:
    local-name: glog_catkin
    uri: https://github.com/ethz-asl/glog_catkin.git
+   version: dcb4559
 - git:
    local-name: gflags_catkin
    uri: https://github.com/ethz-asl/gflags_catkin.git
+   version: 6021097
 - git:
    local-name: eigen_checks
    uri: https://github.com/ethz-asl/eigen_checks.git
+   version: 22a6247
 - git:
    local-name: doxygen_catkin
    uri: https://github.com/ethz-asl/doxygen_catkin.git
+   version: b76cc31
 - git:
    local-name: mincurves
    uri: https://github.com/ethz-asl/mincurves.git
+   version: 955563d
 - git:
    local-name: gtsam_catkin
    uri: https://github.com/ethz-asl/gtsam_catkin.git
+   version: ecf6a04
 - git:
    local-name: libnabo
    uri: https://github.com/ethz-asl/libnabo.git
-   version: 2cc265088d31cf81092ef39215236b9f8838f499
+   version: 2cc2650
 - git:
    local-name: libpointmatcher
    uri: https://github.com/ethz-asl/libpointmatcher.git
@@ -33,19 +40,32 @@
 - git:
    local-name: minkindr
    uri: https://github.com/ethz-asl/minkindr.git
+   version: bc4503c
 - git:
    local-name: minkindr_gtsam
    uri: https://github.com/ethz-asl/minkindr_gtsam.git
+   version: 07d060d
 - git:
    local-name: minkindr_ros
    uri: https://github.com/ethz-asl/minkindr_ros.git
+   version: 88e0bd4
 - git:
    local-name: libpointmatcher_ros
    uri: https://github.com/ethz-asl/ethzasl_icp_mapping.git
-   version: indigo_devel
+   version: a7d8ea9
 - git:
    local-name: catkin_simple
    uri: https://github.com/catkin/catkin_simple.git
+   version: 0e62848
 - git:
    local-name: pcl_catkin
    uri: https://github.com/ethz-asl/pcl_catkin.git
+   version: 9e4365a
+- git:
+   local-name: metis_catkin
+   uri: https://github.com/ethz-asl/metis_catkin.git
+   version: c5c839c
+- git:
+   local-name: tensorflow_ros_cpp
+   uri: https://github.com/tradr-project/tensorflow_ros_cpp.git
+   version: 3e089a3
