@@ -13,7 +13,7 @@
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
-  <rosparam command="load" file="$(find segmapper)/launch/cnn/cnn_kitti_loop_closure.yaml"/>
+  <rosparam command="load" file="$(find segmapper)/launch/kitti/cnn_kitti_loop_closure.yaml"/>
 
   <!-- rviz node -->
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
