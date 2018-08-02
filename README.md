@@ -55,18 +55,20 @@ $ wstool update
 
 #### Tensorflow
 
-| If you are on Ubuntu 16.04 or 18.04 it is neccessary to install tensorflow from source. After compiling tensorflow generate the pip package and continue with these instructions, installing the custom generated package instead of the precompiled one. |
+| If you do not plan on using the deep learned descriptors in SegMap you should at least install the CPU version of Tensorflow to compile the whole package. Otherwise we recommend the GPU version. |
 | --- |
 
-SegMap relies on the package [tensorflow_ros_cpp](https://github.com/tradr-project/tensorflow_ros_cpp) for linking to the tensorflow C++ API. All our code has been tested with tensorflow 1.8. Use your preferred way of pip installing whichever version of tensorflow, here as an example we install the precompiled CPU version.
+| The precompiled version of Tensorflow can only be used with Ubuntu 14.04, for further explanations see [here](https://github.com/tradr-project/tensorflow_ros_cpp#c-abi-difference-problems) (requirements for the GPU version [here](https://www.tensorflow.org/install/install_sources#tested_source_configurations)). For Ubuntu 16.04 and 18.04 you must compile tensorflow from source. After compiling tensorflow, generate the pip package and continue with these instructions, installing the custom generated package instead of the precompiled one. |
+| --- |
+
+SegMap relies on the package [tensorflow_ros_cpp](https://github.com/tradr-project/tensorflow_ros_cpp) for linking to the tensorflow C++ API. All our code has been tested with Tensorflow 1.8.
 
 ```
 $ virtualenv ~/segmappyenv
 $ source ~/segmappyenv/bin/activate
 (segmappyenv)$ pip install --upgrade pip
 (segmappyenv)$ pip install catkin_pkg empy
-# install the CPU or GPU version of tensorflow
-(segmappyenv)$ pip install tensorflow
+(segmappyenv)$ pip install tensorflow-gpu==1.8.0
 ```
 
 ##### Build tensorflow_ros_cpp
@@ -101,10 +103,11 @@ Make sure to source the SegMap workspace before running the segmapper demonstrat
 ```
 $ source ~/segmap_ws/devel/setup.bash
 ```
+To train new models see intructions (here)[https://github.com/ethz-asl/segmap/wiki/Training-new-models].
 
 #### Download demonstration files
 
-To download all necessary files, copy the content of the [segmap_data](http://robotics.ethz.ch/~asl-datasets/segmap/segmap_data/) into ```~/.segmap/```.
+To download all necessary files, copy the content of the [segmap_data](http://robotics.ethz.ch/~asl-datasets/segmap/segmap_data/) into ```~/.segmap/```. If you installed the segmappy python package you can run the automated download script. **Note: These models have been trained using Tensorflow 1.8 and are only guaranteed to work for that version.**
 
 #### Run online SLAM example
 
@@ -158,4 +161,4 @@ Thank you for citing the related publication if you use SegMap in academic work:
 
 ## Contributing to *SegMap*
 
-We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch. Thank you!
+We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch and crandrei(at)ethz(dot)ch. Thank you!
