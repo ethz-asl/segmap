@@ -1,0 +1,132 @@
+SegMapper: {
+  number_of_robots: 1,
+  robot_prefix: "na",
+  
+  world_frame: "map",
+  clear_local_map_after_loop_closure: false,
+  
+  publish_world_to_odom: true,
+  tf_publication_rate_hz: 10,
+  
+  LaserSlamWorker: {
+    use_odometry_information: true,
+    
+    odom_frame: "world",
+    sensor_frame: "velodyne",
+    
+    assembled_cloud_sub_topic: "/velodyne_points",
+    trajectory_pub_topic: "trajectory",
+    odometry_trajectory_pub_topic: "odometry_trajectory",
+    full_map_pub_topic: "full_map",
+    local_map_pub_topic: "local_map",
+    distant_map_pub_topic: "distant_map",
+        
+    create_filtered_map: true,
+    publish_local_map: false,
+    publish_distant_map: false,
+    publish_full_map: false,
+    map_publication_rate_hz: 3,
+  },
+ 
+  # SegMatchWorker parameters
+  SegMatchWorker: {
+  localize: false,
+  close_loops: true,
+  
+  distance_between_segmentations_m: 0.0,
+
+  distance_to_lower_target_cloud_for_viz_m: 30.0,
+  align_target_map_on_first_loop_closure: false,
+  
+  ratio_of_points_to_keep_when_publishing: 1.0,
+  
+  export_segments_and_matches: true,
+  publish_predicted_segment_matches: false,
+  
+  line_scale_loop_closures: 5.0,
+  line_scale_matches: 0.5,
+
+  SegMatch: {
+    segmentation_radius_m: 50.0,
+    segmentation_height_above_m: 999.0,
+    segmentation_height_below_m: 999.0,
+
+    filter_boundary_segments: true,
+    boundary_radius_m: 999.0,
+    filter_duplicate_segments: true,
+    centroid_distance_threshold_m: 2,
+    min_time_between_segment_for_matches_s: 60,
+    check_pose_lies_below_segments: false,
+
+    LocalMap: {
+      voxel_size_m: 0.10,
+      min_points_per_voxel: 1,
+      radius_m: 50,
+      min_vertical_distance_m: -999.0,
+      max_vertical_distance_m: 999.0,
+      neighbors_provider_type: "KdTree",
+    },
+    
+    Segmenters: {
+      segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
+      min_cluster_size: 100,
+      max_cluster_size: 15000,
+      radius_for_growing: 0.2
+    },
+
+    Descriptors: {
+      descriptor_types: ["CNN", "EigenvalueBased"]
+    },
+
+    Classifier: {
+     threshold_to_accept_match: 0.65,
+     n_nearest_neighbours: 25, #25
+     knn_feature_dim: 64, #32
+     enable_two_stage_retrieval: false,
+     apply_hard_threshold_on_feature_distance: false,
+     feature_distance_threshold: 100, #25
+     
+     normalize_eigen_for_knn: false,
+     normalize_eigen_for_hard_threshold: false,
+     max_eigen_features_values: [2493.5, 186681.0, 188389.0, 0.3304, 188388.0, 1.0899, 0.9987],
+     do_not_use_cars: true,
+    },
+
+    GeometricConsistency: {
+      recognizer_type: "Simple", #"Simple", "Partitioned"
+      resolution: 0.6,
+      min_cluster_size: 6,
+      max_consistency_distance_for_caching: 10.0,
+    }
+  },
+  },
+  
+  OnlineEstimator: {
+    loop_closure_noise_model: [0.05, 0.05, 0.05, 0.015, 0.015, 0.015],
+    add_m_estimator_on_loop_closures: true,
+    
+    do_icp_step_on_loop_closures: false,
+    loop_closures_sub_maps_radius: 3,
+
+    LaserTrack: {
+      odometry_noise_model: [0.5, 0.5, 0.5, 0.015, 0.015, 0.015],
+      icp_noise_model: [0.5, 0.05, 0.05, 0.015, 0.015, 0.015],
+      add_m_estimator_on_odom: false,
+      add_m_estimator_on_icp: false,
+    
+      use_icp_factors: true, #Introducing ICP constraints will introduce a drift.
+      use_odom_factors: true,
+      nscan_to_match: 3,
+      nscan_in_sub_map: 5,
+      save_icp_results: false,
+      force_priors: false
+    }
+  },
+ 
+  Benchmarker: {
+    save_statistics_only: false,
+    enable_live_output: false,
+    results_directory: "/tmp/segmatch_benchmark/cnn_kitti_loop_closure"
+  }
+}
+

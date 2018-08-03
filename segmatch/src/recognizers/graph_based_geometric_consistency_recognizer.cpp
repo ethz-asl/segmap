@@ -51,8 +51,6 @@ inline Eigen::Matrix4f GraphBasedGeometricConsistencyRecognizer::estimateRigidTr
     const PairwiseMatches& true_matches) {
   BENCHMARK_BLOCK("SM.Worker.Recognition.ComputeTransformation");
 
-  LOG(INFO) << "true_matches " << true_matches.size();
-  
   // We limit the number of matches for estimating the transform to 8 as pcl::umeyama sometimes
   // crashes with 10+ matches.
   const unsigned int n_matches_to_consider = std::min(

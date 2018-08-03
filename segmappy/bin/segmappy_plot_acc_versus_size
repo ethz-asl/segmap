@@ -1,0 +1,286 @@
+#!/usr/bin/env python
+from __future__ import print_function
+import numpy as np
+import sys
+import os
+
+COMPARE_WITH_AE = True
+LOAD_DATA_FROM_FILE = False
+
+import ensure_segmappy_is_installed
+from segmappy import Config
+from segmappy import Dataset
+from segmappy import Generator
+from segmappy.tools.classifiertools import get_default_preprocessor
+
+# read config file
+configfile = "default_training.ini"
+config = Config(configfile)
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--bins", type=int, default=10)
+parser.add_argument("--ae_model")
+args = parser.parse_args()
+config.bins = args.bins
+config.ae_model = args.ae_model
+
+# load dataset and preprocessor
+dataset = Dataset(
+    folder=config.cnn_test_folder,
+    base_dir=config.base_dir,
+    keep_match_thresh=0.7
+)
+
+segments, positions, classes, n_classes, _, _, _ = dataset.load()
+duplicate_classes = dataset.duplicate_classes
+duplicate_ids = dataset.duplicate_ids
+
+preprocessor = get_default_preprocessor(config)
+preprocessor.init_segments(segments, classes, positions=positions)
+
+# calculate all feature sets
+feature_sets = []
+
+gen_test = Generator(
+    preprocessor,
+    np.arange(len(segments)),
+    n_classes,
+    train=False,
+    batch_size=config.batch_size,
+    shuffle=False,
+)
+
+import tensorflow as tf
+
+# eigen features
+feature_sets.append(dataset.features[:, :7])
+
+# autoencoder features
+if config.ae_model:
+    tf.reset_default_graph()
+
+    # restore variable names from previous session
+    saver = tf.train.import_meta_graph(config.ae_model + ".meta")
+
+    # get key tensorflow variables
+    ae_graph = tf.get_default_graph()
+
+    ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
+    ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+    scales = ae_graph.get_tensor_by_name("scales:0")
+
+    ae_features = []
+    with tf.Session() as sess:
+        saver.restore(sess, config.ae_model)
+
+        for batch in range(gen_test.n_batches):
+            batch_segments, _ = gen_test.next()
+
+            batch_descriptors = sess.run(
+                ae_descriptor,
+                feed_dict={
+                    ae_input: batch_segments,
+                    scales: preprocessor.last_scales,
+                },
+            )
+
+            for batch_descriptor in batch_descriptors:
+                ae_features.append(batch_descriptor)
+
+    feature_sets.append(np.array(ae_features))
+
+# cnn features
+tf.reset_default_graph()
+
+# restore variable names from previous session
+saver = tf.train.import_meta_graph(
+    os.path.join(config.cnn_model_folder, "model.ckpt.meta")
+)
+
+# get key tensorflow variables
+cnn_graph = tf.get_default_graph()
+
+cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
+scales = cnn_graph.get_tensor_by_name("scales:0")
+descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+
+cnn_features = []
+with tf.Session() as sess:
+    saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
+
+    for batch in range(gen_test.n_batches):
+        batch_segments, _ = gen_test.next()
+
+        batch_descriptors = sess.run(
+            descriptor,
+            feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
+        )
+
+        for batch_descriptor in batch_descriptors:
+            cnn_features.append(batch_descriptor)
+
+feature_sets.append(np.array(cnn_features))
+
+# precompute last ids and the corresponding segment sizes for sequences
+last_ids = []
+test_classes = []
+last_sizes = {}
+for cls in range(n_classes):
+    sequences = duplicate_classes[classes == cls]
+    unique_sequences = np.unique(sequences)
+
+    for sequence in unique_sequences:
+        segment_ids = np.where(sequence == duplicate_classes)[0]
+        last_id = np.max(segment_ids)
+        last_ids.append(last_id)
+        last_sizes[sequence] = segments[last_id].shape[0]
+
+    if unique_sequences.size > 1:
+        test_classes.append(cls)
+
+last_ids = np.array(last_ids)
+
+last_classes = classes[last_ids]
+last_sequences = duplicate_classes[last_ids]
+
+all_ranks = []
+all_sizes = []
+
+n_sets = len(feature_sets)
+for s in range(n_sets):
+    features = feature_sets[s]
+    last_features = features[last_ids]
+
+    ranks = []
+    sizes = []
+    for cls in test_classes:
+        sequences = duplicate_classes[classes == cls]
+        unique_sequences = np.unique(sequences)
+
+        for sequence in unique_sequences:
+            segment_ids = np.where(sequence == duplicate_classes)[0]
+
+            for segment_id in segment_ids:
+                dists = np.linalg.norm(last_features - features[segment_id], axis=1)
+                order_ids = np.argsort(dists)
+
+                found_self = False
+                for i, order_id in enumerate(order_ids):
+                    if last_sequences[order_id] != sequence:
+                        if last_classes[order_id] == cls:
+                            if found_self:
+                                ranks.append(i)
+                            else:
+                                ranks.append(i + 1)
+
+                            break
+                    else:
+                        found_self = True
+
+                sizes.append(
+                    float(segments[segment_id].shape[0]) / last_sizes[sequence]
+                )
+
+    all_ranks.append(ranks)
+    all_sizes.append(sizes)
+
+bin_edges = np.linspace(1.0/10, 1, 10)
+
+bins = []
+for i in range(bin_edges.size):
+    bins.append([])
+
+for s in range(n_sets):
+    ranks = all_ranks[s]
+    sizes = all_sizes[s]
+
+    for i in range(bin_edges.size):
+        bins[i].append([])
+
+    for rank, size in zip(ranks, sizes):
+        for i, bin_edge in enumerate(bin_edges):
+            if bin_edge >= size:
+                bins[i][s].append(rank)
+                break
+
+import matplotlib as mpl
+
+mpl.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import matplotlib.lines as mlines
+
+fig_width_pt = 252
+inches_per_pt = 1.0 / 72.27  # Convert pt to inch
+fig_width = fig_width_pt * inches_per_pt
+fig_height = fig_width * 0.9
+fig_size = [fig_width, fig_height]
+
+plt.figure(figsize=(fig_width, fig_height))
+
+fontsize = 8
+params = {
+    "backend": "ps",
+    "axes.labelsize": fontsize,
+    "font.size": fontsize,
+    "legend.fontsize": fontsize,
+    "xtick.labelsize": fontsize,
+    "ytick.labelsize": fontsize,
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": "Computer Modern Roman",
+    "figure.figsize": fig_size,
+}
+plt.rcParams.update(params)
+
+if config.ae_model:
+    colors = ['green', 'orange', 'red']
+else:
+    colors = ['green', 'red']
+
+xlim = 0
+xticks = []
+for i, b in enumerate(bins):
+    positions = np.arange(n_sets) + i * (n_sets + 1) + 1
+    xlim = max(xlim, positions[-1])
+    xticks.append(np.mean(positions))
+    bp = plt.boxplot(b, 0, "", positions=positions, widths=0.5)
+
+    lw = 0.7
+    for i in range(n_sets):
+        plt.setp(bp["boxes"][i], color=colors[i], linewidth=lw)
+        plt.setp(bp["caps"][i*2], color=colors[i], linewidth=lw)
+        plt.setp(bp["caps"][i*2+1], color=colors[i], linewidth=lw)
+        plt.setp(bp["whiskers"][i*2], color=colors[i], linestyle="--", linewidth=lw)
+        plt.setp(bp["whiskers"][i*2+1], color=colors[i], linestyle="--", linewidth=lw)
+        plt.setp(bp["medians"][i], color=colors[i], linewidth=lw)
+
+plt.yscale("log")
+
+ax = plt.gca()
+ax.set_xlim([0, xlim + 1])
+ax.set_ylim([1, 6000])
+ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+
+bin_edges = bin_edges * 100
+ax.set_xticklabels(bin_edges.astype(int))
+ax.set_xticks(xticks)
+ax.tick_params(axis="both", direction="in")
+
+lG = mlines.Line2D([], [], color="green", label="Eigen", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="\\textit{SegMap}", linewidth=lw)
+if config.ae_model:
+    lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
+    handles = [lG, lO, lR]
+else:
+    handles = [lG, lR]
+
+plt.legend(handles=handles, loc=3)
+
+plt.xlabel("Segment completness [\%]")
+plt.ylabel("k-neighbours needed [-]")
+plt.tight_layout()
+
+plt.savefig("acc_versus_size.pdf")

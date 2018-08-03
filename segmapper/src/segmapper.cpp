@@ -185,19 +185,6 @@ void SegMapper::segMatchThread() {
       ++skipped_tracks_count;
       // Keep asking for publishing to increase the publishing counter.
       segmatch_worker_.publish();
-      skip_counters_[track_id]++;
-      
-      if (first_points_received_[track_id] && skip_counters_[track_id] == deactivate_track_when_skipped_x_) {
-          bool is_one_still_active = false;
-          for (const auto& counter : skip_counters_) {
-              if (counter <= 1u) is_one_still_active = true;
-          }
-          if (is_one_still_active) {
-              segmatch_worker_.stopPublishing(track_id);
-          } else {
-              skip_counters_[track_id] = 0u;
-          }
-      }
       continue;
     } else {
         if (!first_points_received_[track_id]) {
