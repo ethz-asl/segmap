@@ -103,7 +103,7 @@ Make sure to source the SegMap workspace before running the segmapper demonstrat
 ```
 $ source ~/segmap_ws/devel/setup.bash
 ```
-To train new models see intructions (here)[https://github.com/ethz-asl/segmap/wiki/Training-new-models].
+To train new models see intructions [here](https://github.com/ethz-asl/segmap/wiki/Training-new-models).
 
 #### Download demonstration files
 
@@ -130,6 +130,7 @@ An online SLAM example with data-driven descriptor can be run with
 ```
 $ roslaunch segmapper cnn_kitti_loop_closure.launch
 ```
+You can now visualize the reconstructed target map in rviz by subscribing to `/segmatch/target_reconstruction`.
 
 More details on the demonstrations can be found [here](https://github.com/ethz-asl/segmap/blob/master/wiki/demonstrations.md).
 
