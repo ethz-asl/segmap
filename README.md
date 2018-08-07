@@ -153,7 +153,7 @@ Thank you for citing the related publication if you use SegMap in academic work:
 @inproceedings{segmatch2017,
   title={SegMatch: Segment based place recognition in 3d point clouds},
   author={Dub{\'e}, Renaud and Dugas, Daniel and Stumm, Elena and Nieto, Juan and Siegwart, Roland and Cadena, Cesar},
-  booktitle={Robotics and Automation (ICRA), 2017 IEEE International Conference on},
+  booktitle={IEEE International Conference on Robotics and Automation (ICRA)},
   pages={5266--5272},
   year={2017},
   organization={IEEE}
