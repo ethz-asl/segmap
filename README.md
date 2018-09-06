@@ -34,7 +34,7 @@ Advanced: it is also possible to use the SegMap C++ library standalone in a C++ 
 
 First install the required system packages:
 ```
-$ sudo apt-get install python-wstool doxygen python3-pip python3-dev python-virtualenv
+$ sudo apt-get install python-wstool doxygen python3-pip python3-dev python-virtualenv dh-autoreconf
 ```
 Set up the workspace configuration:
 ```
@@ -67,7 +67,7 @@ SegMap relies on the package [tensorflow_ros_cpp](https://github.com/tradr-proje
 $ virtualenv ~/segmappyenv
 $ source ~/segmappyenv/bin/activate
 (segmappyenv)$ pip install --upgrade pip
-(segmappyenv)$ pip install catkin_pkg empy
+(segmappyenv)$ pip install catkin_pkg empy pyyaml
 (segmappyenv)$ pip install tensorflow-gpu==1.8.0
 ```
 
