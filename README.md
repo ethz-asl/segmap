@@ -72,11 +72,10 @@ $ source ~/segmappyenv/bin/activate
 ```
 
 ##### Build tensorflow_ros_cpp
+For more details on the optional compile flags or in case of issues compiling see the [FAQ](https://github.com/ethz-asl/segmap/wiki/FAQ#q-issues-compiling-tensorflow_ros_cpp).
 
 ```
 $ cd ~/segmap_ws
-# set the necessary tensorflow_ros_cpp CMake args if any (catkin config --cmake-args <...>)
-# build
 $ catkin build tensorflow_ros_cpp
 ```
 
