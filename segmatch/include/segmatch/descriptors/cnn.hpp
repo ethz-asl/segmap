@@ -34,6 +34,10 @@ class CNNDescriptor : public Descriptor {
       voxel_mean_values_.push_back(voxel_mean_values(i, 0u));
     }*/
 
+    min_x_scale_m_ = static_cast<float>(n_voxels_x_dim_) * min_voxel_size_m_;
+    min_y_scale_m_ = static_cast<float>(n_voxels_y_dim_) * min_voxel_size_m_;
+    min_z_scale_m_ = static_cast<float>(n_voxels_z_dim_) * min_voxel_size_m_;
+
     // Load the semantics nn model.
     LOG(INFO) << "Loading semantics model in " + semantics_nn_folder;
     semantics_graph_executor_.reset(new tf_graph_executor::TensorflowGraphExecutor(
@@ -73,17 +77,17 @@ class CNNDescriptor : public Descriptor {
   segmatch::SegmentedCloud aligned_segments_;
 
   constexpr static float min_voxel_size_m_ = 0.1;
-  
+
   constexpr static unsigned int n_voxels_x_dim_ = 32u;
   constexpr static unsigned int n_voxels_y_dim_ = 32u;
   constexpr static unsigned int n_voxels_z_dim_ = 16u;
   constexpr static unsigned int cnn_input_dim_ = n_voxels_x_dim_ * n_voxels_y_dim_ *
       n_voxels_z_dim_;
-      
-  constexpr static float min_x_scale_m_ = static_cast<float>(n_voxels_x_dim_) * min_voxel_size_m_;
-  constexpr static float min_y_scale_m_ = static_cast<float>(n_voxels_y_dim_) * min_voxel_size_m_;
-  constexpr static float min_z_scale_m_ = static_cast<float>(n_voxels_z_dim_) * min_voxel_size_m_;
-  
+
+  float min_x_scale_m_;
+  float min_y_scale_m_;
+  float min_z_scale_m_;
+
   constexpr static float x_dim_min_1_ = static_cast<float>(n_voxels_x_dim_) - 1.0;
   constexpr static float y_dim_min_1_ = static_cast<float>(n_voxels_y_dim_) - 1.0;
   constexpr static float z_dim_min_1_ = static_cast<float>(n_voxels_z_dim_) - 1.0;
