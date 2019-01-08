@@ -159,7 +159,7 @@ Thank you for citing the related publication if you use SegMap in academic work:
 }
 ```
 
-If you use the incremental version for the segmentation or geometric verification (used in the provided configuration files), please consider citing the describing paper:
+If you use the incremental version for the segmentation or geometric verification algorithms (used in the provided configuration files), please consider citing the describing paper:
 
 ```
 @article{incremental2018,
