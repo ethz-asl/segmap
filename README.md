@@ -162,7 +162,7 @@ Thank you for citing the related publication if you use SegMap in academic work:
 If you use the incremental version for the segmentation or geometric verification (used in the provided configuration files), please consider citing the describing paper:
 
 ```
-@article{dube2018incremental,
+@article{incremental2018,
   title={Incremental Segment-Based Localization in {3D} Point Clouds},
   author={Dub{\'e}, Renaud and Gollub, Mattia G and Sommer, Hannes and Gilitschenski, Igor and Siegwart, Roland and Cadena, Cesar and Nieto, Juan},
   journal={IEEE Robotics and Automation Letters},
