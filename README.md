@@ -159,6 +159,21 @@ Thank you for citing the related publication if you use SegMap in academic work:
 }
 ```
 
+If you use the incremental version for the segmentation or geometric verification (used in the provided configuration files), please consider citing the describing paper:
+
+```
+@article{dube2018incremental,
+  title={Incremental Segment-Based Localization in {3D} Point Clouds},
+  author={Dub{\'e}, Renaud and Gollub, Mattia G and Sommer, Hannes and Gilitschenski, Igor and Siegwart, Roland and Cadena, Cesar and Nieto, Juan},
+  journal={IEEE Robotics and Automation Letters},
+  volume={3},
+  number={3},
+  pages={1832--1839},
+  year={2018},
+  publisher={IEEE}
+}
+```
+
 ## Contributing to *SegMap*
 
 We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch and crandrei(at)ethz(dot)ch. Thank you!
