@@ -6,6 +6,8 @@ SegMap is a map representation based on 3D segments allowing for robot localizat
 
 R. Dubé, A. Cramariuc, D. Dugas, J. Nieto, R. Siegwart, and C. Cadena. **"SegMap: 3D Segment Mapping using Data-Driven Descriptors."** *Robotics: Science and Systems (RSS), 2018.* [pdf](http://www.roboticsproceedings.org/rss14/p03.pdf) - [video](https://youtu.be/CMk4w4eRobg)
 
+R. Dubé, MG. Gollub, H. Sommer, I. Gilitschenski, R. Siegwart, C. Cadena and , J. Nieto. **"Incremental Segment-Based Localization in 3D Point Clouds."** *IEEE Robotics and Automation Letters, 2018.* [pdf](http://n.ethz.ch/~cesarc/files/RAL2018_rdube.pdf)
+
 R. Dubé, D. Dugas, E. Stumm, J. Nieto, R. Siegwart, and C. Cadena. **"SegMatch: Segment Based Place Recognition in 3D Point Clouds."** *IEEE International Conference on Robotics and Automation, 2017.* [pdf](https://arxiv.org/pdf/1609.07720.pdf) - [video](https://youtu.be/iddCgYbgpjE)
 
 ## Features
