@@ -85,7 +85,7 @@ void OpenCvRandomForest::computeFeaturesDistance(const Eigen::MatrixXd& f1,
           // Augment the eigen feature vectors.
           fs.push_back(f_diff_norm_2);
           fs.push_back(f_diff_norm_1);
-          fs.push_back(f1_abs);
+          fs.push_back(f2_abs);
           fs.push_back(f1_abs);
           f_dim_out = 35u;
         }
