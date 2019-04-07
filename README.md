@@ -178,4 +178,4 @@ If you use the incremental version for the segmentation or geometric verificatio
 
 ## Contributing to *SegMap*
 
-We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at rdube(at)ethz(dot)ch, dugasd(at)ethz(dot)ch and crandrei(at)ethz(dot)ch. Thank you!
+We would be very grateful if you would contribute to the code base by reporting bugs, leaving comments and proposing new features through issues and pull requests. Please see the dedicated [wiki page](https://github.com/ethz-asl/segmap/wiki/Contributing-to-SegMap) on this topic and feel free to get in touch at renaud.dube(at)sevensense(dot)ch, dugasd(at)ethz(dot)ch and crandrei(at)ethz(dot)ch. Thank you!
