@@ -29,7 +29,7 @@ EuclideanSegmenter<ClusteredPointT>::EuclideanSegmenter(
 template<typename ClusteredPointT>
 void EuclideanSegmenter<ClusteredPointT>::segment(
     const PointNormals& normals, const std::vector<bool>& is_point_modified, ClusteredCloud& cloud,
-    PointsNeighborsProvider<MapPoint>& points_neighbors_provider, SegmentedCloud& segmented_cloud,
+    PointsNeighborsProvider<ClusteredPointT>& points_neighbors_provider, SegmentedCloud& segmented_cloud,
     std::vector<Id>& cluster_ids_to_segment_ids,
     std::vector<std::pair<Id, Id>>& renamed_segments) {
   BENCHMARK_BLOCK("SM.Worker.Segmenter");
