@@ -133,7 +133,7 @@ $ roslaunch segmapper cnn_kitti_loop_closure.launch
 ```
 You can now visualize the reconstructed target map in rviz by subscribing to `/segmatch/target_reconstruction`.
 
-More details on the demonstrations can be found [here](https://github.com/ethz-asl/segmap/blob/master/wiki/demonstrations.md).
+More details on the demonstrations can be found [here](https://github.com/ethz-asl/segmap/wiki/Demonstrations).
 
 
 ## License
