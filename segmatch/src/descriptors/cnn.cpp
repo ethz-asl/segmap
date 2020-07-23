@@ -159,6 +159,11 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     rescaled_point_cloud_centroids.push_back(centroid);
 
     unsigned int n_occupied_voxels = 0;
+
+    CNNPublisher publisher;
+    publisher.sendMessage("hello");
+
+  
     // tf_graph_executor::Array3D nn_input(n_voxels_x_dim_, n_voxels_y_dim_,
     // n_voxels_z_dim_);
     for (const auto& point : rescaled_point_cloud.points) {
@@ -186,7 +191,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   }
   // BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsDescribed",
   //                        batch_nn_input.size());
-  // BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
+  BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
 
   // if (!batch_nn_input.empty()) {
   //   BENCHMARK_START("SM.Worker.Describe.ForwardPass");

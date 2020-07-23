@@ -8,6 +8,8 @@
 #include "segmatch/parameters.hpp"
 #include "segmatch/segmented_cloud.hpp"
 
+#include "segmatch/descriptors/cnn_ros_publisher.hpp"
+
 namespace segmatch {
 
 class CNNDescriptor : public Descriptor {
