@@ -9,13 +9,13 @@ namespace segmatch {
 
 class CNNPublisher {
  public:
-  CNNPublisher();
+  CNNPublisher(ros::NodeHandle& nh);
 
   void sendMessage(std::string s);
 
  private:
-   ros::Publisher publisher_;
-
+  ros::Publisher publisher_;
+  ros::NodeHandle nh_;
 };
 
 }  // namespace segmatch

@@ -51,6 +51,8 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   std::vector<PclPoint> point_mins;
   std::vector<double> alignments_rad;
   std::vector<size_t> nums_occupied_voxels;
+  ros::NodeHandle nh;
+  CNNPublisher publisher(nh);
 
   for (std::unordered_map<Id, Segment>::iterator it =
            segmented_cloud_ptr->begin();
@@ -160,10 +162,11 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
     unsigned int n_occupied_voxels = 0;
 
-    CNNPublisher publisher;
     publisher.sendMessage("hello");
+    ros::Rate loop_rate(1000);
+    ros::spinOnce();
+    loop_rate.sleep();
 
-  
     // tf_graph_executor::Array3D nn_input(n_voxels_x_dim_, n_voxels_y_dim_,
     // n_voxels_z_dim_);
     for (const auto& point : rescaled_point_cloud.points) {

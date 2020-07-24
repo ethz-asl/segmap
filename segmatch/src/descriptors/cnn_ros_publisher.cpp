@@ -2,18 +2,13 @@
 
 namespace segmatch {
 
-CNNPublisher::CNNPublisher() {
-  ros::NodeHandle node_handle("~");
-  publisher_ = node_handle.advertise<std_msgs::String>("chatter", 1000);
+CNNPublisher::CNNPublisher(ros::NodeHandle& nh) : nh_(nh) {
+  publisher_ = nh_.advertise<std_msgs::String>("tensorflow_interface", 50u);
 }
 
 void CNNPublisher::sendMessage(std::string s) {
-  std::stringstream ss;
-  ss << "hello world " << ros::Time::now();
   std_msgs::String msg;
-  msg.data = ss.str();
-    LOG(INFO) << ss.str();
-
+  msg.data = s;
   publisher_.publish(msg);
 }
 
