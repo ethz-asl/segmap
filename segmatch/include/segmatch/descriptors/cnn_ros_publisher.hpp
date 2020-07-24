@@ -4,6 +4,8 @@
 #include "ros/ros.h"
 #include "segmatch/descriptors/descriptors.hpp"
 #include "std_msgs/String.h"
+#include "std_msgs/UInt64.h"
+#include "segmatch/tensorflow_msg.h"
 
 namespace segmatch {
 

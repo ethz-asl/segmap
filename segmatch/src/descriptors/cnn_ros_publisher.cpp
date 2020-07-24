@@ -3,12 +3,13 @@
 namespace segmatch {
 
 CNNPublisher::CNNPublisher(ros::NodeHandle& nh) : nh_(nh) {
-  publisher_ = nh_.advertise<std_msgs::String>("tensorflow_interface", 50u);
+  publisher_ = nh_.advertise<segmatch::tensorflow_msg>("tensorflow_interface", 50u);
 }
 
 void CNNPublisher::sendMessage(std::string s) {
-  std_msgs::String msg;
+  segmatch::tensorflow_msg msg;
   msg.data = s;
+  msg.timestamp = ros::Time::now().toNSec();
   publisher_.publish(msg);
 }
 
