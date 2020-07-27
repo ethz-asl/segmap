@@ -163,7 +163,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     unsigned int n_occupied_voxels = 0;
 
     publisher.sendMessage("hello");
-    ros::Rate loop_rate(1000);
+    ros::Rate loop_rate(10);
     ros::spinOnce();
     loop_rate.sleep();
 

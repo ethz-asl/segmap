@@ -17,5 +17,8 @@
     <param name="icp_configuration_file" value="$(arg icp_configuration_file)"/>
     <param name="icp_input_filters_file" value="$(arg icp_input_filters_file)"/>
   </node>
+  <!-- Tensorflow interface -->
+  <node pkg="segmatch" name="tf_interface" type="tf_interface.py" output="screen">
+  </node> -->
 
 </launch>
