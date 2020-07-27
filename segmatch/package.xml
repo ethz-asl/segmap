@@ -25,5 +25,6 @@
   <depend>roscpp</depend>
   <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>
+  <exec_depend>rospy</exec_depend>
   <!-- <depend>tf_graph_executor</depend> -->
 </package>

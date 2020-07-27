@@ -13,6 +13,7 @@ cs_add_library(${PROJECT_NAME}
   src/descriptors/eigenvalue_based.cpp
   src/descriptors/ensemble_shape_functions.cpp
   src/descriptors/cnn_ros_publisher.cpp
+  src/descriptors/tf_interface.py
   src/dynamic_voxel_grid.cpp
   src/features.cpp
   src/local_map.cpp
