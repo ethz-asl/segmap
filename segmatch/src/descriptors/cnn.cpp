@@ -51,8 +51,6 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   std::vector<PclPoint> point_mins;
   std::vector<double> alignments_rad;
   std::vector<size_t> nums_occupied_voxels;
-  ros::NodeHandle nh;
-  ns_tf_interface::TensorflowInterface interface_worker(nh);
 
   for (std::unordered_map<Id, Segment>::iterator it =
            segmented_cloud_ptr->begin();
@@ -191,21 +189,16 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   //                        batch_nn_input.size());
   BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
 
-  ROS_INFO_STREAM("!batch_nn_input.empty(): " << !batch_nn_input.empty());
-  ROS_INFO_STREAM("batch_nn_input.size() < mini_batch_size_: "
-                  << (batch_nn_input.size() < mini_batch_size_));
-  std::string s = "Hello";
-  interface_worker.sendMessage(s);
   if (!batch_nn_input.empty()) {
     // BENCHMARK_START("SM.Worker.Describe.ForwardPass");
     std::vector<std::vector<float> > cnn_descriptors;
     std::vector<ns_tf_interface::Array3D> reconstructions;
     std::vector<std::vector<float> > semantics;
     if (true) {  // if (batch_nn_input.size() < mini_batch_size_) {
-      // interface_worker.batchFullForwardPass(
-      //     batch_nn_input, kInputTensorName, scales_as_vectors,
-      //     kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
-      //     cnn_descriptors, reconstructions);
+      interface_worker_.batchFullForwardPass(
+          batch_nn_input, kInputTensorName, scales_as_vectors,
+          kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
+          cnn_descriptors, reconstructions);
     }
     //  else {
     //   std::vector<tf_graph_executor::Array3D> mini_batch;

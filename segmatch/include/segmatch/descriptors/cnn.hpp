@@ -43,6 +43,8 @@ class CNNDescriptor : public Descriptor {
     // semantics_graph_executor_->loadCheckpoint(semantics_nn_folder + "model.ckpt");
 
     LOG(INFO) << "Loaded all TensorFlow models.";
+
+    ns_tf_interface::TensorflowInterface interface_worker_();
   }
 
   ~CNNDescriptor () {};
@@ -99,6 +101,8 @@ class CNNDescriptor : public Descriptor {
   const std::string kSemanticsOutputName = "OutputScope/output_read";
   const std::string kReconstructionTensorName = "ReconstructionScopeAE/ae_reconstruction_read";
   const std::string kScalesTensorName = "scales";
+
+  ns_tf_interface::TensorflowInterface interface_worker_;
 
 }; // class CNNDescriptor
 

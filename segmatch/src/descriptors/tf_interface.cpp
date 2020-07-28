@@ -2,24 +2,13 @@
 
 namespace ns_tf_interface {
 
-TensorflowInterface::TensorflowInterface(ros::NodeHandle& nh) : nh_(nh) {
-  publisher_batch_full_forward_pass_ = nh_.advertise<segmatch::tensorflow_msg>(
-      "tf_interface_topic/tensorflow_msg", 50u);
-  ROS_INFO_STREAM("advertising");
-  ros::Rate loop_rate(10);
-  ros::spinOnce();
-  loop_rate.sleep();
-}
-void TensorflowInterface::sendMessage(std::string s) {
-  segmatch::tensorflow_msg msg;
+TensorflowInterface::TensorflowInterface() {
+  ros::NodeHandle nh;
 
-  msg.data = s;
-  msg.timestamp = ros::Time::now().toNSec();
-  ROS_INFO_STREAM("Sending at: " << msg.timestamp);
-  publisher_batch_full_forward_pass_.publish(msg);
-  ros::Rate loop_rate(10);
-  ros::spinOnce();
-  loop_rate.sleep();
+  publisher_batch_full_forward_pass_ =
+      nh.advertise<segmatch::batch_full_forward_pass_msg>(
+          "tf_interface_topic/batch_full_forward_pass_topic", 50u);
+  ROS_INFO_STREAM("advertising");
 }
 
 void TensorflowInterface::batchFullForwardPass(
@@ -34,9 +23,13 @@ void TensorflowInterface::batchFullForwardPass(
   descriptors.clear();
   reconstructions.clear();
 
-  segmatch::tensorflow_msg msg;
-  std::string s = "Hello";
-  msg.data = s;
+  segmatch::batch_full_forward_pass_msg msg;
+
+  msg.input_tensor_name = input_tensor_name;
+  msg.scales_tensor_name = scales_tensor_name;
+  msg.descriptor_values_name = descriptor_values_name;
+  msg.reconstruction_values_name = reconstruction_values_name;
+
   msg.timestamp = ros::Time::now().toNSec();
   ROS_INFO_STREAM("sending at: " << msg.timestamp);
   publisher_batch_full_forward_pass_.publish(msg);

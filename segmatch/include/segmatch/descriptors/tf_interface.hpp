@@ -2,10 +2,8 @@
 #define SEGMATCH_TF_INTERFACE_HPP_
 
 #include "ros/ros.h"
+#include "segmatch/batch_full_forward_pass_msg.h"
 #include "segmatch/descriptors/descriptors.hpp"
-#include "segmatch/tensorflow_msg.h"
-#include "std_msgs/String.h"
-#include "std_msgs/UInt64.h"
 
 namespace ns_tf_interface {
 
@@ -40,9 +38,7 @@ struct Array3D {
 
 class TensorflowInterface {
  public:
-  TensorflowInterface(ros::NodeHandle& nh);
-
-  void sendMessage(std::string s);
+  TensorflowInterface();
 
   void batchFullForwardPass(const std::vector<Array3D>& inputs,
                             const std::string& input_tensor_name,
@@ -55,9 +51,8 @@ class TensorflowInterface {
 
  private:
   ros::Publisher publisher_batch_full_forward_pass_;
-  ros::NodeHandle nh_;
 };
 
-}  // namespace tf_interface
+}  // namespace ns_tf_interface
 
 #endif  // SEGMATCH_TF_INTERFACE_HPP_
