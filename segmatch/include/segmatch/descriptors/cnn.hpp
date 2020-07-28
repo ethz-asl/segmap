@@ -8,7 +8,7 @@
 #include "segmatch/parameters.hpp"
 #include "segmatch/segmented_cloud.hpp"
 
-#include "segmatch/descriptors/cnn_ros_publisher.hpp"
+#include "segmatch/descriptors/tf_interface.hpp"
 
 namespace segmatch {
 

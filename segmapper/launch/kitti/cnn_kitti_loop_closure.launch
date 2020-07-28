@@ -33,6 +33,6 @@
   </include>
   
     <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 0.2 -s 0 --clock --pause $(arg bag_file)"/>	
+  <node name="player" pkg="rosbag" type="play" output="screen" args="-q -r 0.2 -s 0 --clock --pause $(arg bag_file)"/>	
  
 </launch>

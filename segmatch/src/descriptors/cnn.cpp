@@ -42,7 +42,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsTotal",
                          segmented_cloud_ptr->getNumberOfValidSegments());
 
-  // std::vector<tf_graph_executor::Array3D> batch_nn_input;
+  std::vector<ns_tf_interface::Array3D> batch_nn_input;
   std::vector<Id> described_segment_ids;
   std::vector<PclPoint> scales;
   std::vector<PclPoint> thresholded_scales;
@@ -52,7 +52,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   std::vector<double> alignments_rad;
   std::vector<size_t> nums_occupied_voxels;
   ros::NodeHandle nh;
-  CNNPublisher publisher(nh);
+  ns_tf_interface::TensorflowInterface interface_worker(nh);
 
   for (std::unordered_map<Id, Segment>::iterator it =
            segmented_cloud_ptr->begin();
@@ -162,13 +162,8 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
     unsigned int n_occupied_voxels = 0;
 
-    publisher.sendMessage("hello");
-    ros::Rate loop_rate(10);
-    ros::spinOnce();
-    loop_rate.sleep();
-
-    // tf_graph_executor::Array3D nn_input(n_voxels_x_dim_, n_voxels_y_dim_,
-    // n_voxels_z_dim_);
+    ns_tf_interface::Array3D nn_input(n_voxels_x_dim_, n_voxels_y_dim_,
+                                      n_voxels_z_dim_);
     for (const auto& point : rescaled_point_cloud.points) {
       const unsigned int ind_x = floor(
           point.x + static_cast<float>(n_voxels_x_dim_ - 1) / 2.0 - centroid.x);
@@ -179,10 +174,10 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
       if (ind_x >= 0 && ind_x < n_voxels_x_dim_ && ind_y >= 0 &&
           ind_y < n_voxels_y_dim_ && ind_z >= 0 && ind_z < n_voxels_z_dim_) {
-        // if (nn_input.container[ind_x][ind_y][ind_z] == 0.0) {
-        //   ++n_occupied_voxels;
-        // }
-        // nn_input.container[ind_x][ind_y][ind_z] = 1.0;
+        if (nn_input.container[ind_x][ind_y][ind_z] == 0.0) {
+          ++n_occupied_voxels;
+        }
+        nn_input.container[ind_x][ind_y][ind_z] = 1.0;
       }
     }
     nums_occupied_voxels.push_back(n_occupied_voxels);
@@ -190,77 +185,78 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     it->second.getLastView().n_occupied_voxels = n_occupied_voxels;
     it->second.getLastView().n_points_when_last_described = num_points;
 
-    // batch_nn_input.push_back(nn_input);
+    batch_nn_input.push_back(nn_input);
   }
   // BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsDescribed",
   //                        batch_nn_input.size());
   BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
 
-  // if (!batch_nn_input.empty()) {
-  //   BENCHMARK_START("SM.Worker.Describe.ForwardPass");
-  //   std::vector<std::vector<float> > cnn_descriptors;
-  //   std::vector<tf_graph_executor::Array3D> reconstructions;
-  //   std::vector<std::vector<float> > semantics;
-  //   if (batch_nn_input.size() < mini_batch_size_) {
-  //     graph_executor_->batchFullForwardPass(batch_nn_input,
-  //                                           kInputTensorName,
-  //                                           scales_as_vectors,
-  //                                           kScalesTensorName,
-  //                                           kFeaturesTensorName,
-  //                                           kReconstructionTensorName,
-  //                                           cnn_descriptors,
-  //                                           reconstructions);
+  ROS_INFO_STREAM("!batch_nn_input.empty(): " << !batch_nn_input.empty());
+  ROS_INFO_STREAM("batch_nn_input.size() < mini_batch_size_: "
+                  << (batch_nn_input.size() < mini_batch_size_));
+  std::string s = "Hello";
+  interface_worker.sendMessage(s);
+  if (!batch_nn_input.empty()) {
+    // BENCHMARK_START("SM.Worker.Describe.ForwardPass");
+    std::vector<std::vector<float> > cnn_descriptors;
+    std::vector<ns_tf_interface::Array3D> reconstructions;
+    std::vector<std::vector<float> > semantics;
+    if (true) {  // if (batch_nn_input.size() < mini_batch_size_) {
+      // interface_worker.batchFullForwardPass(
+      //     batch_nn_input, kInputTensorName, scales_as_vectors,
+      //     kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
+      //     cnn_descriptors, reconstructions);
+    }
+    //  else {
+    //   std::vector<tf_graph_executor::Array3D> mini_batch;
+    //   std::vector<std::vector<float> > mini_batch_scales;
+    //   for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
+    //     mini_batch.push_back(batch_nn_input[i]);
+    //     mini_batch_scales.push_back(scales_as_vectors[i]);
+    //     if (mini_batch.size() == mini_batch_size_) {
+    //       std::vector<std::vector<float> > mini_batch_cnn_descriptors;
+    //       std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
 
-  //   } else {
-  //     std::vector<tf_graph_executor::Array3D> mini_batch;
-  //     std::vector<std::vector<float> > mini_batch_scales;
-  //     for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
-  //       mini_batch.push_back(batch_nn_input[i]);
-  //       mini_batch_scales.push_back(scales_as_vectors[i]);
-  //       if (mini_batch.size() == mini_batch_size_) {
-  //         std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-  //         std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
+    //       graph_executor_->batchFullForwardPass(mini_batch,
+    //                                             kInputTensorName,
+    //                                             mini_batch_scales,
+    //                                             kScalesTensorName,
+    //                                             kFeaturesTensorName,
+    //                                             kReconstructionTensorName,
+    //                                             mini_batch_cnn_descriptors,
+    //                                             mini_batch_reconstructions);
 
-  //         graph_executor_->batchFullForwardPass(mini_batch,
-  //                                               kInputTensorName,
-  //                                               mini_batch_scales,
-  //                                               kScalesTensorName,
-  //                                               kFeaturesTensorName,
-  //                                               kReconstructionTensorName,
-  //                                               mini_batch_cnn_descriptors,
-  //                                               mini_batch_reconstructions);
+    //       cnn_descriptors.insert(cnn_descriptors.end(),
+    //                              mini_batch_cnn_descriptors.begin(),
+    //                              mini_batch_cnn_descriptors.end());
+    //       reconstructions.insert(reconstructions.end(),
+    //                              mini_batch_reconstructions.begin(),
+    //                              mini_batch_reconstructions.end());
+    //       mini_batch_scales.clear();
+    //       mini_batch.clear();
+    //     }
+    //   }
+    // if (!mini_batch.empty()) {
+    //   std::vector<std::vector<float> > mini_batch_cnn_descriptors;
+    //   std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
 
-  //         cnn_descriptors.insert(cnn_descriptors.end(),
-  //                                mini_batch_cnn_descriptors.begin(),
-  //                                mini_batch_cnn_descriptors.end());
-  //         reconstructions.insert(reconstructions.end(),
-  //                                mini_batch_reconstructions.begin(),
-  //                                mini_batch_reconstructions.end());
-  //         mini_batch_scales.clear();
-  //         mini_batch.clear();
-  //       }
-  //     }
-  //     if (!mini_batch.empty()) {
-  //       std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-  //       std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
+    //   graph_executor_->batchFullForwardPass(mini_batch,
+    //                                         kInputTensorName,
+    //                                         mini_batch_scales,
+    //                                         kScalesTensorName,
+    //                                         kFeaturesTensorName,
+    //                                         kReconstructionTensorName,
+    //                                         mini_batch_cnn_descriptors,
+    //                                         mini_batch_reconstructions);
 
-  //       graph_executor_->batchFullForwardPass(mini_batch,
-  //                                             kInputTensorName,
-  //                                             mini_batch_scales,
-  //                                             kScalesTensorName,
-  //                                             kFeaturesTensorName,
-  //                                             kReconstructionTensorName,
-  //                                             mini_batch_cnn_descriptors,
-  //                                             mini_batch_reconstructions);
-
-  //       cnn_descriptors.insert(cnn_descriptors.end(),
-  //                              mini_batch_cnn_descriptors.begin(),
-  //                              mini_batch_cnn_descriptors.end());
-  //       reconstructions.insert(reconstructions.end(),
-  //                              mini_batch_reconstructions.begin(),
-  //                              mini_batch_reconstructions.end());
-  //     }
-  //   }
+    //   cnn_descriptors.insert(cnn_descriptors.end(),
+    //                          mini_batch_cnn_descriptors.begin(),
+    //                          mini_batch_cnn_descriptors.end());
+    //   reconstructions.insert(reconstructions.end(),
+    //                          mini_batch_reconstructions.begin(),
+    //                          mini_batch_reconstructions.end());
+    // }
+  }
 
   // // Execute semantics graph.
   // semantics = semantics_graph_executor_->batchExecuteGraph(

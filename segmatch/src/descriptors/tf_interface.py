@@ -10,7 +10,7 @@ def callback(data):
 
 def listener():
     rospy.init_node('listener', anonymous=True)
-    rospy.Subscriber('tensorflow_interface', tensorflow_msg, callback)
+    rospy.Subscriber('tf_interface_topic/tensorflow_msg', tensorflow_msg, callback)
     rospy.spin()
 
 
