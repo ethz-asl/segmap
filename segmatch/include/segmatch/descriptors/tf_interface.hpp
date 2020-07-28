@@ -4,6 +4,7 @@
 #include "ros/ros.h"
 #include "segmatch/batch_full_forward_pass_msg.h"
 #include "segmatch/descriptors/descriptors.hpp"
+#include "std_msgs/MultiArrayDimension.h"
 
 namespace ns_tf_interface {
 

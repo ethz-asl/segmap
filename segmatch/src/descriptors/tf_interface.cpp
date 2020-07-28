@@ -30,6 +30,27 @@ void TensorflowInterface::batchFullForwardPass(
   msg.descriptor_values_name = descriptor_values_name;
   msg.reconstruction_values_name = reconstruction_values_name;
 
+  // ------------------------------------
+  // Encode Multiarrays to message format
+  // ------------------------------------
+
+  // Scales
+  std_msgs::MultiArrayDimension scales_layout_dim;
+  scales_layout_dim.size = scales.size();
+  scales_layout_dim.stride = scales.size() * scales[0].size();
+  msg.scales.layout.dim.push_back(scales_layout_dim);
+
+  scales_layout_dim.size = scales[0].size();
+  scales_layout_dim.stride = scales[0].size();
+  msg.scales.layout.dim.push_back(scales_layout_dim);
+
+  for (int i = 0; i < msg.scales.layout.dim[0].size; ++i) {
+    for (int j = 0; j < msg.scales.layout.dim[1].size; ++j) {
+      msg.scales.data.push_back(scales[i][j]);
+    }
+    ROS_INFO_STREAM(scales[i][0] << " " << scales[i][1] << " " << scales[i][2]);
+  }
+
   msg.timestamp = ros::Time::now().toNSec();
   ROS_INFO_STREAM("sending at: " << msg.timestamp);
   publisher_batch_full_forward_pass_.publish(msg);
