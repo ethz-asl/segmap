@@ -2,7 +2,8 @@
 #define SEGMATCH_TF_INTERFACE_HPP_
 
 #include "ros/ros.h"
-#include "segmatch/batch_full_forward_pass_msg.h"
+#include "segmatch/cnn_input_msg.h"
+#include "segmatch/cnn_output_msg.h"
 #include "segmatch/descriptors/descriptors.hpp"
 #include "std_msgs/MultiArrayDimension.h"
 
@@ -48,10 +49,15 @@ class TensorflowInterface {
                             const std::string& descriptor_tensor_name,
                             const std::string& reconstruction_tensor_name,
                             std::vector<std::vector<float> >& descriptors,
-                            std::vector<Array3D>& reconstructions) const;
+                            std::vector<Array3D>& reconstructions);
 
  private:
-  ros::Publisher publisher_batch_full_forward_pass_;
+  void cnn_output_callback(segmatch::cnn_output_msg msg);
+
+  ros::Subscriber cnn_output_subscriber_;
+  ros::Publisher cnn_input_publisher_;
+
+  std::map<uid_t, segmatch::cnn_output_msg> returned_cnn_msgs_;
 };
 
 }  // namespace ns_tf_interface

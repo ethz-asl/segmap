@@ -5,9 +5,13 @@ namespace ns_tf_interface {
 TensorflowInterface::TensorflowInterface() {
   ros::NodeHandle nh;
 
-  publisher_batch_full_forward_pass_ =
-      nh.advertise<segmatch::batch_full_forward_pass_msg>(
-          "tf_interface_topic/batch_full_forward_pass_topic", 50u);
+  cnn_input_publisher_ = nh.advertise<segmatch::cnn_input_msg>(
+      "tf_interface_topic/cnn_input_topic", 50u);
+
+  cnn_output_subscriber_ =
+      nh.subscribe("tf_interface_topic/cnn_output_topic", 1,
+                   &TensorflowInterface::cnn_output_callback, this);
+
   ROS_INFO_STREAM("advertising");
 }
 
@@ -18,12 +22,12 @@ void TensorflowInterface::batchFullForwardPass(
     const std::string& descriptor_values_name,
     const std::string& reconstruction_values_name,
     std::vector<std::vector<float> >& descriptors,
-    std::vector<Array3D>& reconstructions) const {
+    std::vector<Array3D>& reconstructions) {
   CHECK(!inputs.empty());
   descriptors.clear();
   reconstructions.clear();
 
-  segmatch::batch_full_forward_pass_msg msg;
+  segmatch::cnn_input_msg msg;
 
   msg.input_tensor_name = input_tensor_name;
   msg.scales_tensor_name = scales_tensor_name;
@@ -81,11 +85,34 @@ void TensorflowInterface::batchFullForwardPass(
   }
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
-  ROS_INFO_STREAM("sending at: " << msg.timestamp);
-  publisher_batch_full_forward_pass_.publish(msg);
-  ros::Rate loop_rate(10);
+  ROS_INFO_STREAM("Sending: " << msg.timestamp);
+  cnn_input_publisher_.publish(msg);
+  ros::Rate loop_rate(100);
   ros::spinOnce();
   loop_rate.sleep();
+
+  ros::Rate wait_rate(10);
+  while (ros::ok()) {
+    auto it = returned_cnn_msgs_.find(msg_time_stamp + 1);
+    if (it != returned_cnn_msgs_.end()) {
+      ROS_INFO_STREAM("Found message: " << msg_time_stamp);
+      returned_cnn_msgs_.erase(it);
+      break;
+    } else {
+      ROS_INFO_STREAM("waiting");
+      wait_rate.sleep();
+      if (ros::Time::now().toNSec() - msg_time_stamp > 1e9) {
+        ROS_WARN_STREAM("Message lost!: " << msg_time_stamp);
+        return;
+      }
+    }
+  }
+
+
+}
+
+void TensorflowInterface::cnn_output_callback(segmatch::cnn_output_msg msg) {
+  returned_cnn_msgs_.insert(make_pair(msg.timestamp, msg));
 }
 
 }  // namespace ns_tf_interface

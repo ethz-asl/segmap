@@ -4,6 +4,4 @@ string scales_tensor_name
 string descriptor_values_name
 string reconstruction_values_name
 std_msgs/Float32MultiArray scales
-std_msgs/Float32MultiArray descriptors
 std_msgs/Float64MultiArray inputs
-std_msgs/Float64MultiArray reconstructions
