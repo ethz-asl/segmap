@@ -92,11 +92,13 @@ void TensorflowInterface::batchFullForwardPass(
   loop_rate.sleep();
 
   ros::Rate wait_rate(10);
+  segmatch::cnn_output_msg out_msg;
   while (ros::ok()) {
-    auto it = returned_cnn_msgs_.find(msg_time_stamp + 1);
+    auto it = returned_cnn_msgs_.find(msg_time_stamp);
     if (it != returned_cnn_msgs_.end()) {
       ROS_INFO_STREAM("Found message: " << msg_time_stamp);
       returned_cnn_msgs_.erase(it);
+      out_msg = it->second;
       break;
     } else {
       ROS_INFO_STREAM("waiting");
@@ -108,7 +110,43 @@ void TensorflowInterface::batchFullForwardPass(
     }
   }
 
+  // Decoding message
 
+  if (out_msg.descriptors.data.empty()) {
+    ROS_WARN_STREAM("No descriptor data");
+    return;
+  }
+  if (out_msg.reconstructions.data.empty()) {
+    ROS_WARN_STREAM("No reconstruction data");
+    return;
+  }
+
+  for (int i = 0; i < out_msg.descriptors.layout.dim[0].size; ++i) {
+    std::vector<float> descriptor;
+    for (int j = 0; j < out_msg.descriptors.layout.dim[1].size; ++j) {
+      descriptor.push_back(
+          out_msg.descriptors
+              .data[i * out_msg.descriptors.layout.dim[1].stride + j]);
+    }
+    descriptors.push_back(descriptor);
+  }
+
+  for (int i = 0; i < out_msg.reconstructions.layout.dim[0].size; ++i) {
+    Array3D reconstruction(out_msg.reconstructions.layout.dim[1].size,
+                           out_msg.reconstructions.layout.dim[2].size,
+                           out_msg.reconstructions.layout.dim[3].size);
+    for (int j = 0; j < out_msg.reconstructions.layout.dim[1].size; ++j) {
+      for (int k = 0; k < out_msg.reconstructions.layout.dim[2].size; ++k) {
+        for (int l = 0; l < out_msg.reconstructions.layout.dim[3].size; ++l) {
+          reconstruction.container[j][k][l] =
+              out_msg.reconstructions
+                  .data[j * out_msg.reconstructions.layout.dim[1].stride +
+                        k * out_msg.reconstructions.layout.dim[2].stride + l];
+        }
+      }
+    }
+    reconstructions.push_back(reconstruction);
+  }
 }
 
 void TensorflowInterface::cnn_output_callback(segmatch::cnn_output_msg msg) {
