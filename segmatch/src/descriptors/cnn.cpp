@@ -185,205 +185,198 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
     batch_nn_input.push_back(nn_input);
   }
-  // BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsDescribed",
-  //                        batch_nn_input.size());
+  BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsDescribed",
+                         batch_nn_input.size());
   BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
 
   if (!batch_nn_input.empty()) {
-    // BENCHMARK_START("SM.Worker.Describe.ForwardPass");
+    BENCHMARK_START("SM.Worker.Describe.ForwardPass");
     std::vector<std::vector<float> > cnn_descriptors;
     std::vector<ns_tf_interface::Array3D> reconstructions;
     std::vector<std::vector<float> > semantics;
-    if (true) {  // if (batch_nn_input.size() < mini_batch_size_) {
+    if (batch_nn_input.size() < mini_batch_size_) {
       interface_worker_.batchFullForwardPass(
           batch_nn_input, kInputTensorName, scales_as_vectors,
           kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
           cnn_descriptors, reconstructions);
-    }
-    //  else {
-    //   std::vector<tf_graph_executor::Array3D> mini_batch;
-    //   std::vector<std::vector<float> > mini_batch_scales;
-    //   for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
-    //     mini_batch.push_back(batch_nn_input[i]);
-    //     mini_batch_scales.push_back(scales_as_vectors[i]);
-    //     if (mini_batch.size() == mini_batch_size_) {
-    //       std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-    //       std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
-
-    //       graph_executor_->batchFullForwardPass(mini_batch,
-    //                                             kInputTensorName,
-    //                                             mini_batch_scales,
-    //                                             kScalesTensorName,
-    //                                             kFeaturesTensorName,
-    //                                             kReconstructionTensorName,
-    //                                             mini_batch_cnn_descriptors,
-    //                                             mini_batch_reconstructions);
-
-    //       cnn_descriptors.insert(cnn_descriptors.end(),
-    //                              mini_batch_cnn_descriptors.begin(),
-    //                              mini_batch_cnn_descriptors.end());
-    //       reconstructions.insert(reconstructions.end(),
-    //                              mini_batch_reconstructions.begin(),
-    //                              mini_batch_reconstructions.end());
-    //       mini_batch_scales.clear();
-    //       mini_batch.clear();
-    //     }
-    //   }
-    // if (!mini_batch.empty()) {
-    //   std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-    //   std::vector<tf_graph_executor::Array3D> mini_batch_reconstructions;
-
-    //   graph_executor_->batchFullForwardPass(mini_batch,
-    //                                         kInputTensorName,
-    //                                         mini_batch_scales,
-    //                                         kScalesTensorName,
-    //                                         kFeaturesTensorName,
-    //                                         kReconstructionTensorName,
-    //                                         mini_batch_cnn_descriptors,
-    //                                         mini_batch_reconstructions);
-
-    //   cnn_descriptors.insert(cnn_descriptors.end(),
-    //                          mini_batch_cnn_descriptors.begin(),
-    //                          mini_batch_cnn_descriptors.end());
-    //   reconstructions.insert(reconstructions.end(),
-    //                          mini_batch_reconstructions.begin(),
-    //                          mini_batch_reconstructions.end());
-    // }
-  }
-
-  // // Execute semantics graph.
-  // semantics = semantics_graph_executor_->batchExecuteGraph(
-  //     cnn_descriptors, kInputTensorName, kSemanticsOutputName);
-
-  // CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
-  // BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
-
-  BENCHMARK_START("SM.Worker.Describe.SaveFeatures");
-  // Write the features.
-  for (size_t i = 0u; i < described_segment_ids.size(); ++i) {
-    Segment* segment;
-    CHECK(segmented_cloud_ptr->findValidSegmentPtrById(described_segment_ids[i],
-                                                       &segment));
-    // std::vector<float> nn_output = cnn_descriptors[i];
-
-    // Feature cnn_feature("cnn");
-    // for (size_t j = 0u; j < nn_output.size(); ++j) {
-    //   cnn_feature.push_back(FeatureValue("cnn_" + std::to_string(j),
-    //   nn_output[j]));
-    // }
-
-    // Push the scales.
-    // cnn_feature.push_back(FeatureValue("cnn_scale_x", scales[i].x));
-    // cnn_feature.push_back(FeatureValue("cnn_scale_y", scales[i].y));
-    // cnn_feature.push_back(FeatureValue("cnn_scale_z", scales[i].z));
-
-    // segment->getLastView().features.replaceByName(cnn_feature);
-
-    // std::vector<float> semantic_nn_output = semantics[i];
-    // segment->getLastView().semantic =
-    // std::distance(semantic_nn_output.begin(),
-    //                                                 std::max_element(semantic_nn_output.begin(),
-    //                                                                  semantic_nn_output.end()));
-
-    // Generate the reconstructions.
-    PointCloud reconstruction;
-    const double reconstruction_threshold = 0.75;
-    const double ratio_voxels_to_reconstruct = 1.5;
-    const bool reconstruct_by_probability = true;
-
-    PclPoint point;
-    const PclPoint point_min = point_mins[i];
-    const PclPoint scale = thresholded_scales[i];
-    const PclPoint centroid = rescaled_point_cloud_centroids[i];
-
-    if (reconstruct_by_probability) {
-      for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
-        for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
-          for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
-            // if (reconstructions[i].container[x][y][z] >=
-            // reconstruction_threshold) {
-            //   point.x = point_min.x + scale.x *
-            //     (static_cast<float>(x) - x_dim_min_1_ / 2.0 + centroid.x) /
-            //     x_dim_min_1_;
-            //   point.y = point_min.y + scale.y *
-            //     (static_cast<float>(y) - y_dim_min_1_ / 2.0 + centroid.y) /
-            //     y_dim_min_1_;
-            //   point.z = point_min.z + scale.z *
-            //     (static_cast<float>(z) - z_dim_min_1_ / 2.0 + centroid.z) /
-            //     z_dim_min_1_;
-            //   reconstruction.points.push_back(point);
-            // }
-          }
-        }
-      }
     } else {
-      const unsigned int n_voxels_in_original_segment = nums_occupied_voxels[i];
-      const unsigned int n_voxels_in_reconstructed_segment = floor(
-          double(n_voxels_in_original_segment) * ratio_voxels_to_reconstruct);
+      std::vector<ns_tf_interface::Array3D> mini_batch;
+      std::vector<std::vector<float> > mini_batch_scales;
+      for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
+        mini_batch.push_back(batch_nn_input[i]);
+        mini_batch_scales.push_back(scales_as_vectors[i]);
+        if (mini_batch.size() == mini_batch_size_) {
+          std::vector<std::vector<float> > mini_batch_cnn_descriptors;
+          std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
 
-      // Order by occupancy probability.
-      std::vector<double> probs;
-      std::vector<PclPoint> indices;
-      for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
-        for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
-          for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
-            // probs.push_back(reconstructions[i].container[x][y][z]);
-            PclPoint indice;
-            indice.x = x;
-            indice.y = y;
-            indice.z = z;
-            indices.push_back(indice);
-          }
+          interface_worker_.batchFullForwardPass(
+              mini_batch, kInputTensorName, mini_batch_scales,
+              kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
+              mini_batch_cnn_descriptors, mini_batch_reconstructions);
+
+          cnn_descriptors.insert(cnn_descriptors.end(),
+                                 mini_batch_cnn_descriptors.begin(),
+                                 mini_batch_cnn_descriptors.end());
+          reconstructions.insert(reconstructions.end(),
+                                 mini_batch_reconstructions.begin(),
+                                 mini_batch_reconstructions.end());
+          mini_batch_scales.clear();
+          mini_batch.clear();
         }
       }
-      std::vector<size_t> indexes_in_decreasing_order =
-          getIndexesInDecreasingOrdering(probs);
+      if (!mini_batch.empty()) {
+        std::vector<std::vector<float> > mini_batch_cnn_descriptors;
+        std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
 
-      for (unsigned int j = 0u; j < n_voxels_in_reconstructed_segment; ++j) {
-        point.x =
-            point_min.x +
-            scale.x *
-                (static_cast<float>(indices[indexes_in_decreasing_order[j]].x) -
-                 x_dim_min_1_ / 2.0 + centroid.x) /
-                x_dim_min_1_;
-        point.y =
-            point_min.y +
-            scale.y *
-                (static_cast<float>(indices[indexes_in_decreasing_order[j]].y) -
-                 y_dim_min_1_ / 2.0 + centroid.y) /
-                y_dim_min_1_;
-        point.z =
-            point_min.z +
-            scale.z *
-                (static_cast<float>(indices[indexes_in_decreasing_order[j]].z) -
-                 z_dim_min_1_ / 2.0 + centroid.z) /
-                z_dim_min_1_;
-        reconstruction.points.push_back(point);
+        interface_worker_.batchFullForwardPass(
+            mini_batch, kInputTensorName, mini_batch_scales, kScalesTensorName,
+            kFeaturesTensorName, kReconstructionTensorName,
+            mini_batch_cnn_descriptors, mini_batch_reconstructions);
+
+        cnn_descriptors.insert(cnn_descriptors.end(),
+                               mini_batch_cnn_descriptors.begin(),
+                               mini_batch_cnn_descriptors.end());
+        reconstructions.insert(reconstructions.end(),
+                               mini_batch_reconstructions.begin(),
+                               mini_batch_reconstructions.end());
       }
     }
 
-    reconstruction.width = 1;
-    reconstruction.height = reconstruction.points.size();
+    // // Execute semantics graph.
+    // semantics = semantics_graph_executor_->batchExecuteGraph(
+    //     cnn_descriptors, kInputTensorName, kSemanticsOutputName);
 
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-    transform.rotate(
-        Eigen::AngleAxisf(-alignments_rad[i], Eigen::Vector3f::UnitZ()));
-    pcl::transformPointCloud(reconstruction, reconstruction, transform);
-    segment->getLastView().reconstruction = reconstruction;
+    // CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
+    BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
 
-    // TODO RD remove if compressing reconstruction not needed.
-    /*unsigned int publish_every_x_points = 5;
-    segment->getLastView().reconstruction_compressed.clear();
-    segment->getLastView().reconstruction_compressed.reserve(reconstruction.points.size()
-    / publish_every_x_points); unsigned int z = 0; for (const auto& point :
-    reconstruction.points) { if (z % publish_every_x_points == 0) {
-          segment->getLastView().reconstruction_compressed.points.emplace_back(point.x,
-    point.y, point.z);
+    BENCHMARK_START("SM.Worker.Describe.SaveFeatures");
+    // Write the features.
+    for (size_t i = 0u; i < described_segment_ids.size(); ++i) {
+      Segment* segment;
+      CHECK(segmented_cloud_ptr->findValidSegmentPtrById(
+          described_segment_ids[i], &segment));
+      // std::vector<float> nn_output = cnn_descriptors[i];
+
+      // Feature cnn_feature("cnn");
+      // for (size_t j = 0u; j < nn_output.size(); ++j) {
+      //   cnn_feature.push_back(FeatureValue("cnn_" + std::to_string(j),
+      //   nn_output[j]));
+      // }
+
+      // Push the scales.
+      // cnn_feature.push_back(FeatureValue("cnn_scale_x", scales[i].x));
+      // cnn_feature.push_back(FeatureValue("cnn_scale_y", scales[i].y));
+      // cnn_feature.push_back(FeatureValue("cnn_scale_z", scales[i].z));
+
+      // segment->getLastView().features.replaceByName(cnn_feature);
+
+      // std::vector<float> semantic_nn_output = semantics[i];
+      // segment->getLastView().semantic =
+      // std::distance(semantic_nn_output.begin(),
+      //                                                 std::max_element(semantic_nn_output.begin(),
+      //                                                                  semantic_nn_output.end()));
+
+      // Generate the reconstructions.
+      PointCloud reconstruction;
+      const double reconstruction_threshold = 0.75;
+      const double ratio_voxels_to_reconstruct = 1.5;
+      const bool reconstruct_by_probability = true;
+
+      PclPoint point;
+      const PclPoint point_min = point_mins[i];
+      const PclPoint scale = thresholded_scales[i];
+      const PclPoint centroid = rescaled_point_cloud_centroids[i];
+
+      if (reconstruct_by_probability) {
+        for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
+          for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
+            for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
+              // if (reconstructions[i].container[x][y][z] >=
+              // reconstruction_threshold) {
+              //   point.x = point_min.x + scale.x *
+              //     (static_cast<float>(x) - x_dim_min_1_ / 2.0 + centroid.x) /
+              //     x_dim_min_1_;
+              //   point.y = point_min.y + scale.y *
+              //     (static_cast<float>(y) - y_dim_min_1_ / 2.0 + centroid.y) /
+              //     y_dim_min_1_;
+              //   point.z = point_min.z + scale.z *
+              //     (static_cast<float>(z) - z_dim_min_1_ / 2.0 + centroid.z) /
+              //     z_dim_min_1_;
+              //   reconstruction.points.push_back(point);
+              // }
+            }
+          }
+        }
+      } else {
+        const unsigned int n_voxels_in_original_segment =
+            nums_occupied_voxels[i];
+        const unsigned int n_voxels_in_reconstructed_segment = floor(
+            double(n_voxels_in_original_segment) * ratio_voxels_to_reconstruct);
+
+        // Order by occupancy probability.
+        std::vector<double> probs;
+        std::vector<PclPoint> indices;
+        for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
+          for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
+            for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
+              // probs.push_back(reconstructions[i].container[x][y][z]);
+              PclPoint indice;
+              indice.x = x;
+              indice.y = y;
+              indice.z = z;
+              indices.push_back(indice);
+            }
+          }
+        }
+        std::vector<size_t> indexes_in_decreasing_order =
+            getIndexesInDecreasingOrdering(probs);
+
+        for (unsigned int j = 0u; j < n_voxels_in_reconstructed_segment; ++j) {
+          point.x = point_min.x +
+                    scale.x *
+                        (static_cast<float>(
+                             indices[indexes_in_decreasing_order[j]].x) -
+                         x_dim_min_1_ / 2.0 + centroid.x) /
+                        x_dim_min_1_;
+          point.y = point_min.y +
+                    scale.y *
+                        (static_cast<float>(
+                             indices[indexes_in_decreasing_order[j]].y) -
+                         y_dim_min_1_ / 2.0 + centroid.y) /
+                        y_dim_min_1_;
+          point.z = point_min.z +
+                    scale.z *
+                        (static_cast<float>(
+                             indices[indexes_in_decreasing_order[j]].z) -
+                         z_dim_min_1_ / 2.0 + centroid.z) /
+                        z_dim_min_1_;
+          reconstruction.points.push_back(point);
+        }
       }
-      ++z;
-    }*/
+
+      reconstruction.width = 1;
+      reconstruction.height = reconstruction.points.size();
+
+      Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+      transform.rotate(
+          Eigen::AngleAxisf(-alignments_rad[i], Eigen::Vector3f::UnitZ()));
+      pcl::transformPointCloud(reconstruction, reconstruction, transform);
+      segment->getLastView().reconstruction = reconstruction;
+
+      // TODO RD remove if compressing reconstruction not needed.
+      /*unsigned int publish_every_x_points = 5;
+      segment->getLastView().reconstruction_compressed.clear();
+      segment->getLastView().reconstruction_compressed.reserve(reconstruction.points.size()
+      / publish_every_x_points); unsigned int z = 0; for (const auto& point :
+      reconstruction.points) { if (z % publish_every_x_points == 0) {
+            segment->getLastView().reconstruction_compressed.points.emplace_back(point.x,
+      point.y, point.z);
+        }
+        ++z;
+      }*/
+    }
+    BENCHMARK_STOP("SM.Worker.Describe.SaveFeatures");
   }
-  BENCHMARK_STOP("SM.Worker.Describe.SaveFeatures");
 }
 
 void CNNDescriptor::exportData() const {
