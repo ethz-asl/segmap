@@ -7,21 +7,23 @@ TensorflowInterface::TensorflowInterface() {
 
   cnn_input_publisher_ = nh.advertise<segmatch::cnn_input_msg>(
       "tf_interface_topic/cnn_input_topic", 50u);
-
+  sem_input_publisher_ = nh.advertise<segmatch::sem_input_msg>(
+      "tf_interface_topic/sem_input_topic", 50u);
   cnn_output_subscriber_ =
       nh.subscribe("tf_interface_topic/cnn_output_topic", 1,
                    &TensorflowInterface::cnn_output_callback, this);
-
-  ROS_INFO_STREAM("advertising");
+  sem_output_subscriber_ =
+      nh.subscribe("tf_interface_topic/sem_output_topic", 1,
+                   &TensorflowInterface::sem_output_callback, this);
 }
 
 void TensorflowInterface::batchFullForwardPass(
     const std::vector<Array3D>& inputs, const std::string& input_tensor_name,
-    const std::vector<std::vector<float> >& scales,
+    const std::vector<std::vector<float>>& scales,
     const std::string& scales_tensor_name,
     const std::string& descriptor_values_name,
     const std::string& reconstruction_values_name,
-    std::vector<std::vector<float> >& descriptors,
+    std::vector<std::vector<float>>& descriptors,
     std::vector<Array3D>& reconstructions) {
   CHECK(!inputs.empty());
   descriptors.clear();
@@ -49,8 +51,6 @@ void TensorflowInterface::batchFullForwardPass(
     for (int j = 0; j < msg.scales.layout.dim[1].size; ++j) {
       msg.scales.data.push_back(scales[i][j]);
     }
-    // ROS_INFO_STREAM(scales[i][0] << " " << scales[i][1] << " " <<
-    // scales[i][2]);
   }
 
   // Inputs
@@ -85,7 +85,7 @@ void TensorflowInterface::batchFullForwardPass(
   }
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
-  ROS_DEBUG_STREAM("Sending: " << msg.timestamp);
+  ROS_DEBUG_STREAM("Sending CNN Input: " << msg.timestamp);
   cnn_input_publisher_.publish(msg);
   ros::Rate loop_rate(1000);
   ros::spinOnce();
@@ -152,6 +152,79 @@ void TensorflowInterface::batchFullForwardPass(
 
 void TensorflowInterface::cnn_output_callback(segmatch::cnn_output_msg msg) {
   returned_cnn_msgs_.insert(make_pair(msg.timestamp, msg));
+}
+
+void TensorflowInterface::sem_output_callback(segmatch::sem_output_msg msg) {
+  returned_sem_msgs_.insert(make_pair(msg.timestamp, msg));
+}
+
+std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
+    const std::vector<std::vector<float>>& inputs,
+    const std::string& input_tensor_name,
+    const std::string& output_tensor_name) {
+  CHECK(!inputs.empty());
+  std::vector<std::vector<float>> semantics;
+  segmatch::sem_input_msg msg;
+  msg.input_tensor_name = input_tensor_name;
+  msg.output_tensor_name = output_tensor_name;
+
+  std_msgs::MultiArrayDimension layout_dim;
+  layout_dim.size = inputs.size();
+  layout_dim.stride = inputs.size() * inputs[0].size();
+  msg.inputs.layout.dim.push_back(layout_dim);
+
+  layout_dim.size = inputs[0].size();
+  layout_dim.stride = inputs[0].size();
+  msg.inputs.layout.dim.push_back(layout_dim);
+
+  for (int i = 0; i < msg.inputs.layout.dim[0].size; ++i) {
+    for (int j = 0; j < msg.inputs.layout.dim[1].size; ++j) {
+      msg.inputs.data.push_back(inputs[i][j]);
+    }
+  }
+
+  auto msg_time_stamp = ros::Time::now().toNSec();
+  msg.timestamp = msg_time_stamp;
+  ROS_DEBUG_STREAM("Sending Semantics Input: " << msg.timestamp);
+  sem_input_publisher_.publish(msg);
+  ros::Rate loop_rate(1000);
+  ros::spinOnce();
+  loop_rate.sleep();
+
+  ros::Rate wait_rate(10);
+  segmatch::sem_output_msg out_msg;
+  while (ros::ok()) {
+    auto it = returned_sem_msgs_.find(msg_time_stamp);
+    if (it != returned_sem_msgs_.end()) {
+      ROS_DEBUG_STREAM("Found message: " << msg_time_stamp);
+      returned_sem_msgs_.erase(it);
+      out_msg = it->second;
+      break;
+    } else {
+      ROS_DEBUG_STREAM("waiting");
+      wait_rate.sleep();
+      if (ros::Time::now().toNSec() - msg_time_stamp > 1e9) {
+        ROS_WARN_STREAM("Message lost!: " << msg_time_stamp);
+        return semantics;
+      }
+    }
+  }
+
+  if (out_msg.semantics.data.empty()) {
+    ROS_WARN_STREAM("No semantics data");
+    return semantics;
+  }
+  for (int i = 0; i < out_msg.semantics.layout.dim[0].size; ++i) {
+    std::vector<float> semantic;
+    for (int j = 0; j < out_msg.semantics.layout.dim[1].size; ++j) {
+      semantic.push_back(
+          out_msg.semantics
+              .data[i * out_msg.semantics.layout.dim[1].stride + j]);
+    }
+    semantics.push_back(semantic);
+  }
+
+  return semantics;
 }
 
 }  // namespace ns_tf_interface

@@ -1,0 +1,2 @@
+uint64 timestamp
+std_msgs/Float32MultiArray semantics

@@ -242,9 +242,9 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
       }
     }
 
-    // // Execute semantics graph.
-    // semantics = semantics_graph_executor_->batchExecuteGraph(
-    //     cnn_descriptors, kInputTensorName, kSemanticsOutputName);
+    // Execute semantics graph.
+    semantics = interface_worker_.batchExecuteGraph(
+        cnn_descriptors, kInputTensorName, kSemanticsOutputName);
 
     CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
     BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
@@ -270,11 +270,11 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
       segment->getLastView().features.replaceByName(cnn_feature);
 
-      // std::vector<float> semantic_nn_output = semantics[i];
-      // segment->getLastView().semantic =
-      //     std::distance(semantic_nn_output.begin(),
-      //                   std::max_element(semantic_nn_output.begin(),
-      //                                    semantic_nn_output.end()));
+      std::vector<float> semantic_nn_output = semantics[i];
+      segment->getLastView().semantic =
+          std::distance(semantic_nn_output.begin(),
+                        std::max_element(semantic_nn_output.begin(),
+                                         semantic_nn_output.end()));
 
       // Generate the reconstructions.
       PointCloud reconstruction;
@@ -292,16 +292,19 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
           for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
             for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
               if (reconstructions[i].container[x][y][z] >=
-              reconstruction_threshold) {
+                  reconstruction_threshold) {
                 point.x = point_min.x + scale.x *
-                  (static_cast<float>(x) - x_dim_min_1_ / 2.0 + centroid.x) /
-                  x_dim_min_1_;
+                                            (static_cast<float>(x) -
+                                             x_dim_min_1_ / 2.0 + centroid.x) /
+                                            x_dim_min_1_;
                 point.y = point_min.y + scale.y *
-                  (static_cast<float>(y) - y_dim_min_1_ / 2.0 + centroid.y) /
-                  y_dim_min_1_;
+                                            (static_cast<float>(y) -
+                                             y_dim_min_1_ / 2.0 + centroid.y) /
+                                            y_dim_min_1_;
                 point.z = point_min.z + scale.z *
-                  (static_cast<float>(z) - z_dim_min_1_ / 2.0 + centroid.z) /
-                  z_dim_min_1_;
+                                            (static_cast<float>(z) -
+                                             z_dim_min_1_ / 2.0 + centroid.z) /
+                                            z_dim_min_1_;
                 reconstruction.points.push_back(point);
               }
             }

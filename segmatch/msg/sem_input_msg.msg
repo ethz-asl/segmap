@@ -1,0 +1,4 @@
+uint64 timestamp
+string input_tensor_name
+string output_tensor_name
+std_msgs/Float32MultiArray inputs
