@@ -85,9 +85,9 @@ void TensorflowInterface::batchFullForwardPass(
   }
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
-  ROS_INFO_STREAM("Sending: " << msg.timestamp);
+  ROS_DEBUG_STREAM("Sending: " << msg.timestamp);
   cnn_input_publisher_.publish(msg);
-  ros::Rate loop_rate(100);
+  ros::Rate loop_rate(1000);
   ros::spinOnce();
   loop_rate.sleep();
 
@@ -96,12 +96,12 @@ void TensorflowInterface::batchFullForwardPass(
   while (ros::ok()) {
     auto it = returned_cnn_msgs_.find(msg_time_stamp);
     if (it != returned_cnn_msgs_.end()) {
-      ROS_INFO_STREAM("Found message: " << msg_time_stamp);
+      ROS_DEBUG_STREAM("Found message: " << msg_time_stamp);
       returned_cnn_msgs_.erase(it);
       out_msg = it->second;
       break;
     } else {
-      ROS_INFO_STREAM("waiting");
+      ROS_DEBUG_STREAM("waiting");
       wait_rate.sleep();
       if (ros::Time::now().toNSec() - msg_time_stamp > 1e9) {
         ROS_WARN_STREAM("Message lost!: " << msg_time_stamp);
@@ -140,8 +140,9 @@ void TensorflowInterface::batchFullForwardPass(
         for (int l = 0; l < out_msg.reconstructions.layout.dim[3].size; ++l) {
           reconstruction.container[j][k][l] =
               out_msg.reconstructions
-                  .data[j * out_msg.reconstructions.layout.dim[1].stride +
-                        k * out_msg.reconstructions.layout.dim[2].stride + l];
+                  .data[i * out_msg.reconstructions.layout.dim[1].stride +
+                        j * out_msg.reconstructions.layout.dim[2].stride +
+                        k * out_msg.reconstructions.layout.dim[3].stride + l];
         }
       }
     }
