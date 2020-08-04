@@ -246,7 +246,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     // semantics = semantics_graph_executor_->batchExecuteGraph(
     //     cnn_descriptors, kInputTensorName, kSemanticsOutputName);
 
-    // CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
+    CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
     BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
 
     BENCHMARK_START("SM.Worker.Describe.SaveFeatures");
@@ -255,26 +255,26 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
       Segment* segment;
       CHECK(segmented_cloud_ptr->findValidSegmentPtrById(
           described_segment_ids[i], &segment));
-      // std::vector<float> nn_output = cnn_descriptors[i];
+      std::vector<float> nn_output = cnn_descriptors[i];
 
-      // Feature cnn_feature("cnn");
-      // for (size_t j = 0u; j < nn_output.size(); ++j) {
-      //   cnn_feature.push_back(FeatureValue("cnn_" + std::to_string(j),
-      //   nn_output[j]));
-      // }
+      Feature cnn_feature("cnn");
+      for (size_t j = 0u; j < nn_output.size(); ++j) {
+        cnn_feature.push_back(
+            FeatureValue("cnn_" + std::to_string(j), nn_output[j]));
+      }
 
       // Push the scales.
-      // cnn_feature.push_back(FeatureValue("cnn_scale_x", scales[i].x));
-      // cnn_feature.push_back(FeatureValue("cnn_scale_y", scales[i].y));
-      // cnn_feature.push_back(FeatureValue("cnn_scale_z", scales[i].z));
+      cnn_feature.push_back(FeatureValue("cnn_scale_x", scales[i].x));
+      cnn_feature.push_back(FeatureValue("cnn_scale_y", scales[i].y));
+      cnn_feature.push_back(FeatureValue("cnn_scale_z", scales[i].z));
 
-      // segment->getLastView().features.replaceByName(cnn_feature);
+      segment->getLastView().features.replaceByName(cnn_feature);
 
       // std::vector<float> semantic_nn_output = semantics[i];
       // segment->getLastView().semantic =
-      // std::distance(semantic_nn_output.begin(),
-      //                                                 std::max_element(semantic_nn_output.begin(),
-      //                                                                  semantic_nn_output.end()));
+      //     std::distance(semantic_nn_output.begin(),
+      //                   std::max_element(semantic_nn_output.begin(),
+      //                                    semantic_nn_output.end()));
 
       // Generate the reconstructions.
       PointCloud reconstruction;
@@ -291,19 +291,19 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
         for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
           for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
             for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
-              // if (reconstructions[i].container[x][y][z] >=
-              // reconstruction_threshold) {
-              //   point.x = point_min.x + scale.x *
-              //     (static_cast<float>(x) - x_dim_min_1_ / 2.0 + centroid.x) /
-              //     x_dim_min_1_;
-              //   point.y = point_min.y + scale.y *
-              //     (static_cast<float>(y) - y_dim_min_1_ / 2.0 + centroid.y) /
-              //     y_dim_min_1_;
-              //   point.z = point_min.z + scale.z *
-              //     (static_cast<float>(z) - z_dim_min_1_ / 2.0 + centroid.z) /
-              //     z_dim_min_1_;
-              //   reconstruction.points.push_back(point);
-              // }
+              if (reconstructions[i].container[x][y][z] >=
+              reconstruction_threshold) {
+                point.x = point_min.x + scale.x *
+                  (static_cast<float>(x) - x_dim_min_1_ / 2.0 + centroid.x) /
+                  x_dim_min_1_;
+                point.y = point_min.y + scale.y *
+                  (static_cast<float>(y) - y_dim_min_1_ / 2.0 + centroid.y) /
+                  y_dim_min_1_;
+                point.z = point_min.z + scale.z *
+                  (static_cast<float>(z) - z_dim_min_1_ / 2.0 + centroid.z) /
+                  z_dim_min_1_;
+                reconstruction.points.push_back(point);
+              }
             }
           }
         }
