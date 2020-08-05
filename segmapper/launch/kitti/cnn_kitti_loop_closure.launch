@@ -9,14 +9,14 @@
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 	
   <!-- Rviz visualization config file path -->
-  <!-- <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/> -->
+  <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
   <rosparam command="load" file="$(find segmapper)/launch/kitti/cnn_kitti_loop_closure.yaml"/>
 
   <!-- rviz node -->
-  <!-- <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" /> -->
+  <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
   
   <!-- CNN model path -->
   <arg name="cnn_model_path" value="$(env HOME)/.segmap/trained_models/segmap64/"/>
@@ -33,6 +33,6 @@
   </include>
   
     <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args="-q -r 0.2 -s 0 --clock --pause $(arg bag_file)"/>	
+  <node name="player" pkg="rosbag" type="play" output="screen" args="-s 0 --clock --pause $(arg bag_file)"/>	
  
 </launch>

@@ -120,7 +120,7 @@ class TensorflowInterface:
             os.path.join(self.cnn_model_path, "model.ckpt.meta")
         )
 
-        # get key tensorflow variables -- TODO Marius: load during setup
+        # get key tensorflow variables
         cnn_graph = tf.compat.v1.get_default_graph()
         cnn_input = cnn_graph.get_tensor_by_name(input_tensor_name + ':0')
         cnn_scales = cnn_graph.get_tensor_by_name(scales_tensor_name + ':0')
@@ -207,6 +207,8 @@ class TensorflowInterface:
             '/SegMapper/SegMatchWorker/SegMatch/Descriptors/cnn_model_path')
         self.semantics_model_path = rospy.get_param(
             '/SegMapper/SegMatchWorker/SegMatch/Descriptors/semantics_nn_path')
+
+
 
         rospy.spin()
 
