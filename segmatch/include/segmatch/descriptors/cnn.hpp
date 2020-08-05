@@ -2,8 +2,6 @@
 #define SEGMATCH_CNN_HPP_
 
 #include <laser_slam/common.hpp>
-// #include <tf_graph_executor/tf_graph_executor.hpp>
-
 #include "segmatch/descriptors/descriptors.hpp"
 #include "segmatch/parameters.hpp"
 #include "segmatch/segmented_cloud.hpp"
@@ -19,11 +17,6 @@ class CNNDescriptor : public Descriptor {
     const std::string model_folder = parameters.cnn_model_path;
     const std::string semantics_nn_folder = parameters.semantics_nn_path;
 
-    LOG(INFO) << "Loading CNN model in " + model_folder;
-    // graph_executor_.reset(new tf_graph_executor::TensorflowGraphExecutor(
-    //     model_folder + "model.ckpt.meta"));
-    // graph_executor_->loadCheckpoint(model_folder + "model.ckpt");
-
     aligned_segments_ = SegmentedCloud(false);
 
     /*Eigen::MatrixXd voxel_mean_values;
@@ -35,14 +28,6 @@ class CNNDescriptor : public Descriptor {
     for (size_t i = 0u; i < cnn_input_dim_; ++i) {
       voxel_mean_values_.push_back(voxel_mean_values(i, 0u));
     }*/
-
-    // Load the semantics nn model.
-    LOG(INFO) << "Loading semantics model in " + semantics_nn_folder;
-    // semantics_graph_executor_.reset(new tf_graph_executor::TensorflowGraphExecutor(
-    //     semantics_nn_folder + "model.ckpt.meta"));
-    // semantics_graph_executor_->loadCheckpoint(semantics_nn_folder + "model.ckpt");
-
-    LOG(INFO) << "Loaded all TensorFlow models.";
 
     ns_tf_interface::TensorflowInterface interface_worker_();
   }
@@ -68,9 +53,6 @@ class CNNDescriptor : public Descriptor {
   static constexpr unsigned int kDimension = 32u;
 
   DescriptorsParameters params_;
-
-  // std::shared_ptr<tf_graph_executor::TensorflowGraphExecutor> graph_executor_;
-  // std::shared_ptr<tf_graph_executor::TensorflowGraphExecutor> semantics_graph_executor_;
 
   std::vector<float> voxel_mean_values_;
 
