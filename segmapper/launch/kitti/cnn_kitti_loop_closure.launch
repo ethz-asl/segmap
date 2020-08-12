@@ -34,10 +34,14 @@
   </include>
   
     <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r .1 -s 0 --clock --pause $(arg bag_file)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 0.5 -s 0 --clock --pause $(arg bag_file)"/>
   
     <!-- Tensorflow interface -->
-  <node pkg="segmatch" name="tf_interface" type="tf_interface.py" output="screen">
+  <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen">
+  
+  </node> -->
+	
+  <node pkg="segmatch" name="tf_sem_interface" type="tf_sem_interface.py" output="screen">  
   
   </node> -->
 	
