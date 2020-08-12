@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# from __future__ import print_function
+from __future__ import print_function
 from array import *
 import rospy
 from segmatch.msg import cnn_input_msg
@@ -112,33 +112,10 @@ class TensorflowInterface:
     def tf_interface(self, inputs, scales, input_tensor_name,
                      scales_tensor_name, descriptor_values_name, reconstruction_values_name, message_id):
 
-        # cnn features
-        tf.get_default_graph()
-
-        # restore variable names from previous session
-        saver = tf.train.import_meta_graph(
-            os.path.join(self.cnn_model_path, "model.ckpt.meta")
-        )
-
-        # get key tensorflow variables
-        cnn_graph = tf.compat.v1.get_default_graph()
-        cnn_input = cnn_graph.get_tensor_by_name(input_tensor_name + ':0')
-        cnn_scales = cnn_graph.get_tensor_by_name(scales_tensor_name + ':0')
-        cnn_descriptor = cnn_graph.get_tensor_by_name(
-            descriptor_values_name + ':0')
-        cnn_reconstruction = cnn_graph.get_tensor_by_name(
-            reconstruction_values_name + ':0')
-
-        with tf.Session() as sess:
-            saver.restore(sess, tf.train.latest_checkpoint(
-                self.cnn_model_path))
-
-            descriptors = sess.run(cnn_descriptor, feed_dict={
-                cnn_input: inputs, cnn_scales: scales},)
-            reconstructions = sess.run(cnn_reconstruction, feed_dict={
-                cnn_input: inputs, cnn_scales: scales},)
-
-        # example cnn output
+        descriptors = self.cnn_sess.run(self.cnn_descriptor, feed_dict={
+            self.cnn_input: inputs, self.cnn_scales: scales},)
+        reconstructions = self.cnn_sess.run(self.cnn_reconstruction, feed_dict={
+            self.cnn_input: inputs, self.cnn_scales: scales},)
         self.publish_cnn_output(reconstructions, descriptors, message_id)
 
     def publish_cnn_output(self, reconstructions, descriptors, message_id):
@@ -209,6 +186,21 @@ class TensorflowInterface:
             '/SegMapper/SegMatchWorker/SegMatch/Descriptors/semantics_nn_path')
 
 
+        # CNN features
+        tf.get_default_graph()
+        self.cnn_saver = tf.train.import_meta_graph(
+            os.path.join(self.cnn_model_path, "model.ckpt.meta")
+        )
+        cnn_graph = tf.compat.v1.get_default_graph()
+        self.cnn_input = cnn_graph.get_tensor_by_name('InputScope/input:0')
+        self.cnn_scales = cnn_graph.get_tensor_by_name('scales:0')
+        self.cnn_descriptor = cnn_graph.get_tensor_by_name(
+            'OutputScope/descriptor_read:0')
+        self.cnn_reconstruction = cnn_graph.get_tensor_by_name(
+            'ReconstructionScopeAE/ae_reconstruction_read:0')
+        self.cnn_sess = tf.Session()
+        self.cnn_saver.restore(self.cnn_sess, tf.train.latest_checkpoint(
+            self.cnn_model_path))
 
         rospy.spin()
 
