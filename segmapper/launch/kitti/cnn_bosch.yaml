@@ -15,6 +15,7 @@ SegMapper: {
     sensor_frame: "airsim_drone/Depth_cam",
     
     assembled_cloud_sub_topic: "/airsim_drone/RGBD_cam",
+    # assembled_cloud_sub_topic: "/airsim_drone/Lidar",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
