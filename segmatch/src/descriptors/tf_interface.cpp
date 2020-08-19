@@ -103,8 +103,8 @@ void TensorflowInterface::batchFullForwardPass(
     } else {
       ROS_DEBUG_STREAM("waiting");
       wait_rate.sleep();
-      if (ros::Time::now().toNSec() - msg_time_stamp > 1e9) {
-        ROS_WARN_STREAM("Message lost!: " << msg_time_stamp);
+      if (ros::Time::now().toNSec() - msg_time_stamp > 10e9) {
+        ROS_WARN_STREAM("CNN message lost!: " << msg_time_stamp);
         return;
       }
     }
@@ -203,8 +203,8 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
     } else {
       ROS_DEBUG_STREAM("waiting");
       wait_rate.sleep();
-      if (ros::Time::now().toNSec() - msg_time_stamp > 1e9) {
-        ROS_WARN_STREAM("Message lost!: " << msg_time_stamp);
+      if (ros::Time::now().toNSec() - msg_time_stamp > 10e9) {
+        ROS_WARN_STREAM("Semantics message lost!: " << msg_time_stamp);
         return semantics;
       }
     }
