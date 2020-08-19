@@ -78,7 +78,7 @@ class TensorflowSemanticsInterface:
         self.sem_output = sem_graph.get_tensor_by_name(
             'OutputScope/output_read:0')
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
-        self.sem_sess = tf.compat.v1.Session(
+        self.sem_session = tf.compat.v1.Session(
             config=tf.ConfigProto(gpu_options=gpu_options))
         self.saver.restore(self.sem_session, tf.train.latest_checkpoint(
             self.semantics_model_path))
