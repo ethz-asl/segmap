@@ -41,7 +41,6 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   BENCHMARK_START("SM.Worker.Describe.Preprocess");
   BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsTotal",
                          segmented_cloud_ptr->getNumberOfValidSegments());
-  VLOG(0) << "Start description";
   std::vector<ns_tf_interface::Array3D> batch_nn_input;
   std::vector<Id> described_segment_ids;
   std::vector<PclPoint> scales;
@@ -195,10 +194,15 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     std::vector<ns_tf_interface::Array3D> reconstructions;
     std::vector<std::vector<float> > semantics;
     if (batch_nn_input.size() < mini_batch_size_) {
+      VLOG(0) << "Start description 1";
+
       interface_worker_.batchFullForwardPass(
           batch_nn_input, kInputTensorName, scales_as_vectors,
           kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
           cnn_descriptors, reconstructions);
+
+      VLOG(0) << "End description 1";
+
     } else {
       std::vector<ns_tf_interface::Array3D> mini_batch;
       std::vector<std::vector<float> > mini_batch_scales;
@@ -208,11 +212,13 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
         if (mini_batch.size() == mini_batch_size_) {
           std::vector<std::vector<float> > mini_batch_cnn_descriptors;
           std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
+          VLOG(0) << "Start description 2";
 
           interface_worker_.batchFullForwardPass(
               mini_batch, kInputTensorName, mini_batch_scales,
               kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
               mini_batch_cnn_descriptors, mini_batch_reconstructions);
+          VLOG(0) << "End description 2";
 
           cnn_descriptors.insert(cnn_descriptors.end(),
                                  mini_batch_cnn_descriptors.begin(),
@@ -227,11 +233,13 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
       if (!mini_batch.empty()) {
         std::vector<std::vector<float> > mini_batch_cnn_descriptors;
         std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
+        VLOG(0) << "Start description 3";
 
         interface_worker_.batchFullForwardPass(
             mini_batch, kInputTensorName, mini_batch_scales, kScalesTensorName,
             kFeaturesTensorName, kReconstructionTensorName,
             mini_batch_cnn_descriptors, mini_batch_reconstructions);
+        VLOG(0) << "End description 3";
 
         cnn_descriptors.insert(cnn_descriptors.end(),
                                mini_batch_cnn_descriptors.begin(),
@@ -380,7 +388,6 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     }
     BENCHMARK_STOP("SM.Worker.Describe.SaveFeatures");
   }
-  VLOG(0) << "End of Description";
 }
 
 void CNNDescriptor::exportData() const {
