@@ -15,7 +15,7 @@
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
-  <rosparam command="load" file="$(find segmapper)/launch/kitti/cnn_bosch_lidar.yaml"/>
+  <rosparam command="load" file="$(find segmapper)/launch/bosch/cnn_bosch_lidar.yaml"/>
 
   <!-- rviz node -->
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
@@ -30,8 +30,8 @@
 
   <!-- segmapper node -->
   <include file="$(find segmapper)/launch/segmapper.launch">
-    <arg name="icp_configuration_file" value="$(find segmapper)/launch/kitti/icp_dynamic_outdoor.yaml"/>
-    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/kitti/input_filters_outdoor_lidar.yaml"/>
+    <arg name="icp_configuration_file" value="$(find segmapper)/launch/bosch/icp_dynamic_outdoor.yaml"/>
+    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/bosch/input_filters_outdoor_lidar.yaml"/>
   </include>
 
   <!-- rosbag player node -->
