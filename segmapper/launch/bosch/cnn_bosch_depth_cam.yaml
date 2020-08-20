@@ -12,11 +12,9 @@ SegMapper: {
     use_odometry_information: true,
     
     odom_frame: "world",
-    # sensor_frame: "airsim_drone/Depth_cam",
-    sensor_frame: "airsim_drone/Lidar",
+    sensor_frame: "airsim_drone/Depth_cam",
     
-    # assembled_cloud_sub_topic: "/airsim_drone/RGBD_cam",
-    assembled_cloud_sub_topic: "/airsim_drone/Lidar",
+    assembled_cloud_sub_topic: "/airsim_drone/RGBD_cam",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -71,9 +69,9 @@ SegMapper: {
     
     Segmenters: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
-      min_cluster_size: 50,
+      min_cluster_size: 100,
       max_cluster_size: 15000,
-      radius_for_growing: 0.5
+      radius_for_growing: 0.2
     },
 
     Descriptors: {
