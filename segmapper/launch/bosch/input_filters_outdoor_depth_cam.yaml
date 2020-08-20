@@ -4,7 +4,7 @@
     xMin: -inf
     xMax: inf
     yMin: -inf 
-    yMax: 1.0
+    yMax: inf
     zMin: -inf
     zMax: inf
     removeInside: 0
