@@ -95,8 +95,8 @@ void TensorflowInterface::batchFullForwardPass(
     auto it = returned_cnn_msgs_.find(msg_time_stamp);
     if (it != returned_cnn_msgs_.end()) {
       ROS_INFO_STREAM("Found CNN message: " << msg_time_stamp);
-      returned_cnn_msgs_.erase(it);
       out_msg = it->second;
+      returned_cnn_msgs_.erase(it);
       break;
     } else {
       ROS_DEBUG_STREAM("waiting");
@@ -196,8 +196,8 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
     auto it = returned_sem_msgs_.find(msg_time_stamp);
     if (it != returned_sem_msgs_.end()) {
       ROS_INFO_STREAM("Found Sem message: " << msg_time_stamp);
-      returned_sem_msgs_.erase(it);
       out_msg = it->second;
+      returned_sem_msgs_.erase(it);
       break;
     } else {
       ROS_DEBUG_STREAM("waiting");
