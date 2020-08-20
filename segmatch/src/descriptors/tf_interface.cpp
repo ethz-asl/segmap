@@ -26,8 +26,6 @@ void TensorflowInterface::batchFullForwardPass(
     std::vector<std::vector<float>>& descriptors,
     std::vector<Array3D>& reconstructions) {
   CHECK(!inputs.empty());
-  descriptors.clear();
-  reconstructions.clear();
 
   segmatch::cnn_input_msg msg;
 
@@ -120,6 +118,9 @@ void TensorflowInterface::batchFullForwardPass(
     return;
   }
 
+  descriptors.clear();
+  reconstructions.clear();
+
   for (int i = 0; i < out_msg.descriptors.layout.dim[0].size; ++i) {
     std::vector<float> descriptor;
     for (int j = 0; j < out_msg.descriptors.layout.dim[1].size; ++j) {
@@ -162,7 +163,6 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
     const std::string& input_tensor_name,
     const std::string& output_tensor_name) {
   CHECK(!inputs.empty());
-  std::vector<std::vector<float>> semantics;
   segmatch::sem_input_msg msg;
   msg.input_tensor_name = input_tensor_name;
   msg.output_tensor_name = output_tensor_name;
@@ -207,6 +207,8 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
       }
     }
   }
+
+  std::vector<std::vector<float>> semantics;
 
   if (out_msg.semantics.data.empty()) {
     ROS_WARN_STREAM("No semantics data");
