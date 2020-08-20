@@ -85,7 +85,7 @@ void TensorflowInterface::batchFullForwardPass(
   }
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
-  ROS_DEBUG_STREAM("Sending CNN Input: " << msg.timestamp);
+  ROS_INFO_STREAM("Sending CNN Input: " << msg.timestamp);
   cnn_input_publisher_.publish(msg);
   ros::Rate loop_rate(1000);
   ros::spinOnce();
@@ -96,7 +96,7 @@ void TensorflowInterface::batchFullForwardPass(
   while (ros::ok()) {
     auto it = returned_cnn_msgs_.find(msg_time_stamp);
     if (it != returned_cnn_msgs_.end()) {
-      ROS_DEBUG_STREAM("Found message: " << msg_time_stamp);
+      ROS_INFO_STREAM("Found CNN message: " << msg_time_stamp);
       returned_cnn_msgs_.erase(it);
       out_msg = it->second;
       break;
@@ -104,8 +104,7 @@ void TensorflowInterface::batchFullForwardPass(
       ROS_DEBUG_STREAM("waiting");
       wait_rate.sleep();
       if (ros::Time::now().toNSec() - msg_time_stamp > 10e9) {
-        ROS_WARN_STREAM("CNN message lost!: " << msg_time_stamp);
-        return;
+        ROS_WARN_STREAM("Delayed CNN message: " << msg_time_stamp);
       }
     }
   }
@@ -185,7 +184,7 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
 
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
-  ROS_DEBUG_STREAM("Sending Semantics Input: " << msg.timestamp);
+  ROS_INFO_STREAM("Sending Semantics Input: " << msg.timestamp);
   sem_input_publisher_.publish(msg);
   ros::Rate loop_rate(1000);
   ros::spinOnce();
@@ -196,7 +195,7 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
   while (ros::ok()) {
     auto it = returned_sem_msgs_.find(msg_time_stamp);
     if (it != returned_sem_msgs_.end()) {
-      ROS_DEBUG_STREAM("Found message: " << msg_time_stamp);
+      ROS_INFO_STREAM("Found Sem message: " << msg_time_stamp);
       returned_sem_msgs_.erase(it);
       out_msg = it->second;
       break;
@@ -204,8 +203,7 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
       ROS_DEBUG_STREAM("waiting");
       wait_rate.sleep();
       if (ros::Time::now().toNSec() - msg_time_stamp > 10e9) {
-        ROS_WARN_STREAM("Semantics message lost!: " << msg_time_stamp);
-        return semantics;
+        ROS_WARN_STREAM("Delayed Semantics message: " << msg_time_stamp);
       }
     }
   }

@@ -41,7 +41,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   BENCHMARK_START("SM.Worker.Describe.Preprocess");
   BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsTotal",
                          segmented_cloud_ptr->getNumberOfValidSegments());
-
+  VLOG(0) << "Start description";
   std::vector<ns_tf_interface::Array3D> batch_nn_input;
   std::vector<Id> described_segment_ids;
   std::vector<PclPoint> scales;
@@ -380,6 +380,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     }
     BENCHMARK_STOP("SM.Worker.Describe.SaveFeatures");
   }
+  VLOG(0) << "End of Description";
 }
 
 void CNNDescriptor::exportData() const {
