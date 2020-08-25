@@ -7,7 +7,7 @@
 
   <!-- Bag file path -->
   <!-- <arg name="bag_file" value="$(env HOME)/.segmap/bosch/bosch.bag"/> -->
-  <arg name="bag_file" value="/media/scratch1/mariusbr/bosch.bag"/>
+  <arg name="bag_file" value="/media/scratch1/mariusbr/augmented_bosch.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
