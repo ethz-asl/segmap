@@ -7,6 +7,7 @@ import yaml
 import struct
 import tf.transformations as transformations
 import rosbag
+import rospy
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs.msg import Image
@@ -15,10 +16,10 @@ from cv_bridge import CvBridge
 
 def main():
 
-    # bag_file = '/home/marius/.segmap/bosch/bosch.bag'
-    bag_file = '/media/scratch1/mariusbr/bosch.bag'
-    # out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
-    out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
+    bag_file = '/home/marius/.segmap/bosch/bosch.bag'
+    # bag_file = '/media/scratch1/mariusbr/bosch.bag'
+    out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
+    # out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     image_width = 640.0
@@ -117,15 +118,19 @@ def main():
         i += 1
         print('TF: ' + str(i))
 
-    for topic, tf_static, t in bag.read_messages(topics=['/tf_static']):
-        out_bag.write('/tf_static', tf_static,
-                      tf_static.transforms[0].header.stamp, False)
-
     i = 0
+    time_hack = rospy.Time()
     for topic, msg, t in bag.read_messages(topics=['/airsim_drone/RGBD_cam']):
         out_bag.write('/airsim_drone/RGBD_cam', msg, msg.header.stamp, False)
         i += 1
+        if i == 1:
+            time_hack = msg.header.stamp
         print('Depth Cam: ' + str(i))
+
+    for topic, tf_static, t in bag.read_messages(topics=['/tf_static']):
+        out_bag.write('/tf_static', tf_static,
+                      time_hack, False)
+        print('TF static')
 
     out_bag.close()
 
