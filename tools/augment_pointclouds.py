@@ -16,10 +16,10 @@ from cv_bridge import CvBridge
 
 def main():
 
-    bag_file = '/home/marius/.segmap/bosch/bosch.bag'
-    # bag_file = '/media/scratch1/mariusbr/bosch.bag'
-    out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
-    # out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
+    # bag_file = '/home/marius/.segmap/bosch/bosch.bag'
+    bag_file = '/media/scratch1/mariusbr/bosch.bag'
+    # out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
+    out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     image_width = 640.0
