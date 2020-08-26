@@ -14,7 +14,7 @@ SegMapper: {
     odom_frame: "world",
     sensor_frame: "airsim_drone/Lidar",
     
-    assembled_cloud_sub_topic: "/airsim_drone/Lidar",
+    assembled_cloud_sub_topic: "/augmented_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
