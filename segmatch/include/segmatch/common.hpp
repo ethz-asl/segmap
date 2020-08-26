@@ -23,7 +23,7 @@ typedef PointICloud::Ptr PointICloudPtr;
 typedef std::pair<PointI, PointI> PointIPair;
 typedef std::vector<PointIPair> PointIPairs;
 
-typedef pcl::PointXYZ PclPoint;
+typedef pcl::PointXYZRGBA PclPoint;
 typedef pcl::PointCloud<PclPoint> PointCloud;
 typedef PointCloud::Ptr PointCloudPtr;
 typedef std::pair<PclPoint, PclPoint> PointPair;
@@ -57,7 +57,7 @@ const Id kUnassignedId = -3; // Used internally by the incremental segmenter.
 // takes pairs. It collides a bit with IdMatches. We can discuss that. I also added for
 // convenience the centroids in there as they are easy to get when grabbing the Ids.
 // Let's see how that evolves.
-// 
+//
 // TODO: switch to std::array of size 2? so that the notation is the same .at(0) instead of first.
 typedef std::pair<Id, Id> IdPair;
 
@@ -79,7 +79,7 @@ class PairwiseMatch {
 
 typedef std::vector<PairwiseMatch,
     Eigen::aligned_allocator<PairwiseMatch> > PairwiseMatches;
-    
+
 struct Translation {
   Translation(double x_in, double y_in, double z_in) :
     x(x_in), y(y_in), z(z_in) {}

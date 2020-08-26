@@ -174,6 +174,9 @@ inline bool DynamicVoxelGrid<_DVG_TEMPLATE_SPEC_>::createVoxel_(
   uint32_t old_points_count = 0u;
   uint32_t new_points_count = std::distance(data.points_begin, data.points_end);
 
+  std::shared_ptr<std::vector<uint32_t>> color_counter;
+  std::shared_ptr<std::vector<uint8_t>> semantic_class_counter;
+
   // Add contribution from the existing voxel.
   if (data.old_voxel != nullptr) {
     centroid = *(data.old_voxel->centroid);
@@ -181,14 +184,40 @@ inline bool DynamicVoxelGrid<_DVG_TEMPLATE_SPEC_>::createVoxel_(
     if (new_points_count != 0u) {
       centroid_map *= static_cast<float>(old_points_count);
     }
+
+    color_counter = data.old_voxel->color_counter;
+    semantic_class_counter = data.old_voxel->semantic_class_counter;
+  } else {
+    color_counter = std::make_shared<std::vector<uint32_t>>();
+    semantic_class_counter = std::make_shared<std::vector<uint8_t>>();
   }
+
   uint32_t total_points_count = old_points_count + new_points_count;
 
   // Add contribution from the new points.
   if (new_points_count != 0u) {
     for (auto it = data.points_begin; it != data.points_end; ++it) {
       centroid_map += it->point.getVector3fMap();
+
+      uint32_t rgba = it->point.rgba;
+      uint32_t rgb = rgba & 0xffffff;
+      if (rgb != 16776960) {
+        color_counter->push_back(rgb);
+      }
+
+      uint8_t a = rgba >> 24;
+      semantic_class_counter->push_back(a);
     }
+
+    // TODO(smauq) make this selection more meaningful
+    uint32_t max_rgb = 0;
+    uint8_t max_a = 0;
+    if (color_counter->size() > 0) {
+      max_rgb = (*color_counter)[0];
+      max_a = (*semantic_class_counter)[0];
+    }
+
+    centroid.rgba = (max_a << 24) + max_rgb;
     centroid_map /= static_cast<float>(total_points_count);
   }
 
@@ -204,7 +233,8 @@ inline bool DynamicVoxelGrid<_DVG_TEMPLATE_SPEC_>::createVoxel_(
     centroid_pointer = &new_inactive_centroids.back();
   }
 
-  new_voxels.emplace_back(centroid_pointer, index, total_points_count);
+  new_voxels.emplace_back(centroid_pointer, index, total_points_count,
+      color_counter, semantic_class_counter);
   return is_new_voxel;
 }
 

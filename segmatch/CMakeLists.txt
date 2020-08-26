@@ -6,7 +6,7 @@ catkin_simple()
 
 add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
 
-cs_add_library(${PROJECT_NAME} 
+cs_add_library(${PROJECT_NAME}
   src/database.cpp
   src/descriptors/cnn.cpp
   src/descriptors/descriptors.cpp
@@ -30,6 +30,7 @@ cs_add_library(${PROJECT_NAME}
   src/recognizers/incremental_geometric_consistency_recognizer.cpp
   src/recognizers/partitioned_geometric_consistency_recognizer.cpp
   src/rviz_utilities.cpp
+  #src/search/semantic_kdtree_flann.cpp
   src/segmatch.cpp
   src/segmented_cloud.cpp
   src/segmenters/euclidean_segmenter.cpp
@@ -41,7 +42,7 @@ target_link_libraries(${PROJECT_NAME})
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-catkin_add_gtest(${PROJECT_NAME}_tests 
+catkin_add_gtest(${PROJECT_NAME}_tests
   test/test_main.cpp
   test/test_dynamic_voxel_grid.cpp
   test/test_geometric_consistency_recognizer.cpp

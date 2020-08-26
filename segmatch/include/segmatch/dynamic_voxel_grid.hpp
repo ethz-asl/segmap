@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
@@ -161,19 +162,27 @@ class DynamicVoxelGrid {
   struct Voxel_ {
     Voxel_()
       : centroid(nullptr), index(0), num_points(0) {
+        color_counter = std::make_shared<std::vector<uint32_t>>();
+        semantic_class_counter = std::make_shared<std::vector<uint8_t>>();
     }
 
-    Voxel_(VoxelPointT* centroid, const IndexT& index, const uint32_t num_points)
-      : centroid(centroid), index(index), num_points(num_points) {
+    Voxel_(VoxelPointT* centroid, const IndexT& index, const uint32_t num_points,
+           const std::shared_ptr<std::vector<uint32_t>>& color_counter,
+           const std::shared_ptr<std::vector<uint8_t>>& semantic_class_counter)
+      : centroid(centroid), index(index), num_points(num_points),
+        color_counter(color_counter), semantic_class_counter(semantic_class_counter) {
     }
 
     Voxel_(const Voxel_& other)
-      : centroid(other.centroid), index(other.index), num_points(other.num_points) {
+      : centroid(other.centroid), index(other.index), num_points(other.num_points),
+         color_counter(other.color_counter), semantic_class_counter(other.semantic_class_counter) {
     }
 
     VoxelPointT* centroid;
     IndexT index;
     uint32_t num_points;
+    std::shared_ptr<std::vector<uint32_t>> color_counter;
+    std::shared_ptr<std::vector<uint8_t>> semantic_class_counter;
   };
 
   // The data necessary to construct a voxel.

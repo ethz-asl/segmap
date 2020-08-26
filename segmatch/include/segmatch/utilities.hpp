@@ -152,7 +152,11 @@ static PclPoint calculateCentroid(const PointCloud& point_cloud){
     LOG(ERROR) << "Divide by zero error in centroid computation.";
   }
 
-  return PclPoint(x_mean, y_mean, z_mean);
+  PclPoint point;
+  point.x = x_mean;
+  point.y = y_mean;
+  point.z = z_mean;
+  return point;
 }
 
 static PointCloud mapPoint2PointCloud(const MapCloud& map_cloud) {
