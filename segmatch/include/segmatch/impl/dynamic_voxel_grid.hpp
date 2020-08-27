@@ -17,6 +17,37 @@
 
 #include "segmatch/common.hpp"
 
+inline static uint8_t getBestSemanticsClass(
+    std::shared_ptr<std::vector<uint8_t>> semantic_class_counter) {
+  std::vector<int> class_histogram(256);
+  for (auto it = (*semantic_class_counter).begin();
+       it != (*semantic_class_counter).end(); ++it) {
+    class_histogram[*it] += 1;
+  }
+  uint8_t max_class =
+      (std::max_element(class_histogram.begin(), class_histogram.end())) -
+      class_histogram.begin();
+  return max_class;
+}
+
+inline static uint32_t getAverageColor(
+    std::shared_ptr<std::vector<uint32_t>> color_counter) {
+  float r_average = 0.0;
+  float g_average = 0.0;
+  float b_average = 0.0;
+  for (auto it = (*color_counter).begin(); it != (*color_counter).end(); ++it) {
+    b_average += float((*it) & 0xff);
+    g_average += float(((*it) >> 8) & 0xff);
+    r_average += float(((*it) >> 16) & 0xff);
+  }
+  r_average /= (*color_counter).size();
+  b_average /= (*color_counter).size();
+  g_average /= (*color_counter).size();
+
+  return ((uint8_t)r_average << 16) + ((uint8_t)g_average << 8) +
+         (uint8_t)b_average;
+}
+
 namespace segmatch {
 
 // Force the compiler to reuse instantiations provided in dynamic_voxel_grid.cpp
@@ -201,22 +232,14 @@ inline bool DynamicVoxelGrid<_DVG_TEMPLATE_SPEC_>::createVoxel_(
 
       uint32_t rgba = it->point.rgba;
       uint32_t rgb = rgba & 0xffffff;
-      if (rgb != 16776960) {
-        color_counter->push_back(rgb);
-      }
+      color_counter->push_back(rgb);
 
       uint8_t a = rgba >> 24;
       semantic_class_counter->push_back(a);
     }
 
-    // TODO(smauq) make this selection more meaningful
-    uint32_t max_rgb = 0;
-    uint8_t max_a = 0;
-    if (color_counter->size() > 0) {
-      max_rgb = (*color_counter)[0];
-      max_a = (*semantic_class_counter)[0];
-    }
-
+    uint32_t max_rgb = getAverageColor(color_counter);
+    uint8_t max_a = getBestSemanticsClass(semantic_class_counter);
     centroid.rgba = (max_a << 24) + max_rgb;
     centroid_map /= static_cast<float>(total_points_count);
   }
