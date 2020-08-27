@@ -15,13 +15,13 @@ from cv_bridge import CvBridge
 
 
 def main():
-    # with open('/home/marius/segmap_ws/src/segmap/segmapper/launch/bosch/segmentation_id_color.yaml', 'r') as stream:
-    with open('/home/mariusbr/segmap_ws/src/segmap/segmapper/launch/bosch/segmentation_id_color.yaml', 'r') as stream:
+    with open('/home/marius/segmap_ws/src/segmap/segmapper/launch/bosch/segmentation_id_color.yaml', 'r') as stream:
+    # with open('/home/mariusbr/segmap_ws/src/segmap/segmapper/launch/bosch/segmentation_id_color.yaml', 'r') as stream:
         segmentation_id_color = yaml.load(stream)
-    # bag_file = '/home/marius/.segmap/bosch/bosch.bag'
-    bag_file = '/media/scratch1/mariusbr/bosch.bag'
-    # out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
-    out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
+    bag_file = '/home/marius/.segmap/bosch/bosch.bag'
+    # bag_file = '/media/scratch1/mariusbr/bosch.bag'
+    out_bag_file = '/home/marius/.segmap/bosch/augmented_bosch.bag'
+    # out_bag_file = '/media/scratch1/mariusbr/augmented_bosch.bag'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     image_width = 640
@@ -66,7 +66,6 @@ def main():
         current_image = images[image_iterator]
         points = point_cloud2.read_points(depth_cam_pcl)
         for point in points:
-            j += 1
             projected_point = numpy.dot(
                 tf_lidar_cam, (point[0], point[1], point[2], 1))
 
@@ -112,6 +111,8 @@ def main():
                       augmented_cloud.header.stamp, False)
 
         i += 1
+        if i == 100:
+            break
         print('Pointcloud: ' + str(i))
     i = 0
     for topic, tf, t in bag.read_messages(topics=['/tf']):
@@ -124,6 +125,8 @@ def main():
     for topic, tf_static, t in bag.read_messages(topics=['/tf_static']):
         out_bag.write('/tf_static', tf_static,
                       time_hack, False)
+        print('TF static')
+
     out_bag.close()
 
 

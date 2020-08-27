@@ -5,7 +5,7 @@
     xMax: inf
     yMin: -inf 
     yMax: inf
-    zMin: -1.0
+    zMin: -inf
     zMax: inf
     removeInside: 0
 - MaxDistDataPointsFilter:
