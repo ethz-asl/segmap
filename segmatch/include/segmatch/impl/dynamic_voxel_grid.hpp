@@ -19,14 +19,23 @@
 
 inline static uint8_t getBestSemanticsClass(
     std::shared_ptr<std::vector<uint8_t>> semantic_class_counter) {
-  std::vector<int> class_histogram(256);
-  for (auto it = (*semantic_class_counter).begin();
-       it != (*semantic_class_counter).end(); ++it) {
-    class_histogram[*it] += 1;
+  std::sort(semantic_class_counter->begin(), semantic_class_counter->end());
+  static int curr_class, curr_class_length, max_class, max_class_length;
+  curr_class_length = 0;
+  max_class_length = 0;
+  for (auto it = semantic_class_counter->begin();
+       it != semantic_class_counter->end(); ++it) {
+    if (*it == curr_class) {
+      curr_class_length++;
+    } else {
+      curr_class = *it;
+      curr_class_length = 1;
+    }
+    if (curr_class_length > max_class_length) {
+      max_class = curr_class;
+      max_class_length = curr_class_length;
+    }
   }
-  uint8_t max_class =
-      (std::max_element(class_histogram.begin(), class_histogram.end())) -
-      class_histogram.begin();
   return max_class;
 }
 
