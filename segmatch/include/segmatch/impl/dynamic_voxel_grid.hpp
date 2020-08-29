@@ -44,14 +44,14 @@ inline static uint32_t getAverageColor(
   float r_average = 0.0;
   float g_average = 0.0;
   float b_average = 0.0;
-  for (auto it = (*color_counter).begin(); it != (*color_counter).end(); ++it) {
+  for (auto it = color_counter->begin(); it != color_counter->end(); ++it) {
     b_average += float((*it) & 0xff);
     g_average += float(((*it) >> 8) & 0xff);
     r_average += float(((*it) >> 16) & 0xff);
   }
-  r_average /= (*color_counter).size();
-  b_average /= (*color_counter).size();
-  g_average /= (*color_counter).size();
+  r_average /= color_counter->size();
+  b_average /= color_counter->size();
+  g_average /= color_counter->size();
 
   return ((uint8_t)r_average << 16) + ((uint8_t)g_average << 8) +
          (uint8_t)b_average;
