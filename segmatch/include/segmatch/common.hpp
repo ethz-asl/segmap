@@ -88,6 +88,8 @@ struct Translation {
   double z;
 };
 
+double rgb_to_hue(uint32_t rgb);
+
 } // namespace segmatch
 
 #endif // SEGMATCH_COMMON_HPP_

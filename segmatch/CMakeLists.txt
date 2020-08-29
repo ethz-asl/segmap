@@ -7,6 +7,7 @@ catkin_simple()
 add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
 
 cs_add_library(${PROJECT_NAME}
+  src/common.cpp
   src/database.cpp
   src/descriptors/cnn.cpp
   src/descriptors/descriptors.cpp
