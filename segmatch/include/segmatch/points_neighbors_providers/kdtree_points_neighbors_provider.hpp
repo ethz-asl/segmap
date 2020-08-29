@@ -4,9 +4,12 @@
 #include <vector>
 
 #include <pcl/search/kdtree.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
-#include "segmatch/points_neighbors_providers/points_neighbors_provider.hpp"
 #include "segmatch/common.hpp"
+#include "segmatch/points_neighbors_providers/points_neighbors_provider.hpp"
+#include "segmatch/search/segmatch_distance_function.hpp"
+#include "segmatch/search/segmatch_point_representation.hpp"
 
 namespace segmatch {
 
@@ -47,13 +50,13 @@ class KdTreePointsNeighborsProvider : public PointsNeighborsProvider<PointT> {
   /// \returns Pointer to the PCL search object. If the provider doesn't use PCL search objects
   /// this function returns null.
   typename pcl::search::Search<PointT>::Ptr getPclSearchObject() override {
-    return typename pcl::search::KdTree<PointT>::Ptr(&kd_tree_,
-                                                     [](pcl::search::KdTree<PointT>* ptr) {});
+    return typename pcl::search::KdTree<PointT, pcl::KdTreeFLANN<PointT, pcl::L2_Segmatch<float>>>::Ptr(&kd_tree_,
+        [](pcl::search::KdTree<PointT, pcl::KdTreeFLANN<PointT, pcl::L2_Segmatch<float>>>* ptr) {});
   }
 
  private:
   // The tree used for neighbor searches.
-  pcl::search::KdTree<PointT> kd_tree_;
+  pcl::search::KdTree<PointT, pcl::KdTreeFLANN<PointT, pcl::L2_Segmatch<float>>> kd_tree_;
   typename pcl::PointCloud<PointT>::ConstPtr point_cloud_;
 }; // class KdTreePointsNeighborsProvider
 

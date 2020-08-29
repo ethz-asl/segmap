@@ -30,7 +30,6 @@ cs_add_library(${PROJECT_NAME}
   src/recognizers/incremental_geometric_consistency_recognizer.cpp
   src/recognizers/partitioned_geometric_consistency_recognizer.cpp
   src/rviz_utilities.cpp
-  #src/search/semantic_kdtree_flann.cpp
   src/segmatch.cpp
   src/segmented_cloud.cpp
   src/segmenters/euclidean_segmenter.cpp
