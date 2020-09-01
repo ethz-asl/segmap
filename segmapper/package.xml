@@ -34,5 +34,6 @@
   <depend>segmatch_ros</depend>  
   <depend>tf</depend>
   <depend>visualization_msgs</depend>
+  <depend>noiser</depend>
 </package>
 

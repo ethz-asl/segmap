@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 2.8.3)
+project(noiser)
+
+add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
+
+find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
+    roscpp
+    std_msgs
+    genmsg
+    tf
+)
+
+catkin_simple(ALL_DEPS_REQUIRED)
+
+cs_add_executable(${PROJECT_NAME} 
+    src/noiser.cpp
+)
+
+find_package(Boost REQUIRED COMPONENTS system thread)
+
+#add_doxygen(NOT_AUTOMATIC)
+
+cs_install()
+cs_export()
