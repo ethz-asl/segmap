@@ -5,9 +5,14 @@ add_definitions(-std=c++11 -DBENCHMARK_ENABLE)
 
 find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
     roscpp
+    rospy
     std_msgs
     genmsg
     tf
+    rosbag
+    visualization_msgs
+    pcl_catkin
+
 )
 
 catkin_simple(ALL_DEPS_REQUIRED)
