@@ -4,9 +4,6 @@
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/conversions.h>
 #include <pcl/point_types.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -28,6 +25,9 @@ class NoiserClass {
   float noise_stddev_;
   std::default_random_engine generator_;
   ros::Publisher pub_;
-  };
+  std::string input_topic_name_;
+  std::string output_topic_name_;
+  std::vector<float> noise_factors_;
+};
 }  // namespace noiser
 #endif  // NOISER_HPP_

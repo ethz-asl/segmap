@@ -44,6 +44,7 @@
   </node> -->
 
   <node pkg="noiser" name="noiser" type="noiser" output="screen">
+  <rosparam command="load" file="$(find noiser)/config/noiser_config.yaml"/>
   </node>
 
 </launch>

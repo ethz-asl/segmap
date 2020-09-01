@@ -1,0 +1,31 @@
+noise_mean: 0.0
+noise_stddev: 0.1
+
+input_topic_name: "/augmented_cloud"
+output_topic_name: "/noisy_cloud"
+
+noise_factors:
+  - 1.0   # Undefined
+  - 1.0   # Car
+  - 1.0   # Tree
+  - 1.0   # Bench
+  - 1.0   # Hedge
+  - 1.0   # Fence
+  - 1.0   # Roller_Machine
+  - 1.0   # Truck
+  - 1.0   # FreightContainer
+  - 1.0   # Dumpster
+  - 1.0   # LightGenerator
+  - 1.0   # Roadblock
+  - 1.0   # Portapotty
+  - 1.0   # BoxStack
+  - 1.0   # CinderStack
+  - 1.0   # ConcreteStack
+  - 1.0   # BrickStack
+  - 1.0   # Bin
+  - 1.0   # PowerLine
+  - 1.0   # SignBoard
+  - 1.0   # Sky
+  - 1.0   # Landscape
+  - 1.0   # Road
+  - 1.0   # Small_house
