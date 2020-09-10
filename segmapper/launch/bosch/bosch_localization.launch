@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <launch>
-
-  <arg name="respawn_value" default="false" />
-  <!-- boolean: true, false -->
-
-  <!-- Bag file path -->
+  
+  <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
+  
+  <!-- Bag file path -->  
   <arg name="bag_file" value="$(env HOME)/.segmap/bosch/augmented_bosch1.bag"/>
-  <!-- <arg name="bag_file" value="/media/scratch1/mariusbr/bosch.bag"/> -->
-  <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
-
+	
   <!-- Rviz visualization config file path -->
   <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
-  <rosparam command="load" file="$(find segmapper)/launch/bosch/cnn_bosch_depth_cam.yaml"/>
+
+  <rosparam command="load" file="$(find segmapper)/launch/bosch/bosch_localization.yaml"/>
+  
+  <!-- Target cloud -->
+  <arg name="target_cloud" value="/tmp/map.pcd"/>
+  <rosparam param="/SegMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
+  
+  <!-- Callgrind profiling option -->
+  <arg name="enable_callgrind" default="false" />
+  <arg name="play_rate" value="0.005" if="$(arg enable_callgrind)"/>
+  <arg name="play_rate" value="1" unless="$(arg enable_callgrind)"/>
 
   <!-- rviz node -->
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
-
-  <!-- CNN model path -->
-  <arg name="cnn_model_path" value="$(env HOME)/.segmap/trained_models/segmap64/"/>
-  <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Descriptors/cnn_model_path" subst_value="True">$(arg cnn_model_path)</rosparam>
-
-  <!-- Semantics nn path -->
-  <arg name="semantics_nn_path" value="$(env HOME)/.segmap/trained_models/segmap64_semantics/"/>
-  <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Descriptors/semantics_nn_path" subst_value="True">$(arg semantics_nn_path)</rosparam>
-
+  
   <!-- segmapper node -->
   <include file="$(find segmapper)/launch/segmapper.launch">
     <arg name="icp_configuration_file" value="$(find segmapper)/launch/bosch/icp_dynamic_outdoor.yaml"/>
-    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/bosch/input_filters_outdoor_depth_cam.yaml"/>
+    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/bosch/input_filters_outdoor.yaml"/>
+    <arg name="enable_callgrind" value="$(arg enable_callgrind)"/>
   </include>
 
-  <!-- rosbag player node -->
+    <!-- rosbag player node -->
   <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 0 --clock --quiet --pause $(arg bag_file)"/>
 
   <!-- Tensorflow interface -->
@@ -46,5 +46,5 @@
   <node pkg="noiser" name="noiser" type="noiser" output="screen">
   <rosparam command="load" file="$(find noiser)/config/noiser_config.yaml"/>
   </node>
-
+	
 </launch>
