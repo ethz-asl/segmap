@@ -109,29 +109,29 @@ def main():
 
         # Convert feature vector to image & save to bag.
         # ToDo(alaturn) Fix data scaling and type conversion.
-        output2 = output[0]
-        norm = numpy.linalg.norm(output2)
-        output2 = output2/norm
-        print output2
-        feature_img = numpy.zeros([1,50,3])
-        feature_img[0,:,0] = output2[0]
-        feature_img[0,:,1] = output2[0]
-        feature_img[0,:,1] = output2[0]
-        print feature_img.shape
-        feature_img_large = cv2.resize(feature_img, None, fx = 15, fy = 40, interpolation = cv2.INTER_CUBIC)
-        cv2.imshow("image", feature_img_large)
-        cv2.waitKey()
+        feature_vec = output[0]
+        norm = numpy.linalg.norm(feature_vec)
+        feature_vec = (feature_vec/norm)*254
+        feature_vec = feature_vec.astype(numpy.uint8)
+        print feature_vec.shape
+        feature_vec = numpy.transpose(feature_vec)
+        print feature_vec.shape
+        feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
+        feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
+        feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
+        # cv2.imshow("image", feature_img_large)
+        # cv2.waitKey()
 
 
         # Save to bag.
-        image_message.header.stamp = pcl.header.stamp
-        out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
+        # out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
 
         out_bag.write('/augmented_cloud', pcl,
                       pcl.header.stamp, False)
 
         out_bag.write('/locnet_descriptor', output_msg,
                       pcl.header.stamp, False)
+        out_bag.write('/locnet_descriptor_img', feature_img_msg, pcl.header.stamp, False)
         i += 1
         print i
         # if i == 100:
