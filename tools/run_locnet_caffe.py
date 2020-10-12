@@ -13,7 +13,7 @@ from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Float64MultiArray
 
 import cv2
-import cv_bridge
+import cv_bridge as cvb
 
 
 def main():
@@ -93,13 +93,18 @@ def main():
         output_msg = Float64MultiArray(data=output[0])
         
         # ToDo(alatur) Convert Histogram to image & save to bag.
-        img = numpy.zeros([bucket_count,network_input_size,3])
-        img[:,:,0] = histogram[0,0,:,:]
-        print img.shape
-        print histogram.shape
-        dst = cv2.resize(img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        cv2.imshow("image", dst)
+        histogram_img = numpy.zeros([bucket_count,network_input_size,3])
+        histogram_img[:,:,0] = histogram[0,0,:,:]
+        histogram_img[:,:,1] = histogram[0,0,:,:]
+        histogram_img[:,:,2] = histogram[0,0,:,:]
+        histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
+        cv2.imshow("image", histogram_img_large)
         cv2.waitKey()
+        bridge = cvb.CvBridge()
+        image_message = bridge.cv2_to_imgmsg(histogram_img_large, "bgr8")
+        # print image_message.header
+        image_message.header.stamp = pcl.header.stamp
+        out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
 
         out_bag.write('/augmented_cloud', pcl,
                       pcl.header.stamp, False)
