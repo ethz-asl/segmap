@@ -98,10 +98,14 @@ def main():
         histogram_img[:,:,1] = histogram[0,0,:,:]
         histogram_img[:,:,2] = histogram[0,0,:,:]
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        cv2.imshow("image", histogram_img_large)
-        cv2.waitKey()
+        print histogram_img_large.dtype
+        # cv2.imshow("image", histogram_img_large)
+        # cv2.waitKey()
         bridge = cvb.CvBridge()
-        image_message = bridge.cv2_to_imgmsg(histogram_img_large, "bgr8")
+        hist32 = numpy.float32(histogram_img_large)
+        uimg = hist32.astype(numpy.uint8)
+        image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
+
         # print image_message.header
         image_message.header.stamp = pcl.header.stamp
         out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
