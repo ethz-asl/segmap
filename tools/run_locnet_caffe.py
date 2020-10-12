@@ -18,6 +18,7 @@ import cv_bridge as cvb
 
 def main():
     # File paths.
+    # ToDo(alaturn) read these in as argument.
     bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag' 
     out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet.bag' 
     model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
@@ -28,15 +29,15 @@ def main():
     net = caffe.Net(config_file, model_file, caffe.TEST)
     
     # Parameters of the handcrafted LocNet histogram (input to CNN).
-    max_distance = 200
+    # ToDo(alaturn) read these in as argument.
+    max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
     d_min = 0.0
-    d_max = 1.5
+    d_max = 80
     image_width = 640
     image_height = 480
     bucket_count = 80       # given from network
     network_input_size = 64  # given from network
     delta_i_b = (1.0 / bucket_count) * (d_max - d_min)
-    print 'Hallo'
     i = 0
     for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
         points = point_cloud2.read_points(pcl)
@@ -65,7 +66,7 @@ def main():
             if point_valid and last_point_valid and not(is_new_line):
 
                 # ToDo(alaturn) Switch to R mode (better than deltaR)
-                dist = math.sqrt((x - last_x)**2 + (y-last_y)**2)
+                #dist = math.sqrt((x - last_x)**2 + (y-last_y)**2)
                 for n in range(0, bucket_count):
 
                     if d_min + n * delta_i_b > dist:
@@ -92,13 +93,13 @@ def main():
         # Save the computed metrics to new bag.
         output_msg = Float64MultiArray(data=output[0])
         
-        # ToDo(alatur) Convert Histogram to image & save to bag.
+        # Convert Histogram to image & save to bag.
+        # ToDo(alaturn) Cleanup type conversions
         histogram_img = numpy.zeros([bucket_count,network_input_size,3])
         histogram_img[:,:,0] = histogram[0,0,:,:]
         histogram_img[:,:,1] = histogram[0,0,:,:]
         histogram_img[:,:,2] = histogram[0,0,:,:]
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        print histogram_img_large.dtype
         # cv2.imshow("image", histogram_img_large)
         # cv2.waitKey()
         bridge = cvb.CvBridge()
@@ -106,7 +107,23 @@ def main():
         uimg = hist32.astype(numpy.uint8)
         image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
 
-        # print image_message.header
+        # Convert feature vector to image & save to bag.
+        # ToDo(alaturn) Fix data scaling and type conversion.
+        output2 = output[0]
+        norm = numpy.linalg.norm(output2)
+        output2 = output2/norm
+        print output2
+        feature_img = numpy.zeros([1,50,3])
+        feature_img[0,:,0] = output2[0]
+        feature_img[0,:,1] = output2[0]
+        feature_img[0,:,1] = output2[0]
+        print feature_img.shape
+        feature_img_large = cv2.resize(feature_img, None, fx = 15, fy = 40, interpolation = cv2.INTER_CUBIC)
+        cv2.imshow("image", feature_img_large)
+        cv2.waitKey()
+
+
+        # Save to bag.
         image_message.header.stamp = pcl.header.stamp
         out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
 
