@@ -12,16 +12,22 @@ from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Float64MultiArray
 
+import cv2
+import cv_bridge
+
 
 def main():
-    bag_file = '/home/marius/.segmap/bosch/augmented_bosch1.bag'
-    out_bag_file = '/home/marius/.segmap/bosch/locnet.bag'
-    model_file = '/home/marius/.segmap/locnet/models/kitti_delta_range.caffemodel'
-    config_file = '/home/marius/.segmap/locnet/cfg/kitti_delta_range.prototxt'
+    # File paths.
+    bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag' 
+    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet.bag' 
+    model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
+    config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     caffe.set_mode_cpu()
-    net = caffe.Net(config_file, model_file, 0)
+    net = caffe.Net(config_file, model_file, caffe.TEST)
+    
+    # Parameters of the handcrafted LocNet histogram (input to CNN).
     max_distance = 200
     d_min = 0.0
     d_max = 1.5
@@ -30,7 +36,7 @@ def main():
     bucket_count = 80       # given from network
     network_input_size = 64  # given from network
     delta_i_b = (1.0 / bucket_count) * (d_max - d_min)
-
+    print 'Hallo'
     i = 0
     for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
         points = point_cloud2.read_points(pcl)
@@ -58,6 +64,7 @@ def main():
 
             if point_valid and last_point_valid and not(is_new_line):
 
+                # ToDo(alaturn) Switch to R mode (better than deltaR)
                 dist = math.sqrt((x - last_x)**2 + (y-last_y)**2)
                 for n in range(0, bucket_count):
 
@@ -77,19 +84,33 @@ def main():
                 is_new_line = True
             ring_index = math.trunc(
                 line_index * network_input_size / image_height)
+        
+        # Now pass the histogram through the network.
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
 
+        # Save the computed metrics to new bag.
         output_msg = Float64MultiArray(data=output[0])
         
+        # ToDo(alatur) Convert Histogram to image & save to bag.
+        img = numpy.zeros([bucket_count,network_input_size,3])
+        img[:,:,0] = histogram[0,0,:,:]
+        print img.shape
+        print histogram.shape
+        dst = cv2.resize(img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
+        cv2.imshow("image", dst)
+        cv2.waitKey()
+
         out_bag.write('/augmented_cloud', pcl,
                       pcl.header.stamp, False)
+
         out_bag.write('/locnet_descriptor', output_msg,
                       pcl.header.stamp, False)
         i += 1
         print i
         # if i == 100:
         #     break
+        
 
     tf_it = 0
     for topic, tf, t in bag.read_messages(topics=['/tf']):
@@ -103,7 +124,7 @@ def main():
         out_bag.write('/tf_static', tf_static,
                       time_hack, False)
     out_bag.close()
-
+    
 
 if __name__ == '__main__':
     main()
