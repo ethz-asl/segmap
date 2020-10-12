@@ -33,8 +33,8 @@ def main():
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
     d_min = 0.0
     d_max = 80
-    theta_deg_min = -36 # positive theta = above horizont
-    theta_deg_max = 36
+    theta_deg_min = -40 # positive theta = above horizont
+    theta_deg_max = 40 
     image_width = 640
     image_height = 480
     bucket_count = 80       # given from network
@@ -70,7 +70,7 @@ def main():
                 continue
 
             # 1. Compute vertical angle.
-            theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0
+            theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0 + abs(theta_deg_min)
             # print l
             # print theta_deg
             # if theta_deg > maxx:
@@ -80,11 +80,23 @@ def main():
             # l+=1
 
             # 2. Assign to scan line.
-            
-            
+            scan_line = math.floor(theta_deg/delta_theta_deg)
+            # print scan_line
+            # if scan_line > maxx:
+            #     maxx = scan_line
+            # if scan_line < minn:
+            #     minn = scan_line
+
             # 3. Assign to distance bucket.
+            bucket = math.floor((r-d_min)/delta_i_b)
+            # print bucket
+            # if bucket > maxx:
+            #     maxx = bucket
+            # if bucket < minn:
+            #     minn = bucket
 
             # 4. Increase counter.
+            histogram[0,0,bucket,scan_line] +=1
 
             # if r > max_distance:
             #     point_valid = False
@@ -115,10 +127,11 @@ def main():
             #     line_index * network_input_size / image_height)
         
         # Normalize count in each ring.
+        
         # print 'done!'
         # print minn
         # print maxx
-        lol
+        # lol
         # Now pass the histogram through the network.
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
