@@ -33,11 +33,14 @@ def main():
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
     d_min = 0.0
     d_max = 80
+    theta_deg_min = -36 # positive theta = above horizont
+    theta_deg_max = 36
     image_width = 640
     image_height = 480
     bucket_count = 80       # given from network
     network_input_size = 64  # given from network
     delta_i_b = (1.0 / bucket_count) * (d_max - d_min)
+    delta_theta_deg = (1.0/network_input_size)*(theta_deg_max - theta_deg_min)
     i = 0
     for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
         points = point_cloud2.read_points(pcl)
@@ -52,40 +55,70 @@ def main():
         last_y = 0
         dist = 0
 
+        # print len(list(points))
+        l = 0
+        maxx = - 1000
+        minn = 1000
         for point in points:
             x = point[0]
             y = point[1]
             z = point[2]
             r = math.sqrt(x*x + y*y + z*z)
+            r2d = math.sqrt(x*x + y*y)
 
-            if r > max_distance:
-                point_valid = False
-            else:
-                point_valid = True
+            if  (r < d_min or r > d_max):
+                continue
 
-            if point_valid and last_point_valid and not(is_new_line):
+            # 1. Compute vertical angle.
+            theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0
+            # print l
+            # print theta_deg
+            # if theta_deg > maxx:
+            #     maxx = theta_deg
+            # if theta_deg < minn:
+            #     minn = theta_deg
+            # l+=1
 
-                # ToDo(alaturn) Switch to R mode (better than deltaR)
-                #dist = math.sqrt((x - last_x)**2 + (y-last_y)**2)
-                for n in range(0, bucket_count):
+            # 2. Assign to scan line.
+            
+            
+            # 3. Assign to distance bucket.
 
-                    if d_min + n * delta_i_b > dist:
-                        histogram[0, 0, n, ring_index] += 1
-                        break
+            # 4. Increase counter.
 
-            # update for next point
-            last_point_valid = point_valid
-            is_new_line = False
-            last_x = x
-            last_y = y
-            azimuth_index += 1
-            if azimuth_index == image_width:
-                line_index += 1
-                azimuth_index = 0
-                is_new_line = True
-            ring_index = math.trunc(
-                line_index * network_input_size / image_height)
+            # if r > max_distance:
+            #     point_valid = False
+            # else:
+            #     point_valid = True
+
+            # if point_valid and last_point_valid and not(is_new_line):
+
+            #     # ToDo(alaturn) Switch to R mode (better than deltaR)
+            #     #dist = math.sqrt((x - last_x)**2 + (y-last_y)**2)
+            #     for n in range(0, bucket_count):
+
+            #         if d_min + n * delta_i_b > dist:
+            #             histogram[0, 0, n, ring_index] += 1
+            #             break
+
+            # # update for next point
+            # last_point_valid = point_valid
+            # is_new_line = False
+            # last_x = x
+            # last_y = y
+            # azimuth_index += 1
+            # if azimuth_index == image_width:
+            #     line_index += 1
+            #     azimuth_index = 0
+            #     is_new_line = True
+            # ring_index = math.trunc(
+            #     line_index * network_input_size / image_height)
         
+        # Normalize count in each ring.
+        # print 'done!'
+        # print minn
+        # print maxx
+        lol
         # Now pass the histogram through the network.
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
