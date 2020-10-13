@@ -136,7 +136,7 @@ def main():
             # print ring_count
             histogram[0,0,:,k] = histogram[0,0,:,k]/ring_count
             # print 'Normed'
-            print histogram[0,0,:,k]
+            # print histogram[0,0,:,k]
             k +=1
 
         # print 'The End'
@@ -149,7 +149,8 @@ def main():
         output = net.blobs['feat'].data
 
         # Save the computed metrics to new bag.
-        
+        bridge = cvb.CvBridge()
+
         # Convert Histogram to image & save to bag.
         # ToDo(alaturn) Cleanup type conversions
         # histogram_img = numpy.zeros([bucket_count,network_input_size,3])
@@ -159,14 +160,15 @@ def main():
         # histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
         # cv2.imshow("image", histogram_img_large)
         # cv2.waitKey()
-        histogram_img = histogram[0,0,:,:]
-        print numpy.max(histogram_img)
-        print numpy.min(histogram_img) 
-
-        bridge = cvb.CvBridge()
-        hist32 = numpy.float32(histogram_img_large)
-        uimg = hist32.astype(numpy.uint8)
-        image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
+        histogram_img = histogram[0,0,:,:]*254
+        histogram_img = histogram_img.astype(numpy.uint8)
+        histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
+        histogram_img_msg = bridge.cv2_to_imgmsg(histogram_img_large, encoding="mono8")
+        # cv2.imshow("image", histogram_img_large)
+        # cv2.waitKey()
+        # hist32 = numpy.float32(histogram_img_large)
+        # uimg = hist32.astype(numpy.uint8)
+        # image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
 
         # Feature vector.
         output_msg = Float64MultiArray(data=output[0])
@@ -177,9 +179,9 @@ def main():
         norm = numpy.linalg.norm(feature_vec)
         feature_vec = (feature_vec/norm)*254
         feature_vec = feature_vec.astype(numpy.uint8)
-        print feature_vec.shape
+        # print feature_vec.shape
         feature_vec = numpy.transpose(feature_vec)
-        print feature_vec.shape
+        # print feature_vec.shape
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
@@ -192,7 +194,8 @@ def main():
 
         out_bag.write('/augmented_cloud', pcl,
                       pcl.header.stamp, False)
-
+        out_bag.write('/locnet_range_histogram', histogram_img_msg,
+                      pcl.header.stamp, False)
         out_bag.write('/locnet_descriptor', output_msg,
                       pcl.header.stamp, False)
         out_bag.write('/locnet_descriptor_img', feature_img_msg, pcl.header.stamp, False)
