@@ -71,29 +71,12 @@ def main():
 
             # 1. Compute vertical angle.
             theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0 + abs(theta_deg_min)
-            # print l
-            # print theta_deg
-            # if theta_deg > maxx:
-            #     maxx = theta_deg
-            # if theta_deg < minn:
-            #     minn = theta_deg
-            # l+=1
 
             # 2. Assign to scan line.
             scan_line = int(math.floor(theta_deg/delta_theta_deg))
-            # print scan_line
-            # if scan_line > maxx:
-            #     maxx = scan_line
-            # if scan_line < minn:
-            #     minn = scan_line
 
             # 3. Assign to distance bucket.
             bucket = int(math.floor((r-d_min)/delta_i_b))
-            # print bucket
-            # if bucket > maxx:
-            #     maxx = bucket
-            # if bucket < minn:
-            #     minn = bucket
 
             # 4. Increase counter.
             histogram[0,0,bucket,scan_line] +=1
@@ -130,20 +113,9 @@ def main():
         k = 0
         for col in numpy.transpose(histogram[0,0,:,:]):
             ring_count = max(1,numpy.sum(col))
-            # print 'Column'
-            # print col
-            # print 'Ring Count'
-            # print ring_count
             histogram[0,0,:,k] = histogram[0,0,:,k]/ring_count
-            # print 'Normed'
-            # print histogram[0,0,:,k]
             k +=1
 
-        # print 'The End'
-        # print 'done!'
-        # print minn
-        # print maxx
-        # lol
         # Now pass the histogram through the network.
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
@@ -152,36 +124,22 @@ def main():
         bridge = cvb.CvBridge()
 
         # Convert Histogram to image & save to bag.
-        # ToDo(alaturn) Cleanup type conversions
-        # histogram_img = numpy.zeros([bucket_count,network_input_size,3])
-        # histogram_img[:,:,0] = histogram[0,0,:,:]
-        # histogram_img[:,:,1] = histogram[0,0,:,:]
-        # histogram_img[:,:,2] = histogram[0,0,:,:]
-        # histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        # cv2.imshow("image", histogram_img_large)
-        # cv2.waitKey()
         histogram_img = histogram[0,0,:,:]*254
         histogram_img = histogram_img.astype(numpy.uint8)
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
         histogram_img_msg = bridge.cv2_to_imgmsg(histogram_img_large, encoding="mono8")
         # cv2.imshow("image", histogram_img_large)
         # cv2.waitKey()
-        # hist32 = numpy.float32(histogram_img_large)
-        # uimg = hist32.astype(numpy.uint8)
-        # image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
 
         # Feature vector.
         output_msg = Float64MultiArray(data=output[0])
 
         # Convert feature vector to image & save to bag.
-        # ToDo(alaturn) Fix data scaling and type conversion.
         feature_vec = output[0]
         norm = numpy.linalg.norm(feature_vec)
         feature_vec = (feature_vec/norm)*254
         feature_vec = feature_vec.astype(numpy.uint8)
-        # print feature_vec.shape
         feature_vec = numpy.transpose(feature_vec)
-        # print feature_vec.shape
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
@@ -190,8 +148,6 @@ def main():
 
 
         # Save to bag.
-        # out_bag.write('/range_histogram', image_message, pcl.header.stamp, False)
-
         out_bag.write('/augmented_cloud', pcl,
                       pcl.header.stamp, False)
         out_bag.write('/locnet_range_histogram', histogram_img_msg,
