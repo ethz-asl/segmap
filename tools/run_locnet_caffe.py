@@ -31,8 +31,9 @@ def main():
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
-    d_min = 0.0
-    d_max = 80
+    d_min = 2.5 # There are some body returns.
+    d_max = 80 #beyond it's not nice data.
+    z_min = -2.0
     theta_deg_min = -40 # positive theta = above horizont
     theta_deg_max = 40 
     image_width = 640
@@ -66,7 +67,7 @@ def main():
             r = math.sqrt(x*x + y*y + z*z)
             r2d = math.sqrt(x*x + y*y)
 
-            if  (r < d_min or r > d_max):
+            if  (r < d_min or r > d_max):# or (z < z_min):
                 continue
 
             # 1. Compute vertical angle.
@@ -124,12 +125,19 @@ def main():
         bridge = cvb.CvBridge()
 
         # Convert Histogram to image & save to bag.
+        print 'max val bef'
+        print numpy.max(histogram)
         histogram_img = histogram[0,0,:,:]*254
+        print 'max val aft'
+        print numpy.max(histogram_img)
         histogram_img = histogram_img.astype(numpy.uint8)
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        histogram_img_msg = bridge.cv2_to_imgmsg(histogram_img_large, encoding="mono8")
-        # cv2.imshow("image", histogram_img_large)
-        # cv2.waitKey()
+        histogram_img_large = numpy.transpose(histogram_img_large)
+        histogram_img_large = numpy.flipud(histogram_img_large)
+        histogram_img_large = numpy.dstack((histogram_img_large,histogram_img_large,histogram_img_large))
+        histogram_img_msg = bridge.cv2_to_imgmsg(histogram_img_large, encoding="bgr8")
+        cv2.imshow("image", histogram_img_large)
+        cv2.waitKey(100)
 
         # Feature vector.
         output_msg = Float64MultiArray(data=output[0])
@@ -148,8 +156,8 @@ def main():
 
 
         # Save to bag.
-        out_bag.write('/augmented_cloud', pcl,
-                      pcl.header.stamp, False)
+        # out_bag.write('/augmented_cloud', pcl,
+        #               pcl.header.stamp, False)
         out_bag.write('/locnet_range_histogram', histogram_img_msg,
                       pcl.header.stamp, False)
         out_bag.write('/locnet_descriptor', output_msg,
