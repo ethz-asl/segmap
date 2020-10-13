@@ -27,7 +27,7 @@ def main():
     out_bag = rosbag.Bag(out_bag_file, 'w')
     caffe.set_mode_cpu()
     net = caffe.Net(config_file, model_file, caffe.TEST)
-    
+    print 'Hallo'
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
@@ -48,7 +48,7 @@ def main():
         azimuth_index = 0
         line_index = 0
         ring_index = 0
-        histogram = zeros([1, 3, bucket_count, network_input_size])
+        histogram = zeros([1, 3, network_input_size, bucket_count])
         is_new_line = True
         point_valid = True
         last_point_valid = True
@@ -80,7 +80,7 @@ def main():
             bucket = int(math.floor((r-d_min)/delta_i_b))
 
             # 4. Increase counter.
-            histogram[0,0,bucket,scan_line] +=1
+            histogram[0,0,scan_line, bucket] +=1
 
             # if r > max_distance:
             #     point_valid = False
@@ -112,10 +112,12 @@ def main():
         
         # ToDo(alaturn) Normalize count in each ring.
         k = 0
-        for col in numpy.transpose(histogram[0,0,:,:]):
-            ring_count = max(1,numpy.sum(col))
-            histogram[0,0,:,k] = histogram[0,0,:,k]/ring_count
+        for row in histogram[0,0,:,:]: #col in numpy.transpose(histogram[0,0,:,:]):
+            ring_count = max(1,numpy.sum(row))
+            histogram[0,0,k,:] = histogram[0,0,k,:]/ring_count
             k +=1
+
+        histogram[0,0,:,:] = numpy.flipud(histogram[0,0,:,:])
 
         # Now pass the histogram through the network.
         net.forward_all(**{"data": histogram})
@@ -132,12 +134,12 @@ def main():
         print numpy.max(histogram_img)
         histogram_img = histogram_img.astype(numpy.uint8)
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
-        histogram_img_large = numpy.transpose(histogram_img_large)
-        histogram_img_large = numpy.flipud(histogram_img_large)
+        # histogram_img_large = numpy.transpose(histogram_img_large)
+        # histogram_img_large = numpy.flipud(histogram_img_large)
         histogram_img_large = numpy.dstack((histogram_img_large,histogram_img_large,histogram_img_large))
         histogram_img_msg = bridge.cv2_to_imgmsg(histogram_img_large, encoding="bgr8")
-        cv2.imshow("image", histogram_img_large)
-        cv2.waitKey(100)
+        # cv2.imshow("image", histogram_img_large)
+        # cv2.waitKey(50)
 
         # Feature vector.
         output_msg = Float64MultiArray(data=output[0])
@@ -151,8 +153,8 @@ def main():
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
-        # cv2.imshow("image", feature_img_large)
-        # cv2.waitKey()
+        cv2.imshow("image", feature_img_large)
+        cv2.waitKey(10)
 
 
         # Save to bag.
