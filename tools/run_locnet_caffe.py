@@ -58,7 +58,7 @@ def main():
         # print len(list(points))
         l = 0
         maxx = - 1000
-        minn = 1000
+        minn = 1000 
         for point in points:
             x = point[0]
             y = point[1]
@@ -80,7 +80,7 @@ def main():
             # l+=1
 
             # 2. Assign to scan line.
-            scan_line = math.floor(theta_deg/delta_theta_deg)
+            scan_line = int(math.floor(theta_deg/delta_theta_deg))
             # print scan_line
             # if scan_line > maxx:
             #     maxx = scan_line
@@ -88,7 +88,7 @@ def main():
             #     minn = scan_line
 
             # 3. Assign to distance bucket.
-            bucket = math.floor((r-d_min)/delta_i_b)
+            bucket = int(math.floor((r-d_min)/delta_i_b))
             # print bucket
             # if bucket > maxx:
             #     maxx = bucket
@@ -126,8 +126,20 @@ def main():
             # ring_index = math.trunc(
             #     line_index * network_input_size / image_height)
         
-        # Normalize count in each ring.
-        
+        # ToDo(alaturn) Normalize count in each ring.
+        k = 0
+        for col in numpy.transpose(histogram[0,0,:,:]):
+            ring_count = max(1,numpy.sum(col))
+            # print 'Column'
+            # print col
+            # print 'Ring Count'
+            # print ring_count
+            histogram[0,0,:,k] = histogram[0,0,:,k]/ring_count
+            # print 'Normed'
+            print histogram[0,0,:,k]
+            k +=1
+
+        # print 'The End'
         # print 'done!'
         # print minn
         # print maxx
@@ -137,21 +149,27 @@ def main():
         output = net.blobs['feat'].data
 
         # Save the computed metrics to new bag.
-        output_msg = Float64MultiArray(data=output[0])
         
         # Convert Histogram to image & save to bag.
         # ToDo(alaturn) Cleanup type conversions
-        histogram_img = numpy.zeros([bucket_count,network_input_size,3])
-        histogram_img[:,:,0] = histogram[0,0,:,:]
-        histogram_img[:,:,1] = histogram[0,0,:,:]
-        histogram_img[:,:,2] = histogram[0,0,:,:]
-        histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
+        # histogram_img = numpy.zeros([bucket_count,network_input_size,3])
+        # histogram_img[:,:,0] = histogram[0,0,:,:]
+        # histogram_img[:,:,1] = histogram[0,0,:,:]
+        # histogram_img[:,:,2] = histogram[0,0,:,:]
+        # histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
         # cv2.imshow("image", histogram_img_large)
         # cv2.waitKey()
+        histogram_img = histogram[0,0,:,:]
+        print numpy.max(histogram_img)
+        print numpy.min(histogram_img) 
+
         bridge = cvb.CvBridge()
         hist32 = numpy.float32(histogram_img_large)
         uimg = hist32.astype(numpy.uint8)
         image_message = bridge.cv2_to_imgmsg(uimg, encoding="bgr8")
+
+        # Feature vector.
+        output_msg = Float64MultiArray(data=output[0])
 
         # Convert feature vector to image & save to bag.
         # ToDo(alaturn) Fix data scaling and type conversion.
