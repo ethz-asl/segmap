@@ -20,15 +20,15 @@ import timeit
 def main():
     # File paths.
     # ToDo(alaturn) read these in as argument.
-    bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag' 
-    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet_gpu_test.bag' 
+    bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_09_30_drive_18.bag' 
+    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet_KITTI_2011_09_30_drive_18_test.bag' 
     model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
     config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     #caffe.set_mode_cpu()
     caffe.set_mode_gpu()
-    net = caffe.Net(config_file, model_file, caffe.TEST)
+    #net = caffe.Net(config_file, model_file, caffe.TEST)
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
@@ -44,7 +44,9 @@ def main():
     delta_i_b = (1.0 / bucket_count) * (d_max - d_min)
     delta_theta_deg = (1.0/network_input_size)*(theta_deg_max - theta_deg_min)
     i = 0
-    for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
+    print 'Hallo1'
+    for topic, pcl, t in bag.read_messages(topics=['velodyne_points']):
+        print 'Lol'
         points = point_cloud2.read_points(pcl)
         # azimuth_index = 0
         # line_index = 0
@@ -67,12 +69,17 @@ def main():
             z = point[2]
             r = math.sqrt(x*x + y*y + z*z)
             r2d = math.sqrt(x*x + y*y)
+            if r<0.1 or r2d<0.1:
+                continue
             theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0
-
+            
 
             if  (r < d_min or r > d_max) or (theta_deg < theta_deg_min or theta_deg > theta_deg_max):# or (z < z_min):
+                
                 continue
 
+            print 'The ANGLE'
+            print theta_deg
             # 1. Make everything positive.
             theta_deg -= theta_deg_min
 
