@@ -15,6 +15,7 @@ from std_msgs.msg import Float64MultiArray
 import cv2
 import cv_bridge as cvb
 
+import timeit
 
 def main():
     # File paths.
@@ -25,7 +26,8 @@ def main():
     config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
-    caffe.set_mode_cpu()
+    #caffe.set_mode_cpu()
+    caffe.set_mode_gpu()
     net = caffe.Net(config_file, model_file, caffe.TEST)
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
@@ -124,8 +126,13 @@ def main():
         histogram[0,0,:,:] = numpy.flipud(histogram[0,0,:,:])
 
         # Now pass the histogram through the network.
+        start = timeit.timeit()
+        print "START"
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
+        end = timeit.timeit()
+        print end - start
+        print "END"
 
         # Save the computed metrics to new bag.
         bridge = cvb.CvBridge()
