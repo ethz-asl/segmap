@@ -20,22 +20,21 @@ def main():
     # File paths.
     # ToDo(alaturn) read these in as argument.
     bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag' 
-    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet.bag' 
+    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet_gpu_test.bag' 
     model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
     config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     caffe.set_mode_cpu()
     net = caffe.Net(config_file, model_file, caffe.TEST)
-    print 'Hallo'
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
     d_min = 2.5 # There are some body returns.
     d_max = 80 #beyond it's not nice data.
     z_min = -2.0
-    theta_deg_min = -40 # positive theta = above horizont
-    theta_deg_max = 40 
+    theta_deg_min = -24.0 # positive theta = above horizont
+    theta_deg_max = 2.0 
     image_width = 640
     image_height = 480
     bucket_count = 80       # given from network
@@ -45,39 +44,44 @@ def main():
     i = 0
     for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
         points = point_cloud2.read_points(pcl)
-        azimuth_index = 0
-        line_index = 0
-        ring_index = 0
+        # azimuth_index = 0
+        # line_index = 0
+        # ring_index = 0
         histogram = zeros([1, 3, network_input_size, bucket_count])
-        is_new_line = True
-        point_valid = True
-        last_point_valid = True
-        last_x = 0
-        last_y = 0
-        dist = 0
+        # is_new_line = True
+        # point_valid = True
+        # last_point_valid = True
+        # last_x = 0
+        # last_y = 0
+        # dist = 0
 
         # print len(list(points))
         l = 0
-        maxx = - 1000
-        minn = 1000 
+        # maxx = - 1000
+        # minn = 1000 
         for point in points:
             x = point[0]
             y = point[1]
             z = point[2]
             r = math.sqrt(x*x + y*y + z*z)
             r2d = math.sqrt(x*x + y*y)
+            theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0
 
-            if  (r < d_min or r > d_max):# or (z < z_min):
+
+            if  (r < d_min or r > d_max) or (theta_deg < theta_deg_min or theta_deg > theta_deg_max):# or (z < z_min):
                 continue
 
-            # 1. Compute vertical angle.
-            theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0 + abs(theta_deg_min)
+            # 1. Make everything positive.
+            theta_deg -= theta_deg_min
 
             # 2. Assign to scan line.
             scan_line = int(math.floor(theta_deg/delta_theta_deg))
 
             # 3. Assign to distance bucket.
             bucket = int(math.floor((r-d_min)/delta_i_b))
+
+            # print bucket
+            # print scan_line
 
             # 4. Increase counter.
             histogram[0,0,scan_line, bucket] +=1
@@ -127,11 +131,7 @@ def main():
         bridge = cvb.CvBridge()
 
         # Convert Histogram to image & save to bag.
-        print 'max val bef'
-        print numpy.max(histogram)
         histogram_img = histogram[0,0,:,:]*254
-        print 'max val aft'
-        print numpy.max(histogram_img)
         histogram_img = histogram_img.astype(numpy.uint8)
         histogram_img_large = cv2.resize(histogram_img, None, fx = 7, fy = 7, interpolation = cv2.INTER_CUBIC)
         # histogram_img_large = numpy.transpose(histogram_img_large)
@@ -153,8 +153,8 @@ def main():
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
-        cv2.imshow("image", feature_img_large)
-        cv2.waitKey(10)
+        # cv2.imshow("image", feature_img_large)
+        # cv2.waitKey(10)
 
 
         # Save to bag.
@@ -167,22 +167,23 @@ def main():
         out_bag.write('/locnet_descriptor_img', feature_img_msg, pcl.header.stamp, False)
         i += 1
         print i
-        # if i == 100:
+        # if i == 2:
         #     break
         
+    print 'Done with LocNet'
+    # tf_it = 0
+    # for topic, tf, t in bag.read_messages(topics=['/tf']):
+    #     out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)
+    #     tf_it += 1
+    #     if tf_it == 1:
+    #         time_hack = tf.transforms[0].header.stamp
+    #     print('TF: ' + str(tf_it))
 
-    tf_it = 0
-    for topic, tf, t in bag.read_messages(topics=['/tf']):
-        out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)
-        tf_it += 1
-        if tf_it == 1:
-            time_hack = tf.transforms[0].header.stamp
-        print('TF: ' + str(tf_it))
-
-    for topic, tf_static, t in bag.read_messages(topics=['/tf_static']):
-        out_bag.write('/tf_static', tf_static,
-                      time_hack, False)
+    # for topic, tf_static, t in bag.read_messages(topics=['/tf_static']):
+    #     out_bag.write('/tf_static', tf_static,
+    #                   time_hack, False)
     out_bag.close()
+    print 'Closed bag'
     
 
 if __name__ == '__main__':
