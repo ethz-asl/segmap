@@ -15,20 +15,18 @@ from std_msgs.msg import Float64MultiArray
 import cv2
 import cv_bridge as cvb
 
-import timeit
-
 def main():
     # File paths.
     # ToDo(alaturn) read these in as argument.
     bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_09_30_drive_18.bag' 
-    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/locnet_KITTI_2011_09_30_drive_18_test.bag' 
+    out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/empty.bag' 
     model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
     config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
     bag = rosbag.Bag(bag_file)
     out_bag = rosbag.Bag(out_bag_file, 'w')
     #caffe.set_mode_cpu()
     caffe.set_mode_gpu()
-    #net = caffe.Net(config_file, model_file, caffe.TEST)
+    net = caffe.Net(config_file, model_file, caffe.TEST)
     # Parameters of the handcrafted LocNet histogram (input to CNN).
     # ToDo(alaturn) read these in as argument.
     max_distance = 200  # ToDo(alatur) isn't this what d_max is for??
@@ -36,7 +34,7 @@ def main():
     d_max = 80 #beyond it's not nice data.
     z_min = -2.0
     theta_deg_min = -24.0 # positive theta = above horizont
-    theta_deg_max = 2.0 
+    theta_deg_max = 2.0 # KITTI LiDAR seems to reach til +4 degree.. 
     image_width = 640
     image_height = 480
     bucket_count = 80       # given from network
@@ -46,7 +44,7 @@ def main():
     i = 0
     print 'Hallo1'
     for topic, pcl, t in bag.read_messages(topics=['velodyne_points']):
-        print 'Lol'
+        # print 'Lol'
         points = point_cloud2.read_points(pcl)
         # azimuth_index = 0
         # line_index = 0
@@ -59,10 +57,7 @@ def main():
         # last_y = 0
         # dist = 0
 
-        # print len(list(points))
         l = 0
-        # maxx = - 1000
-        # minn = 1000 
         for point in points:
             x = point[0]
             y = point[1]
@@ -74,12 +69,9 @@ def main():
             theta_deg = numpy.sign(z)*math.atan(abs(z)/r2d)/math.pi*180.0
             
 
-            if  (r < d_min or r > d_max) or (theta_deg < theta_deg_min or theta_deg > theta_deg_max):# or (z < z_min):
-                
+            if  (r < d_min) or (r > d_max) or (theta_deg < theta_deg_min) or (theta_deg > theta_deg_max):# or (z < z_min):
                 continue
 
-            print 'The ANGLE'
-            print theta_deg
             # 1. Make everything positive.
             theta_deg -= theta_deg_min
 
@@ -123,7 +115,6 @@ def main():
             # ring_index = math.trunc(
             #     line_index * network_input_size / image_height)
         
-        # ToDo(alaturn) Normalize count in each ring.
         k = 0
         for row in histogram[0,0,:,:]: #col in numpy.transpose(histogram[0,0,:,:]):
             ring_count = max(1,numpy.sum(row))
@@ -131,15 +122,12 @@ def main():
             k +=1
 
         histogram[0,0,:,:] = numpy.flipud(histogram[0,0,:,:])
-
+        histogram[0,1,:,:] = histogram[0,0,:,:]
+        histogram[0,2,:,:] = histogram[0,0,:,:]
+        histogram[0,0,:,:] = histogram[0,0,:,:]
         # Now pass the histogram through the network.
-        start = timeit.timeit()
-        print "START"
         net.forward_all(**{"data": histogram})
         output = net.blobs['feat'].data
-        end = timeit.timeit()
-        print end - start
-        print "END"
 
         # Save the computed metrics to new bag.
         bridge = cvb.CvBridge()
@@ -167,8 +155,8 @@ def main():
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
-        # cv2.imshow("image", feature_img_large)
-        # cv2.waitKey(10)
+        cv2.imshow("image", feature_img_large)
+        cv2.waitKey(10)
 
 
         # Save to bag.
