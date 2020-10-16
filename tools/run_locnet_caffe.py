@@ -14,11 +14,15 @@ from std_msgs.msg import Float64MultiArray
 
 import cv2
 import cv_bridge as cvb
+import matplotlib
+import matplotlib.pyplot as plt
+
 
 def main():
     # File paths.
     # ToDo(alaturn) read these in as argument.
-    bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_09_30_drive_18.bag' 
+    #bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_09_30_drive_18.bag' 
+    bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag' 
     out_bag_file = '/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/empty.bag' 
     model_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/models/kitti_range.caffemodel'
     config_file = '/home/nikhilesh/segmap_ws/src/LocNet_caffe/cfg/kitti_range_deploy.prototxt'
@@ -43,7 +47,9 @@ def main():
     delta_theta_deg = (1.0/network_input_size)*(theta_deg_max - theta_deg_min)
     i = 0
     print 'Hallo1'
-    for topic, pcl, t in bag.read_messages(topics=['velodyne_points']):
+    feature_map = zeros(50)
+    #for topic, pcl, t in bag.read_messages(topics=['velodyne_points']):
+    for topic, pcl, t in bag.read_messages(topics=['/augmented_cloud']):
         # print 'Lol'
         points = point_cloud2.read_points(pcl)
         # azimuth_index = 0
@@ -148,6 +154,13 @@ def main():
 
         # Convert feature vector to image & save to bag.
         feature_vec = output[0]
+        print feature_vec.shape
+        feature_map = numpy.vstack([feature_map, feature_vec])
+        # print 'Lol'
+        # print feature_map
+        # print feature_map.shape
+        # print feature_vec.shape
+        # print type(feature_vec)
         norm = numpy.linalg.norm(feature_vec)
         feature_vec = (feature_vec/norm)*254
         feature_vec = feature_vec.astype(numpy.uint8)
@@ -155,8 +168,8 @@ def main():
         feature_vec = cv2.rotate(feature_vec, cv2.ROTATE_90_CLOCKWISE)
         feature_img_large = cv2.resize(feature_vec, None, fx = 20, fy = 70, interpolation = cv2.INTER_CUBIC)
         feature_img_msg = bridge.cv2_to_imgmsg(feature_img_large, encoding="mono8")
-        cv2.imshow("image", feature_img_large)
-        cv2.waitKey(10)
+        # cv2.imshow("image", feature_img_large)
+        # cv2.waitKey(10)
 
 
         # Save to bag.
@@ -169,9 +182,37 @@ def main():
         out_bag.write('/locnet_descriptor_img', feature_img_msg, pcl.header.stamp, False)
         i += 1
         print i
-        # if i == 2:
-        #     break
+
         
+        if i == 1000:
+            break
+
+    # Evaluate descriptor quality.
+    feature_map = numpy.delete(feature_map, 0, 0)
+    query_indices = numpy.random.random_integers(0, feature_map.shape[0]-1, 100)
+    for i in query_indices:
+        print i
+        # Assess quality
+        query_index = i
+        #query_index = 3 # ToDo sample randomly.
+        query_descriptor = feature_map[query_index,:]
+        similarity = []
+        for row in feature_map:
+            dist = numpy.linalg.norm(query_descriptor - row)
+            # print dist
+            similarity = numpy.append(similarity, dist)
+
+        index = numpy.arange(len(similarity))
+        plt.plot(index, similarity, marker='x')  
+        plt.plot([query_index],[1] , marker='*')
+        filename = 'bosch_augmented_1_cam' + str(query_index)
+        # plt.show
+        plt.savefig('/home/nikhilesh/LocNetQuickEval/bosch_augmented_1_cam/'+filename+'.png')
+        plt.clf()
+        # cv2.waitKey(0)
+
+
+
     print 'Done with LocNet'
     # tf_it = 0
     # for topic, tf, t in bag.read_messages(topics=['/tf']):
