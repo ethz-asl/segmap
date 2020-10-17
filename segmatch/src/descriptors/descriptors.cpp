@@ -7,6 +7,7 @@
 #include "segmatch/descriptors/cnn.hpp"
 #include "segmatch/descriptors/eigenvalue_based.hpp"
 #include "segmatch/descriptors/ensemble_shape_functions.hpp"
+#include "segmatch/descriptors/fpfh.hpp"
 
 namespace segmatch {
 
@@ -38,6 +39,8 @@ Descriptors::Descriptors(const DescriptorsParameters& parameters) {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new EnsembleShapeFunctions(parameters)));
     } else if (parameters.descriptor_types[i] == "CNN") {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new CNNDescriptor(parameters)));
+    } else if (parameters.descriptor_types[i] == "FPFH") {
+      descriptors_.push_back(std::unique_ptr<Descriptor>(new FpfhDescriptor(parameters)));
     } else {
       CHECK(false) << "The descriptor '" << parameters.descriptor_types[i] <<
           "' was not implemented.";
