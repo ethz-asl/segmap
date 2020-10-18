@@ -71,12 +71,20 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   fpfh.setSearchMethod(tree_fpfh);
 
   // Create output dataset.
+  pcl::PointCloud<pcl::FPFHSignature33>::Ptr fpfhs(new pcl::PointCloud<pcl::FPFHSignature33>());
 
   // Compute largest distance centroid-pt.
+  Eigen::Vector4f max_pt_eig;
+  pcl::getMaxDistance(*cloud, centroid1.getVector4fMap(), max_pt_eig);
+  float max_distance = (Eigen::Vector3f(centroid1.x, centroid1.y, centroid1.z) - Eigen::Vector3f(max_pt_eig[0], max_pt_eig[1], max_pt_eig[2])).norm();
+  // std::cout<<"Max distance: "<<max_distance<<std::endl;
 
   // Set radius-search to allow for all points.
+  fpfh.setRadiusSearch(1.1*max_distance);
 
   // Only compute SPFH for centroid.
+  fpfh.compute (*fpfhs);
+  std::cout<<"Numbers: "<<cloud->size()<<" "<<fpfhs->size()<<std::endl;
 
   // Return.
   // std::vector<int> test_fpfh(125, 12); 
@@ -98,8 +106,8 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
   features->replaceByName(fpfh_feature);
 
-  // double secondsPassed =  (clock() - startTime) / CLOCKS_PER_SEC;
-  // std::cout<<"It took: "<<secondsPassed<<" seconds!"<<std::endl;
+  double secondsPassed =  (clock() - startTime) / CLOCKS_PER_SEC;
+  std::cout<<"It took: "<<secondsPassed<<" seconds!"<<std::endl;
 
 }
 
