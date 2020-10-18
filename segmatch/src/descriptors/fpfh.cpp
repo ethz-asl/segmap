@@ -32,23 +32,30 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
   // Do Stuff in here.
 
+
   // Extract point cloud.
-  PointCloudPtr cloud(new PointCloud);
+  // PointCloudPtr cloud(new PointCloud);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::copyPointCloud(segment.getLastView().point_cloud, *cloud);
 
-  // Extract surface normals for point cloud (how to choose radius?).
-
-  // (How to handle NaN normals?).  
+  // ToDo(alaturn) Extract surface normals for point cloud (how to choose radius?).
+    // (How to handle NaN normals?).  
+  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal> ());
 
   // Get centroid of segment.
-
+  PclPoint centroid = segment.getLastView().centroid;
   // Get Z-Axis (= fake normal for centroid makes descriptor invariant to centroid normal)
 
   // Add centroid at the end of point cloud and surface normal.
 
   // Create FPFHE class and pass data+normals to it.
+  pcl::FPFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::FPFHSignature33> fpfh;
+  fpfh.setInputCloud (cloud);
+  fpfh.setInputNormals (normals);
 
   // Create empty kdtree.
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
+  fpfh.setSearchMethod(tree);
 
   // Create output dataset.
 
@@ -59,15 +66,22 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // Only compute SPFH for centroid.
 
   // Return.
-  std::vector<int> test_fpfh(125, 12); 
-  std::generate(test_fpfh.begin(), test_fpfh.end(), std::rand);
+  // std::vector<int> test_fpfh(125, 12); 
+  // std::generate(test_fpfh.begin(), test_fpfh.end(), std::rand);
 
 
   Feature fpfh_feature("fpfh");
-  for (size_t j = 0u; j < test_fpfh.size(); ++j) {
-      fpfh_feature.push_back(
-      FeatureValue("fpfh_" + std::to_string(j), test_fpfh[j]));
-  }
+  fpfh_feature.push_back(
+      FeatureValue("fpfh_x", centroid.x));
+    fpfh_feature.push_back(
+      FeatureValue("fpfh_y", centroid.y));
+  fpfh_feature.push_back(
+  FeatureValue("fpfh_z", centroid.z));
+
+  // for (size_t j = 0u; j < test_fpfh.size(); ++j) {
+  //     fpfh_feature.push_back(
+  //     FeatureValue("fpfh_" + std::to_string(j), test_fpfh[j]));
+  // }
 
   features->replaceByName(fpfh_feature);
 
