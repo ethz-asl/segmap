@@ -9,6 +9,7 @@
 #include <pcl/features/fpfh.h>
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
+#include <ctime>
 
 #pragma STDC FENV_ACCESS on
 
@@ -32,17 +33,15 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   std::feclearexcept(FE_ALL_EXCEPT);
 
   // Do Stuff in here.
-
+  clock_t startTime = clock(); //Start timer
 
   // Extract point cloud.
   // PointCloudPtr cloud(new PointCloud);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::copyPointCloud(segment.getLastView().point_cloud, *cloud);
 
-  std::cout<<"Number of pts in pc: "<<cloud->size()<<std::endl;
-
-  // ToDo(alaturn) Extract surface normals for point cloud (how to choose radius?).
-    // (How to handle NaN normals?).  
+  // Extract surface normals for point cloud.
+  // ToDo(alaturn) How to handle NaN normals? How to choose radius?  
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
   ne.setInputCloud(cloud);
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_ne(new pcl::search::KdTree<pcl::PointXYZ> ());
@@ -53,21 +52,23 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
   // Get centroid of segment.
   PclPoint centroid = segment.getLastView().centroid;
+  
   // Get Z-Axis (= fake normal for centroid makes descriptor invariant to centroid normal)
-
+  pcl::Normal centroid_normal(0.0,0.0,1.0);
+  pcl::PointXYZ centroid1(centroid.x, centroid.y, centroid.z);
+  
   // Add centroid at the end of point cloud and surface normal.
+  cloud->push_back(centroid1);
+  cloud_normals->push_back(centroid_normal);
 
   // Create FPFHE class and pass data+normals to it.
   pcl::FPFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::FPFHSignature33> fpfh;
   fpfh.setInputCloud(cloud);
   fpfh.setInputNormals(cloud_normals);
 
-  std::cout<<"Number of normals in pc: "<<cloud_normals->size()<<std::endl;
-
-
   // Create empty kdtree.
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-  fpfh.setSearchMethod(tree);
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_fpfh(new pcl::search::KdTree<pcl::PointXYZ>);
+  fpfh.setSearchMethod(tree_fpfh);
 
   // Create output dataset.
 
@@ -96,6 +97,9 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // }
 
   features->replaceByName(fpfh_feature);
+
+  // double secondsPassed =  (clock() - startTime) / CLOCKS_PER_SEC;
+  // std::cout<<"It took: "<<secondsPassed<<" seconds!"<<std::endl;
 
 }
 
