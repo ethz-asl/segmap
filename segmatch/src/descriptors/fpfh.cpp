@@ -8,6 +8,7 @@
 #include <pcl/common/common.h>
 #include <pcl/features/fpfh.h>
 #include <pcl/point_types.h>
+#include <pcl/features/normal_3d.h>
 
 #pragma STDC FENV_ACCESS on
 
@@ -38,9 +39,17 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::copyPointCloud(segment.getLastView().point_cloud, *cloud);
 
+  std::cout<<"Number of pts in pc: "<<cloud->size()<<std::endl;
+
   // ToDo(alaturn) Extract surface normals for point cloud (how to choose radius?).
     // (How to handle NaN normals?).  
-  pcl::PointCloud<pcl::Normal>::Ptr normals(new pcl::PointCloud<pcl::Normal> ());
+  pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+  ne.setInputCloud(cloud);
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_ne(new pcl::search::KdTree<pcl::PointXYZ> ());
+  ne.setSearchMethod(tree_ne);
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+  ne.setRadiusSearch(0.03);
+  ne.compute(*cloud_normals);
 
   // Get centroid of segment.
   PclPoint centroid = segment.getLastView().centroid;
@@ -50,8 +59,11 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
   // Create FPFHE class and pass data+normals to it.
   pcl::FPFHEstimation<pcl::PointXYZ, pcl::Normal, pcl::FPFHSignature33> fpfh;
-  fpfh.setInputCloud (cloud);
-  fpfh.setInputNormals (normals);
+  fpfh.setInputCloud(cloud);
+  fpfh.setInputNormals(cloud_normals);
+
+  std::cout<<"Number of normals in pc: "<<cloud_normals->size()<<std::endl;
+
 
   // Create empty kdtree.
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
