@@ -33,6 +33,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   std::feclearexcept(FE_ALL_EXCEPT);
 
   // Do Stuff in here.
+  std::cout<<"Start "<<std::endl;
   clock_t startTime = clock(); //Start timer
 
   // Extract point cloud.
@@ -58,7 +59,16 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   pcl::PointXYZ centroid1(centroid.x, centroid.y, centroid.z);
   
   // Add centroid at the end of point cloud and surface normal.
+  // std::cout<<"Centroid: X: "<<centroid1.x<<" Y: "<<centroid1.y<<" Z: "<<centroid1.z<<std::endl;
+  // std::cout<<"FirstEntry: X: "<<cloud->begin()->x<<" Y: "<<cloud->begin()->y<<" Z: "<<cloud->begin()->z<<std::endl;
+  // std::cout<<"LastEntry: X: "<<(cloud->end()-1)->x<<" Y: "<<(cloud->end()-1)->y<<" Z: "<<(cloud->end()-1)->z<<std::endl;
+  // std::cout<<"Cloud Size: "<<cloud->size()<<std::endl;
+
   cloud->push_back(centroid1);
+  // std::cout<<"FirstEntry: X: "<<cloud->begin()->x<<" Y: "<<cloud->begin()->y<<" Z: "<<cloud->begin()->z<<std::endl;
+  // std::cout<<"LastEntry: X: "<<(cloud->end()-1)->x<<" Y: "<<(cloud->end()-1)->y<<" Z: "<<(cloud->end()-1)->z<<std::endl;
+  // std::cout<<"Cloud Size: "<<cloud->size()<<std::endl;
+
   cloud_normals->push_back(centroid_normal);
 
   // Create FPFHE class and pass data+normals to it.
@@ -83,26 +93,34 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   fpfh.setRadiusSearch(1.1*max_distance);
 
   // Only compute SPFH for centroid.
-  fpfh.compute (*fpfhs);
-  std::cout<<"Numbers: "<<cloud->size()<<" "<<fpfhs->size()<<std::endl;
+  std::vector<int> indices(cloud->size()-1);  // We don't want to include the last point, which is the centroid.
+  std::iota(std::begin(indices), std::end(indices), 0);
 
-  // Return.
-  // std::vector<int> test_fpfh(125, 12); 
+  int nr_subdiv = 11; // ToDo(alaturn) Make param.
+  Eigen::MatrixXf hist_f1(1, nr_subdiv), hist_f2(1, nr_subdiv), hist_f3(1, nr_subdiv); 
+  // Check that last entry = centroid.
+  fpfh.computePointSPFHSignature(*cloud, *cloud_normals, int(cloud->size()-1), 0, indices, hist_f1, hist_f2, hist_f3);
+  // std::cout<<" F1: "<<hist_f1.size()<<" F2: "<<hist_f2.size()<<" F3: "<<hist_f3.size()<<std::endl;
+  // fpfh.compute (*fpfhs);
+  // std::cout<<"Numbers: "<<cloud->size()<<" "<<fpfhs->size()<<std::endl;
+
+  // Return descriptor.
+  Eigen::VectorXf fpfh_vec(hist_f1.size() + hist_f2.size() + hist_f3.size());
+  fpfh_vec << hist_f1, hist_f2, hist_f3;
+  std::cout<<"Size feature vec: "<<fpfh_vec.size()<<std::endl;
   // std::generate(test_fpfh.begin(), test_fpfh.end(), std::rand);
-
-
   Feature fpfh_feature("fpfh");
-  fpfh_feature.push_back(
-      FeatureValue("fpfh_x", centroid.x));
-    fpfh_feature.push_back(
-      FeatureValue("fpfh_y", centroid.y));
-  fpfh_feature.push_back(
-  FeatureValue("fpfh_z", centroid.z));
+  // fpfh_feature.push_back(
+  //     FeatureValue("fpfh_x", centroid.x));
+  //   fpfh_feature.push_back(
+  //     FeatureValue("fpfh_y", centroid.y));
+  // fpfh_feature.push_back(
+  // FeatureValue("fpfh_z", centroid.z));
 
-  // for (size_t j = 0u; j < test_fpfh.size(); ++j) {
-  //     fpfh_feature.push_back(
-  //     FeatureValue("fpfh_" + std::to_string(j), test_fpfh[j]));
-  // }
+  for (size_t j = 0u; j < fpfh_vec.size(); ++j) {
+      fpfh_feature.push_back(
+      FeatureValue("fpfh_" + std::to_string(j), fpfh_vec[j]));
+  }
 
   features->replaceByName(fpfh_feature);
 
