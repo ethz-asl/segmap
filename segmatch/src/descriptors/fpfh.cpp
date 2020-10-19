@@ -9,8 +9,12 @@
 #include <pcl/features/fpfh.h>
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl/filters/filter.h>
 #include <ctime>
 #include <cmath>
+
+#include <pcl/pcl_macros.h>
+
 
 #pragma STDC FENV_ACCESS on
 
@@ -49,8 +53,40 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_ne(new pcl::search::KdTree<pcl::PointXYZ> ());
   ne.setSearchMethod(tree_ne);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-  ne.setRadiusSearch(0.03);
+  ne.setRadiusSearch(0.5);
   ne.compute(*cloud_normals);
+
+  // ToDo(alaturn) Get rid off NaNs (FPFH doesn't filter them and will break).
+  pcl::PointCloud<pcl::PointXYZ>::Ptr test_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::Normal>::Ptr test_cloud_normals (new pcl::PointCloud<pcl::Normal>);
+  std::vector<int> indices_good_cloud;
+  std::vector<int> indices_good_cloud_normals;
+  pcl::removeNaNFromPointCloud(*cloud, *test_cloud, indices_good_cloud); 
+  pcl::removeNaNNormalsFromPointCloud (*cloud_normals, *test_cloud_normals, indices_good_cloud_normals); 
+  std::cout<<"size(cloudIN): "<<cloud->size()<<" size(cloudOut): "<<test_cloud->size()<<" size(idx): "<<indices_good_cloud.size()<<std::endl;
+  std::cout<<"size(cloudNIN): "<<cloud_normals->size()<<" size(cloudNOut): "<<test_cloud_normals->size()<<" size(idxN): "<<indices_good_cloud.size()<<std::endl;
+
+  int cc1=0;
+  int cc2=0;
+  for(auto it=cloud->begin();it!=cloud->end();it++)
+  {
+    if(!pcl_isfinite(it->x) || !pcl_isfinite(it->y) || !pcl_isfinite(it->z))
+    {
+      cc1++;
+    }
+  }
+  
+  for(auto itt=cloud_normals->begin();itt!=cloud_normals->end();itt++)
+  {
+    if(!pcl_isfinite(itt->normal_x) || !pcl_isfinite(itt->normal_y) || !pcl_isfinite(itt->normal_z))
+    {
+      cc2++;
+    }
+  }
+
+  std::cout<<"Nan1: "<<cc1<<" Nan2: "<<cc2<<std::endl;
+
+  // ToDo(alaturn) Actually filter out NaNs.
 
   // Get centroid of segment.
   PclPoint centroid = segment.getLastView().centroid;
@@ -99,7 +135,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // // Return descriptor.
   Eigen::VectorXf fpfh_vec(3*nr_subdiv);
   fpfh_vec = hist_tot.row(0);
-  std::cout<<"Size feature vec: "<<fpfh_vec.size()<<std::endl;
+  std::cout << "Feature = " << fpfh_vec << std::endl;
 
   Feature fpfh_feature("fpfh");
 
@@ -108,8 +144,6 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
       fpfh_feature.push_back(
       FeatureValue("fpfh_" + std::to_string(j), double(fpfh_vec[j])));
   }
-
-  std::cout<<"Size feature: "<<fpfh_feature.size()<<std::endl;
 
   features->replaceByName(fpfh_feature);
 
