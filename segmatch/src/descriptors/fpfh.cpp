@@ -92,7 +92,6 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // Get centroid of segment.
   PclPoint centroid = segment.getLastView().centroid;
 
-
   // Viz Sandbox.
   // pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
   // viewer->setBackgroundColor (0, 0, 0);
@@ -142,7 +141,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   hist_tot.setZero();
 
   // Check that last entry = centroid.
-  std::cout<<"size(pc): "<<cloud->size()<<" size(pcN): "<<cloud_normals->size()<<std::endl;
+  // std::cout<<"size(pc): "<<cloud->size()<<" size(pcN): "<<cloud_normals->size()<<std::endl;
   // std::cout<<"F1: "<<hist_f1.rows()<<" "<<hist_f1.cols()<<" F2: "<<hist_f2.rows()<<" "<<hist_f2.cols()<<" F3: "<<hist_f3.rows()<<" "<<hist_f3.cols()<<std::endl;
   // std::raise(SIGINT);
   fpfh.computePointSPFHSignature(*cloud, *cloud_normals, (cloud->size())-1, 0, indices, hist_f1, hist_f2, hist_f3);
@@ -156,7 +155,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   Eigen::VectorXf fpfh_vec(3*nr_subdiv);
   fpfh_vec = hist_tot.row(0);
   // std::cout<<"Sum(FeatureTot): "<<(hist_tot.row(0)).sum()<<std::endl;
-  std::cout << "FeatureTot = " <<hist_tot.row(0)<<std::endl; //hist_f1.row(0)<<hist_f2.row(0)<<hist_f3.row(0)<< std::endl;
+  // std::cout << "FeatureTot = " <<hist_tot.row(0)<<std::endl; //hist_f1.row(0)<<hist_f2.row(0)<<hist_f3.row(0)<< std::endl;
 
   Feature fpfh_feature("fpfh");
   for (size_t j = 0u; j < fpfh_vec.size(); ++j){
@@ -169,17 +168,17 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   features->replaceByName(fpfh_feature);
 
   // Viz histogram.
-  pcl::FPFHSignature33 testss;
-  for (int ss=0; ss<33; ss++)
-  {
-    testss.histogram[ss]=fpfh_vec[ss];
-  }
-  pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
-  descriptors->push_back(testss);
-  std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
-  pcl::visualization::PCLPlotter plotter;
-  plotter.addFeatureHistogram(*descriptors, 33);
-  plotter.plot();
+  // pcl::FPFHSignature33 testss;
+  // for (int ss=0; ss<33; ss++)
+  // {
+  //   testss.histogram[ss]=fpfh_vec[ss];
+  // }
+  // pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
+  // descriptors->push_back(testss);
+  // std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
+  // pcl::visualization::PCLPlotter plotter;
+  // plotter.addFeatureHistogram(*descriptors, 33);
+  // plotter.plot();
 
   //raise(SIGINT);
 
