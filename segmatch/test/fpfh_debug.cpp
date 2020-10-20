@@ -13,6 +13,8 @@
 
 #include <pcl/io/pcd_io.h>
 
+#include <algorithm>
+
 int main(int argc, char **argv) {
 	// Create Segmatched FPFH object.
 	segmatch::DescriptorsParameters dummy_params;
@@ -45,7 +47,7 @@ int main(int argc, char **argv) {
 	
 	pcl::PCLPointCloud2 pcl_pc2;
     pcl_conversions::toPCL(*input,pcl_pc2);
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
 
 	std::cout<<"Read one pc scan "<<temp_cloud->size()<<std::endl;
@@ -55,7 +57,18 @@ int main(int argc, char **argv) {
 	pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/test_pcd.pcd", *temp_cloud);
 
 	// Count number of distinct segments (different intensity values).
+	std::vector<int> segment_ids;
+	for(auto it=temp_cloud->begin(); it!=temp_cloud->end();it++)
+	{
+		int intensity = int(it->intensity);
+		bool already_assigned = (std::find(segment_ids.begin(), segment_ids.end(), intensity) != segment_ids.end());
+		if(!already_assigned)
+		{
+			segment_ids.push_back(intensity);
+		}
+	}
 
+	std::cout<<"There are "<<segment_ids.size()<<" segments in the point cloud!"<<std::endl;
 	// Create one point cloud for each segment.
 
 	// Pass each point cloud to FPFH object.
