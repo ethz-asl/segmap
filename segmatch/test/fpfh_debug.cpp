@@ -18,6 +18,10 @@
 #include "segmatch/segmented_cloud.hpp"
 #include "segmatch/features.hpp"
 
+#include <pcl/features/fpfh.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include<pcl/visualization/pcl_plotter.h>
+
 int main(int argc, char **argv) {
 	// Load point clouds from bag file.
 	rosbag::Bag bag;
@@ -113,11 +117,34 @@ int main(int argc, char **argv) {
 		seg.views.push_back(seg_view);
 
 		// Descriptor.
-		segmatch::Features fpfh_feature;
+		segmatch::Features fpfh_features;
 
 		// Run FPFH.
-		fpfh_tester.describe(seg, &fpfh_feature);
+		fpfh_tester.describe(seg, &fpfh_features);
+
+		std::cout<<"Computed Features: "<<fpfh_features.size()<<std::endl;
+
+		// Extract feature.
+		std::vector<segmatch::FeatureValueType> descriptor = fpfh_features.asVectorOfValues();
+
+		std::cout<<"Size Descriptor: "<<descriptor.size()<<std::endl;
+
+
+		// Viz histogram.
+  		pcl::FPFHSignature33 fpfh_descriptor;
+		for (int k=0; k<33; k++)
+		{
+		  fpfh_descriptor.histogram[k] = float(descriptor[k]);
+		}
+		pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
+		descriptors->push_back(fpfh_descriptor);
+		std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
+		pcl::visualization::PCLPlotter plotter;
+		plotter.addFeatureHistogram(*descriptors, 33);
+		plotter.plot();
 	}
+
+
 
 	// Retrieve feature.
 
