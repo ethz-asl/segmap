@@ -17,6 +17,9 @@
 
 #include <pcl/pcl_macros.h>
 
+#include <boost/thread/thread.hpp>
+#include <pcl/visualization/pcl_visualizer.h>
+
 
 #pragma STDC FENV_ACCESS on
 
@@ -88,6 +91,25 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
   // Get centroid of segment.
   PclPoint centroid = segment.getLastView().centroid;
+
+
+  // Viz Sandbox.
+  pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
+  viewer->setBackgroundColor (0, 0, 0);
+  viewer->addPointCloud<pcl::PointXYZ> (cloud,"sample cloud");
+  viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
+  // viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (cloud, cloud_normals, 10, 0.05, "normals");
+  viewer->addCoordinateSystem (1.0);
+  viewer->initCameraParameters ();
+  viewer->setCameraPosition(centroid.x, centroid.y, centroid.z-2.0, 0,0,1, 0);
+
+  while (!viewer->wasStopped ())
+  {
+    viewer->spinOnce (100);
+    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+  }
+
+  // raise(SIGINT);
   
   // Get Z-Axis (= fake normal for centroid makes descriptor invariant to centroid normal)
   pcl::Normal centroid_normal(0.0,0.0,1.0);
