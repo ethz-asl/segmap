@@ -1,40 +1,39 @@
+// This program reads in a rosbag, which contains a pointcloud consisting of segments (segment-ID = intensity).
+// It split the cloud into segments, extracts the FPFH descriptor from each segment and saves the segment.
+
+#include <algorithm>
+#include <iostream>
+
 #include "segmatch/descriptors/fpfh.hpp"
 #include "segmatch/parameters.hpp"
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <iostream>
 
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/PCLPointCloud2.h>
 #include <pcl/conversions.h>
-#include <pcl_ros/transforms.h>
-
-#include <pcl/io/pcd_io.h>
-
-#include <algorithm>
-
-#include "segmatch/segmented_cloud.hpp"
-#include "segmatch/features.hpp"
-
 #include <pcl/features/fpfh.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/point_types.h>
+#include <pcl_ros/transforms.h>
+#include <pcl/visualization/pcl_plotter.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include<pcl/visualization/pcl_plotter.h>
+
+#include "segmatch/features.hpp"
+#include "segmatch/segmented_cloud.hpp"
 
 int main(int argc, char **argv) {
-	// Load point clouds from bag file.
+	// Load point cloud from bag file.
 	rosbag::Bag bag;
 	bag.open("/home/nikhilesh/Documents/segments/segments.bag", rosbag::bagmode::Read);
 	std::vector<std::string> topics;
 	topics.push_back(std::string("segmatch/source_representation"));
 	rosbag::View view(bag, rosbag::TopicQuery(topics));
 	sensor_msgs::PointCloud2::ConstPtr input;
-	int l=0;
+	// ToDo(alaturn) Right now, only works if there is only a single topic on the bag. Filter out by topic...
 	for(rosbag::MessageInstance const m: rosbag::View(bag))
 	{	
-		l++;
-		std::cout<<"HalloI"<<std::endl;
 		input = m.instantiate<sensor_msgs::PointCloud2>();
 		if (input!=NULL) 
 			{
@@ -45,21 +44,23 @@ int main(int argc, char **argv) {
 
 	if(input==NULL)
 	{
-		std::cout<<"OOOOO"<<std::endl;
+		std::cout<<"Something went wrong!"<<std::endl;
+		return;
 	}
 	
+	// Conver to PCL standard.
 	pcl::PCLPointCloud2 pcl_pc2;
     pcl_conversions::toPCL(*input,pcl_pc2);
     pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
     pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
 
-	std::cout<<"Read one pc scan "<<temp_cloud->size()<<std::endl;
+	std::cout<<"Number of points: "<<temp_cloud->size()<<std::endl;
 
 	bag.close();
 
 	pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/test_pcd.pcd", *temp_cloud);
 
-	// Count number of distinct segments (different intensity values).
+	// Count number of segments (ID = intensity).
 	std::vector<int> segment_ids;
 	for(auto it=temp_cloud->begin(); it!=temp_cloud->end();it++)
 	{
@@ -92,6 +93,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Save also each segment to file for later visualization.
 	for(int i = 0; i<cloud_segments.size();i++)
 	{
 		if(cloud_segments[i].size()>0)
@@ -99,16 +101,15 @@ int main(int argc, char **argv) {
 			std::cout<<"Cloud No. "<<i<<" has "<<cloud_segments[i].size()<<" points."<<std::endl;
 			pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/segment" + std::to_string(i)+".pcd", cloud_segments[i]);
 		}
-	
 	}
 
-	// Pass each point cloud to FPFH object.
+	// Extract the FPFH descriptor for each segment.
 	segmatch::DescriptorsParameters dummy_params;
 	segmatch::FpfhDescriptor fpfh_tester(dummy_params);
 
 	for(int i=0;i<cloud_segments.size();i++)
 	{
-		// Convert point cloud to segment.
+		// Convert point cloud to segmatch-segment.
 		segmatch::SegmentView seg_view;
 		seg_view.point_cloud = (cloud_segments[i]);
 		seg_view.calculateCentroid();
@@ -116,32 +117,28 @@ int main(int argc, char **argv) {
 		seg.clear();
 		seg.views.push_back(seg_view);
 
-		// Descriptor.
+		// Compute FPFH.
 		segmatch::Features fpfh_features;
-
-		// Run FPFH.
 		fpfh_tester.describe(seg, &fpfh_features);
-
 		std::cout<<"Computed Features: "<<fpfh_features.size()<<std::endl;
 
-		// Extract feature.
+		// Extract descriptor.
 		std::vector<segmatch::FeatureValueType> descriptor = fpfh_features.asVectorOfValues();
-
 		std::cout<<"Size Descriptor: "<<descriptor.size()<<std::endl;
 
 
-		// Viz histogram.
-  		pcl::FPFHSignature33 fpfh_descriptor;
-		for (int k=0; k<33; k++)
-		{
-		  fpfh_descriptor.histogram[k] = float(descriptor[k]);
-		}
-		pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
-		descriptors->push_back(fpfh_descriptor);
-		std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
-		pcl::visualization::PCLPlotter plotter;
-		plotter.addFeatureHistogram(*descriptors, 33);
-		plotter.plot();
+		// // Visualize histogram.
+  		// pcl::FPFHSignature33 fpfh_descriptor;
+		// for (int k=0; k<33; k++)
+		// {
+		//   fpfh_descriptor.histogram[k] = float(descriptor[k]);
+		// }
+		// pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
+		// descriptors->push_back(fpfh_descriptor);
+		// std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
+		// pcl::visualization::PCLPlotter plotter;
+		// plotter.addFeatureHistogram(*descriptors, 33);
+		// plotter.plot();
 	}
 
 
@@ -155,7 +152,4 @@ int main(int argc, char **argv) {
 	// Save histogram to file.
 
 	// Close bag file.
-
-	std::cout<<"Hello WELT"<<std::endl;
-
 }
