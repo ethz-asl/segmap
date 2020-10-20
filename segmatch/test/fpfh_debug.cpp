@@ -77,8 +77,12 @@ int main(int argc, char **argv) {
 	for(auto pt_it = temp_cloud->begin();pt_it!=temp_cloud->end();pt_it++)
 	{
 		int segment_id = int(pt_it->intensity);
-		int segment_idx = 3;// Find entry in segment_ids.
-		cloud_segments[segment_idx].push_back(*pt_it);
+		auto it = find(segment_ids.begin(), segment_ids.end(), segment_id);
+		if (it != segment_ids.end())
+		{
+			int idx = distance(segment_ids.begin(), it);
+			cloud_segments[idx].push_back(*pt_it);
+		}
 	}
 
 	for(int i = 0; i<cloud_segments.size();i++)
