@@ -19,7 +19,7 @@
 
 #include <boost/thread/thread.hpp>
 #include <pcl/visualization/pcl_visualizer.h>
-
+#include<pcl/visualization/pcl_plotter.h>
 
 #pragma STDC FENV_ACCESS on
 
@@ -94,20 +94,20 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
 
 
   // Viz Sandbox.
-  pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
-  viewer->setBackgroundColor (0, 0, 0);
-  viewer->addPointCloud<pcl::PointXYZ> (cloud,"sample cloud");
-  viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
-  // viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (cloud, cloud_normals, 10, 0.05, "normals");
-  viewer->addCoordinateSystem (1.0);
-  viewer->initCameraParameters ();
-  viewer->setCameraPosition(centroid.x, centroid.y, centroid.z-2.0, 0,0,1, 0);
+  // pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer ("3D Viewer"));
+  // viewer->setBackgroundColor (0, 0, 0);
+  // viewer->addPointCloud<pcl::PointXYZ> (cloud,"sample cloud");
+  // viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "sample cloud");
+  // // viewer->addPointCloudNormals<pcl::PointXYZ, pcl::Normal> (cloud, cloud_normals, 10, 0.05, "normals");
+  // viewer->addCoordinateSystem (1.0);
+  // viewer->initCameraParameters ();
+  // viewer->setCameraPosition(centroid.x, centroid.y, centroid.z-2.0, 0,0,1, 0);
 
-  while (!viewer->wasStopped ())
-  {
-    viewer->spinOnce (100);
-    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-  }
+  // while (!viewer->wasStopped ())
+  // {
+  //   viewer->spinOnce (100);
+  //   boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+  // }
 
   // raise(SIGINT);
   
@@ -155,7 +155,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // Return descriptor.
   Eigen::VectorXf fpfh_vec(3*nr_subdiv);
   fpfh_vec = hist_tot.row(0);
-  std::cout<<"Sum(FeatureTot): "<<(hist_tot.row(0)).sum()<<std::endl;
+  // std::cout<<"Sum(FeatureTot): "<<(hist_tot.row(0)).sum()<<std::endl;
   std::cout << "FeatureTot = " <<hist_tot.row(0)<<std::endl; //hist_f1.row(0)<<hist_f2.row(0)<<hist_f3.row(0)<< std::endl;
 
   Feature fpfh_feature("fpfh");
@@ -167,6 +167,21 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   }
 
   features->replaceByName(fpfh_feature);
+
+  // Viz histogram.
+  pcl::FPFHSignature33 testss;
+  for (int ss=0; ss<33; ss++)
+  {
+    testss.histogram[ss]=fpfh_vec[ss];
+  }
+  pcl::PointCloud<pcl::FPFHSignature33>::Ptr descriptors(new pcl::PointCloud<pcl::FPFHSignature33>());
+  descriptors->push_back(testss);
+  std::cout<<"Size Hist "<<descriptors->size()<<std::endl;
+  pcl::visualization::PCLPlotter plotter;
+  plotter.addFeatureHistogram(*descriptors, 33);
+  plotter.plot();
+
+  //raise(SIGINT);
 
   double secondsPassed =  (clock() - startTime) / CLOCKS_PER_SEC;
 
