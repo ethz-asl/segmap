@@ -13,6 +13,8 @@
 #include <ctime>
 #include <cmath>
 
+#include <csignal>
+
 #include <pcl/pcl_macros.h>
 
 
@@ -84,7 +86,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
     }
   }
 
-  std::cout<<"Nan1: "<<cc1<<" Nan2: "<<cc2<<std::endl;
+  std::cout<<"NanPC: "<<cc1<<" NanPCN: "<<cc2<<std::endl;
 
   // ToDo(alaturn) Actually filter out NaNs.
 
@@ -109,33 +111,65 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   fpfh.setSearchMethod(tree_fpfh);
 
   // Create output dataset.
-  pcl::PointCloud<pcl::FPFHSignature33>::Ptr fpfhs(new pcl::PointCloud<pcl::FPFHSignature33>());
+  // pcl::PointCloud<pcl::FPFHSignature33>::Ptr fpfhs(new pcl::PointCloud<pcl::FPFHSignature33>());
 
   // Compute largest distance centroid-pt.
-  Eigen::Vector4f max_pt_eig;
-  pcl::getMaxDistance(*cloud, centroid1.getVector4fMap(), max_pt_eig);
-  float max_distance = (Eigen::Vector3f(centroid1.x, centroid1.y, centroid1.z) - Eigen::Vector3f(max_pt_eig[0], max_pt_eig[1], max_pt_eig[2])).norm();
+  // Eigen::Vector4f max_pt_eig;
+  // pcl::getMaxDistance(*cloud, centroid1.getVector4fMap(), max_pt_eig);
+  // float max_distance = (Eigen::Vector3f(centroid1.x, centroid1.y, centroid1.z) - Eigen::Vector3f(max_pt_eig[0], max_pt_eig[1], max_pt_eig[2])).norm();
 
   // Set radius-search to allow for all points.
-  fpfh.setRadiusSearch(1.1*max_distance);
+  // fpfh.setRadiusSearch(1.1*max_distance);
 
   // Only compute SPFH for centroid.
   std::vector<int> indices(cloud->size()-1);  // We don't want to include the last point, which is the centroid.
   std::iota(std::begin(indices), std::end(indices), 0);
 
+  // if(indices.size()<130)
+  // {
+  //   for(int ll=0;ll<indices.size();ll++)
+  //   {
+  //     std::cout<<"LL: "<<indices[ll]<<std::endl;
+  //   }
+  // }
+
   int nr_subdiv = 11; // ToDo(alaturn) Make param.
   Eigen::MatrixXf hist_f1(1, nr_subdiv), hist_f2(1, nr_subdiv), hist_f3(1, nr_subdiv); 
   Eigen::MatrixXf hist_tot(1, 3*nr_subdiv);
-  // Check that last entry = centroid.
-  fpfh.computePointSPFHSignature(*cloud, *cloud_normals, int(cloud->size()-1), 0, indices, hist_f1, hist_f2, hist_f3);
-  hist_tot << hist_f1, hist_f2, hist_f3;
-  Eigen::VectorXf lol(3*nr_subdiv);
-  lol = hist_tot.row(0);
+  hist_f1.setZero(); 
+  hist_f2.setZero(); 
+  hist_f3.setZero();
+  hist_tot.setZero();
 
-  // // Return descriptor.
+  std::cout<<"CX: "<<centroid.x<<" CY: "<<centroid.y<<" CZ: "<<centroid.z<<std::endl;
+  std::cout<<"RealX: "<<(cloud->end()-1)->x<<" RealY: "<<(cloud->end()-1)->y<<" RealZ: "<<(cloud->end()-1)->z<<std::endl;
+
+
+  // Check that last entry = centroid.
+  std::cout<<"size(pc): "<<cloud->size()<<" size(pcN): "<<cloud_normals->size()<<std::endl;
+  std::cout<<"F1: "<<hist_f1.rows()<<" "<<hist_f1.cols()<<" F2: "<<hist_f2.rows()<<" "<<hist_f2.cols()<<" F3: "<<hist_f3.rows()<<" "<<hist_f3.cols()<<std::endl;
+  std::raise(SIGINT);
+  fpfh.computePointSPFHSignature(*cloud, *cloud_normals, cloud->size()-1, 0, indices, hist_f1, hist_f2, hist_f3);
+  std::cout<<"sum(F1): "<<(hist_f1.row(0)).sum()<<" sum(F2): "<<(hist_f2.row(0)).sum()<<" sum(F3): "<<(hist_f3.row(0)).sum()<<std::endl;
+  // for(int i=0;i<nr_subdiv;i++)
+  // {
+  //   if(
+  //     (hist_f1(i)>1000.0 || hist_f1(i)<-1000.0 || (hist_f1(i)<0.001 && hist_f1(i)>-0.001)) ||
+  //     (hist_f2(i)>1000.0 || hist_f2(i)<-1000.0 || (hist_f2(i)<0.001 && hist_f2(i)>-0.001)) ||
+  //     (hist_f3(i)>1000.0 || hist_f3(i)<-1000.0 || (hist_f3(i)<0.001 && hist_f3(i)>-0.001))
+  //     )
+  //   {
+  //     std::cout<<"OHOHOHOHOH "<<hist_f1(i)<<" "<<hist_f2(i)<<" "<<hist_f3(i)<<std::endl;
+  //   }
+
+  // }
+
+  hist_tot << hist_f1, hist_f2, hist_f3;
+
+  // Return descriptor.
   Eigen::VectorXf fpfh_vec(3*nr_subdiv);
   fpfh_vec = hist_tot.row(0);
-  std::cout << "Feature = " << fpfh_vec << std::endl;
+  std::cout << "Feature = " << hist_f1.row(0)<<hist_f2.row(0)<<hist_f3.row(0)<< std::endl;
 
   Feature fpfh_feature("fpfh");
 
