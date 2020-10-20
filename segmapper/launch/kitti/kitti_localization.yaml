@@ -83,9 +83,9 @@ SegMapper: {
      threshold_to_accept_match: 0.60,
      n_nearest_neighbours: 120, # uUsed
      knn_feature_dim: 33,  #125,  # Used
-     enable_two_stage_retrieval: false, #true,  # Used  
+     enable_two_stage_retrieval: true, #true,  # Used  
      apply_hard_threshold_on_feature_distance: true,  # Used
-     feature_distance_threshold: 100.0, #0.01, # Used
+     feature_distance_threshold: 900.0, #Note: it's used for the SQUARED norm! # #0.01, # Used
      
      normalize_eigen_for_knn: false, # Used
      normalize_eigen_for_hard_threshold: false,
