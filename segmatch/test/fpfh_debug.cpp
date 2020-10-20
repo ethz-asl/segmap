@@ -69,7 +69,27 @@ int main(int argc, char **argv) {
 	}
 
 	std::cout<<"There are "<<segment_ids.size()<<" segments in the point cloud!"<<std::endl;
+	
 	// Create one point cloud for each segment.
+	std::vector<pcl::PointCloud<pcl::PointXYZI>, Eigen::aligned_allocator<pcl::PointXYZI>> cloud_segments(segment_ids.size());
+	std::cout<<"Created "<<cloud_segments.size()<<" segments."<<std::endl;
+
+	for(auto pt_it = temp_cloud->begin();pt_it!=temp_cloud->end();pt_it++)
+	{
+		int segment_id = int(pt_it->intensity);
+		int segment_idx = 3;// Find entry in segment_ids.
+		cloud_segments[segment_idx].push_back(*pt_it);
+	}
+
+	for(int i = 0; i<cloud_segments.size();i++)
+	{
+		if(cloud_segments[i].size()>0)
+		{
+			std::cout<<"Cloud No. "<<i<<" has "<<cloud_segments[i].size()<<" points."<<std::endl;
+			pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/segment" + std::to_string(i)+".pcd", cloud_segments[i]);
+		}
+	
+	}
 
 	// Pass each point cloud to FPFH object.
 
