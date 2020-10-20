@@ -15,11 +15,10 @@
 
 #include <algorithm>
 
-int main(int argc, char **argv) {
-	// Create Segmatched FPFH object.
-	segmatch::DescriptorsParameters dummy_params;
-	segmatch::FpfhDescriptor fpfh_tester(dummy_params);
+#include "segmatch/segmented_cloud.hpp"
+#include "segmatch/features.hpp"
 
+int main(int argc, char **argv) {
 	// Load point clouds from bag file.
 	rosbag::Bag bag;
 	bag.open("/home/nikhilesh/Documents/segments/segments.bag", rosbag::bagmode::Read);
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
 	std::cout<<"There are "<<segment_ids.size()<<" segments in the point cloud!"<<std::endl;
 	
 	// Create one point cloud for each segment.
-	std::vector<pcl::PointCloud<pcl::PointXYZI>, Eigen::aligned_allocator<pcl::PointXYZI>> cloud_segments(segment_ids.size());
+	std::vector<pcl::PointCloud<pcl::PointXYZRGBA>, Eigen::aligned_allocator<pcl::PointXYZRGBA>> cloud_segments(segment_ids.size());
 	std::cout<<"Created "<<cloud_segments.size()<<" segments."<<std::endl;
 
 	for(auto pt_it = temp_cloud->begin();pt_it!=temp_cloud->end();pt_it++)
@@ -81,7 +80,11 @@ int main(int argc, char **argv) {
 		if (it != segment_ids.end())
 		{
 			int idx = distance(segment_ids.begin(), it);
-			cloud_segments[idx].push_back(*pt_it);
+			pcl::PointXYZRGBA point;
+			point.x = pt_it->x;
+			point.y = pt_it->y;
+			point.z = pt_it->z;
+			cloud_segments[idx].push_back(point);
 		}
 	}
 
@@ -96,6 +99,25 @@ int main(int argc, char **argv) {
 	}
 
 	// Pass each point cloud to FPFH object.
+	segmatch::DescriptorsParameters dummy_params;
+	segmatch::FpfhDescriptor fpfh_tester(dummy_params);
+
+	for(int i=0;i<cloud_segments.size();i++)
+	{
+		// Convert point cloud to segment.
+		segmatch::SegmentView seg_view;
+		seg_view.point_cloud = (cloud_segments[i]);
+		seg_view.calculateCentroid();
+		segmatch::Segment seg;
+		seg.clear();
+		seg.views.push_back(seg_view);
+
+		// Descriptor.
+		segmatch::Features fpfh_feature;
+
+		// Run FPFH.
+		fpfh_tester.describe(seg, &fpfh_feature);
+	}
 
 	// Retrieve feature.
 
