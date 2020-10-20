@@ -10,6 +10,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/conversions.h>
 #include <pcl/features/fpfh.h>
+#include <pcl/features/normal_3d.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/point_types.h>
@@ -78,6 +79,7 @@ int main(int argc, char **argv) {
 	
 	// Create one point cloud for each segment.
 	std::vector<pcl::PointCloud<pcl::PointXYZRGBA>, Eigen::aligned_allocator<pcl::PointXYZRGBA>> cloud_segments(segment_ids.size());
+	std::vector<pcl::PointCloud<pcl::PointXYZI>, Eigen::aligned_allocator<pcl::PointXYZI>> cloud_segments_pcd(segment_ids.size());
 	std::cout<<"Created "<<cloud_segments.size()<<" segments."<<std::endl;
 
 	for(auto pt_it = temp_cloud->begin();pt_it!=temp_cloud->end();pt_it++)
@@ -88,20 +90,35 @@ int main(int argc, char **argv) {
 		{
 			int idx = distance(segment_ids.begin(), it);
 			pcl::PointXYZRGBA point;
+			pcl::PointXYZI point_pcd;
 			point.x = pt_it->x;
 			point.y = pt_it->y;
 			point.z = pt_it->z;
+			point_pcd.x = pt_it->x;
+			point_pcd.y = pt_it->y;
+			point_pcd.z = pt_it->z;
+			point_pcd.intensity = 254; //pt_it->intensity;
 			cloud_segments[idx].push_back(point);
+			cloud_segments_pcd[idx].push_back(point_pcd);
 		}
 	}
 
 	// Save also each segment to file for later visualization.
-	for(int i = 0; i<cloud_segments.size();i++)
+	for(int i = 0; i<cloud_segments_pcd.size();i++)
 	{
-		if(cloud_segments[i].size()>0)
+		if(cloud_segments_pcd[i].size()>0)
 		{
 			// std::cout<<"Cloud No. "<<i<<" has "<<cloud_segments[i].size()<<" points."<<std::endl;
-			pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/fpfh_output/segment" + std::to_string(i)+".pcd", cloud_segments[i]);
+  			// pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> ne;
+  			// ne.setInputCloud(&cloud_segments_pcd[i]);
+  	// 		pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI> ());
+  	// 		ne.setSearchMethod (tree);
+  	// 		pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
+  	// 		ne.setRadiusSearch (0.5);
+  	// 		ne.compute (*cloud_normals);
+  	// 		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals(new pcl::PointCloud<pcl::PointNormal>);
+			// pcl::concatenateFields (cloud_segments_pcd[i], *cloud_normals, *cloud_with_normals);
+			pcl::io::savePCDFileASCII ("/home/nikhilesh/Documents/segments/fpfh_output/segment" + std::to_string(i)+".pcd", cloud_segments_pcd[i]);
 		}
 	}
 
