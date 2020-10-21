@@ -19,12 +19,15 @@ config = Config(configfile)
 
 import argparse
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=10)
 parser.add_argument("--ae_model")
 args = parser.parse_args()
 config.bins = args.bins
 config.ae_model = args.ae_model
+
+print(config.base_dir)
 
 # load dataset and preprocessor
 dataset = Dataset(
@@ -37,91 +40,91 @@ segments, positions, classes, n_classes, _, _, _ = dataset.load()
 duplicate_classes = dataset.duplicate_classes
 duplicate_ids = dataset.duplicate_ids
 
-preprocessor = get_default_preprocessor(config)
-preprocessor.init_segments(segments, classes, positions=positions)
+# preprocessor = get_default_preprocessor(config)
+# preprocessor.init_segments(segments, classes, positions=positions)
 
 # calculate all feature sets
 feature_sets = []
 
-gen_test = Generator(
-    preprocessor,
-    np.arange(len(segments)),
-    n_classes,
-    train=False,
-    batch_size=config.batch_size,
-    shuffle=False,
-)
+# gen_test = Generator(
+#     preprocessor,
+#     np.arange(len(segments)),
+#     n_classes,
+#     train=False,
+#     batch_size=config.batch_size,
+#     shuffle=False,
+# )
 
-import tensorflow as tf
+# import tensorflow as tf
 
-# eigen features
+# # eigen features
 feature_sets.append(dataset.features[:, :7])
 
-# autoencoder features
-if config.ae_model:
-    tf.reset_default_graph()
+# # autoencoder features
+# if config.ae_model:
+#     tf.reset_default_graph()
 
-    # restore variable names from previous session
-    saver = tf.train.import_meta_graph(config.ae_model + ".meta")
+#     # restore variable names from previous session
+#     saver = tf.train.import_meta_graph(config.ae_model + ".meta")
 
-    # get key tensorflow variables
-    ae_graph = tf.get_default_graph()
+#     # get key tensorflow variables
+#     ae_graph = tf.get_default_graph()
 
-    ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
-    ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
-    scales = ae_graph.get_tensor_by_name("scales:0")
+#     ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
+#     ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+#     scales = ae_graph.get_tensor_by_name("scales:0")
 
-    ae_features = []
-    with tf.Session() as sess:
-        saver.restore(sess, config.ae_model)
+#     ae_features = []
+#     with tf.Session() as sess:
+#         saver.restore(sess, config.ae_model)
 
-        for batch in range(gen_test.n_batches):
-            batch_segments, _ = gen_test.next()
+#         for batch in range(gen_test.n_batches):
+#             batch_segments, _ = gen_test.next()
 
-            batch_descriptors = sess.run(
-                ae_descriptor,
-                feed_dict={
-                    ae_input: batch_segments,
-                    scales: preprocessor.last_scales,
-                },
-            )
+#             batch_descriptors = sess.run(
+#                 ae_descriptor,
+#                 feed_dict={
+#                     ae_input: batch_segments,
+#                     scales: preprocessor.last_scales,
+#                 },
+#             )
 
-            for batch_descriptor in batch_descriptors:
-                ae_features.append(batch_descriptor)
+#             for batch_descriptor in batch_descriptors:
+#                 ae_features.append(batch_descriptor)
 
-    feature_sets.append(np.array(ae_features))
+#     feature_sets.append(np.array(ae_features))
 
-# cnn features
-tf.reset_default_graph()
+# # cnn features
+# tf.reset_default_graph()
 
-# restore variable names from previous session
-saver = tf.train.import_meta_graph(
-    os.path.join(config.cnn_model_folder, "model.ckpt.meta")
-)
+# # restore variable names from previous session
+# saver = tf.train.import_meta_graph(
+#     os.path.join(config.cnn_model_folder, "model.ckpt.meta")
+# )
 
-# get key tensorflow variables
-cnn_graph = tf.get_default_graph()
+# # get key tensorflow variables
+# cnn_graph = tf.get_default_graph()
 
-cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
-scales = cnn_graph.get_tensor_by_name("scales:0")
-descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+# cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
+# scales = cnn_graph.get_tensor_by_name("scales:0")
+# descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
 
-cnn_features = []
-with tf.Session() as sess:
-    saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
+# cnn_features = []
+# with tf.Session() as sess:
+#     saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
 
-    for batch in range(gen_test.n_batches):
-        batch_segments, _ = gen_test.next()
+#     for batch in range(gen_test.n_batches):
+#         batch_segments, _ = gen_test.next()
 
-        batch_descriptors = sess.run(
-            descriptor,
-            feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
-        )
+#         batch_descriptors = sess.run(
+#             descriptor,
+#             feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
+#         )
 
-        for batch_descriptor in batch_descriptors:
-            cnn_features.append(batch_descriptor)
+#         for batch_descriptor in batch_descriptors:
+#             cnn_features.append(batch_descriptor)
 
-feature_sets.append(np.array(cnn_features))
+# feature_sets.append(np.array(cnn_features))
 
 # precompute last ids and the corresponding segment sizes for sequences
 last_ids = []
@@ -228,7 +231,7 @@ params = {
     "legend.fontsize": fontsize,
     "xtick.labelsize": fontsize,
     "ytick.labelsize": fontsize,
-    "text.usetex": True,
+    "text.usetex": False,
     "font.family": "serif",
     "font.serif": "Computer Modern Roman",
     "figure.figsize": fig_size,
@@ -279,7 +282,7 @@ else:
 
 plt.legend(handles=handles, loc=3)
 
-plt.xlabel("Segment completness [\%]")
+plt.xlabel("Segment completness [-]")
 plt.ylabel("k-neighbours needed [-]")
 plt.tight_layout()
 
