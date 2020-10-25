@@ -40,8 +40,8 @@ segments, positions, classes, n_classes, _, _, _ = dataset.load()
 duplicate_classes = dataset.duplicate_classes
 duplicate_ids = dataset.duplicate_ids
 
-# preprocessor = get_default_preprocessor(config)
-# preprocessor.init_segments(segments, classes, positions=positions)
+preprocessor = get_default_preprocessor(config)
+preprocessor.init_segments(segments, classes, positions=positions)
 
 # calculate all feature sets
 feature_sets = []
@@ -57,8 +57,15 @@ feature_sets = []
 
 # import tensorflow as tf
 
-# # eigen features
-feature_sets.append(dataset.features[:, :7])
+# FPFH Features
+feature_sets.append(dataset.features[:, :33])
+
+# eigen features
+feature_sets.append(dataset.features[:, 33:])
+
+
+
+# Eigen features
 
 # # autoencoder features
 # if config.ae_model:
@@ -133,7 +140,6 @@ last_sizes = {}
 for cls in range(n_classes):
     sequences = duplicate_classes[classes == cls]
     unique_sequences = np.unique(sequences)
-
     for sequence in unique_sequences:
         segment_ids = np.where(sequence == duplicate_classes)[0]
         last_id = np.max(segment_ids)
@@ -272,8 +278,8 @@ ax.set_xticklabels(bin_edges.astype(int))
 ax.set_xticks(xticks)
 ax.tick_params(axis="both", direction="in")
 
-lG = mlines.Line2D([], [], color="green", label="Eigen", linewidth=lw)
-lR = mlines.Line2D([], [], color="red", label="\\textit{SegMap}", linewidth=lw)
+lG = mlines.Line2D([], [], color="green", label="FPFH", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="Eigen", linewidth=lw)
 if config.ae_model:
     lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
     handles = [lG, lO, lR]
@@ -286,4 +292,4 @@ plt.xlabel("Segment completness [-]")
 plt.ylabel("k-neighbours needed [-]")
 plt.tight_layout()
 
-plt.savefig("acc_versus_size.pdf")
+plt.savefig("acc_versus_size2.pdf")
