@@ -5,10 +5,10 @@
   <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
   
   <!-- Bag file path -->  
-  <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_10_03_drive_27.bag"/>
+  <arg name="bag_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_10_03_drive_27.bag"/>
 	
   <!-- Rviz visualization config file path -->
-  <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_localization.rviz"/>
+  <arg name="rviz_config_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/kitti_localization.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
@@ -16,7 +16,7 @@
   <rosparam command="load" file="$(find segmapper)/launch/kitti/kitti_localization.yaml"/>
   
   <!-- Target cloud -->
-  <arg name="target_cloud" value="$(env HOME)/.segmap/kitti/drive27_target_map.pcd"/>
+  <arg name="target_cloud" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/drive27_target_map.pcd"/>
   <rosparam param="/SegMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
   
   <!-- Callgrind profiling option -->

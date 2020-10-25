@@ -6,12 +6,12 @@
   <!-- boolean: true, false -->
 
   <!-- Bag file path -->
-  <arg name="bag_file" value="$(env HOME)/.segmap/bosch/augmented_bosch1.bag"/>
+  <arg name="bag_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/bosch_augmented_1_cam.bag"/>
   <!-- <arg name="bag_file" value="/media/scratch1/mariusbr/bosch.bag"/> -->
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
-  <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
+  <arg name="rviz_config_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/kitti_localization.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>

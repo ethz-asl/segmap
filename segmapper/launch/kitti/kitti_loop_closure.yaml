@@ -40,7 +40,7 @@ SegMapper: {
   
   ratio_of_points_to_keep_when_publishing: 1.0,
   
-  export_segments_and_matches: false,
+  export_segments_and_matches: true,
   publish_predicted_segment_matches: false,
   
   line_scale_loop_closures: 5.0,
@@ -71,14 +71,14 @@ SegMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["EigenvalueBased"], # "EnsembleShapeFunctions"
+      descriptor_types: ["FPFH", "EigenvalueBased"], # "EnsembleShapeFunctions"
     },
 
     Classifier: {
      threshold_to_accept_match: 0.60,
-     n_nearest_neighbours: 120,
-     knn_feature_dim: 7,
-     enable_two_stage_retrieval: true,
+     n_nearest_neighbours: 20,
+     knn_feature_dim: 33, #7,
+     enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: true,
      feature_distance_threshold: 0.01,
      

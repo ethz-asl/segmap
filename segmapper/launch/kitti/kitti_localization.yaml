@@ -40,7 +40,7 @@ SegMapper: {
   
   ratio_of_points_to_keep_when_publishing: 1.0,
   
-  export_segments_and_matches: false,
+  export_segments_and_matches: true, #false,
   publish_predicted_segment_matches: false,
   
   line_scale_loop_closures: 5.0,
@@ -75,19 +75,19 @@ SegMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["FPFH"], # "EigenvalueBased" EnsembleShapeFunctions"
+      descriptor_types: ["EigenvalueBased"], # "EigenvalueBased" EnsembleShapeFunctions"
 
     },
 
     Classifier: {
      threshold_to_accept_match: 0.60,
-     n_nearest_neighbours: 120, # uUsed
-     knn_feature_dim: 33,  #125,  # Used
-     enable_two_stage_retrieval: true, #true,  # Used  
-     apply_hard_threshold_on_feature_distance: true,  # Used
-     feature_distance_threshold: 900.0, #Note: it's used for the SQUARED norm! # #0.01, # Used
+     n_nearest_neighbours: 120, 
+     knn_feature_dim: 7, #33, 
+     enable_two_stage_retrieval: true, 
+     apply_hard_threshold_on_feature_distance: true, 
+     feature_distance_threshold: 0.01, #900.0, #Note: it's used for the SQUARED norm! # #0.01, # Used
      
-     normalize_eigen_for_knn: false, # Used
+     normalize_eigen_for_knn: false,
      normalize_eigen_for_hard_threshold: false,
      max_eigen_features_values: [2493.5, 186681.0, 188389.0, 0.3304, 188388.0, 1.0899, 0.9987]
     },

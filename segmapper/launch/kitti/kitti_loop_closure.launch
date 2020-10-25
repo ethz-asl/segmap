@@ -3,13 +3,14 @@
 <launch>
   
   <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
-  
+    
   <!-- Bag file path -->  
-  <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_09_30_drive_18.bag"/>
+<!--   <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_09_30_drive_18.bag"/> -->
+  <arg name="bag_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/2011_09_30_drive_18.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
-  <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
+  <arg name="rviz_config_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>

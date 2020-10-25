@@ -14,7 +14,7 @@ SegMapper: {
     odom_frame: "world",
     sensor_frame: "airsim_drone/Lidar",
     
-    assembled_cloud_sub_topic: "/noisy_cloud",
+    assembled_cloud_sub_topic: "/augmented_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -81,7 +81,7 @@ SegMapper: {
     Classifier: {
      threshold_to_accept_match: 0.65,
      n_nearest_neighbours: 25, #25
-     knn_feature_dim: 7, #32
+     knn_feature_dim: 7, #32,
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 100, #25
