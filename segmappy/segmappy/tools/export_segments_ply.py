@@ -52,7 +52,7 @@ def main():
 
     # Convert each segment and save as .ply point cloud.
     folder_path = base_dir + folder + "/segment_clouds/"
-    for idx in range(100):#len(segments)):
+    for idx in range(len(segments)):
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
         cloud_xyz = segments[idx][:,:3]     
