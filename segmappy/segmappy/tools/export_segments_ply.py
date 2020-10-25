@@ -12,10 +12,14 @@ configfile = "default_training.ini"
 config = Config(configfile)
 
 
+
 def main():
     """Extract segment point clouds and save in ply format.
     """
     # Path path to segments_database.csv (what is exported from SegMap).
+    base_dir = config.base_dir
+    folder = config.cnn_test_folder
+    print("Data Folder: "+base_dir+folder)
 
     # Load Dataset.
     dataset = Dataset(
@@ -28,22 +32,34 @@ def main():
         require_diff_points=0.0,
         use_matches=False,
         min_class_size=0.0,
+        normalize_classes=False
     )
 
     segments, positions, classes, n_classes, _, _, _ = dataset.load()
+    duplicate_ids = dataset.duplicate_ids
+    descriptors = dataset.features
+
+    assert str(len(segments))==str(len(classes))==str(len(duplicate_ids))==str(len(positions))==str(len(descriptors))
 
     print('--------------------')
     print('Loaded Dataset')
-    print('Number of Segments: '+str(len(segments)))
-    print('Number of Positions: '+str(len(positions)))
-    print('Number of Descriptors: '+str(len(dataset.features)))
+    print('Number of Segments: '+str(len(segments))+" of type: "+str(type(segments)))
+    print('Number of Segment IDs: '+str(len(classes))+" of type: "+str(type(classes)))
+    print('Number of View IDs: '+str(len(duplicate_ids))+" of type: "+str(type(duplicate_ids)))
+    print('Number of Positions: '+str(len(positions))+" of type: "+str(type(positions)))
+    print('Number of Descriptors: '+str(len(descriptors))+" of type: "+str(type(descriptors)))
+    print(".....................")
 
-
-    # Convert each segment to .ply point cloud.
-
-    # Save (viewID, segID).
-
-
+    # Convert each segment and save as .ply point cloud.
+    folder_path = base_dir + folder + "/segment_clouds/"
+    for idx in range(100):#len(segments)):
+        seg_id = classes[idx]
+        view_id = duplicate_ids[idx]
+        cloud_xyz = segments[idx][:,:3]     
+        pc_ply = o3d.geometry.PointCloud()
+        pc_ply.points = o3d.utility.Vector3dVector(cloud_xyz)
+        o3d.io.write_point_cloud(folder_path+"segment_"+str(seg_id)+"_view_"+str(view_id)+".ply", pc_ply)
+        # o3d.io.write_point_cloud("TestData/sync"+str(idx)+".pcd", pc_ply)
     return
 
 if __name__ == '__main__':

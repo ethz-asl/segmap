@@ -99,7 +99,7 @@ class Dataset(object):
             "segments",
         )
 
-        self._sort_ids()
+        # self._sort_ids()
 
         return (
             self.segments,
