@@ -53,7 +53,7 @@ def main():
 
     # Convert each segment and save as .ply point cloud.
     
-    for idx in range(5): #len(segments)):
+    for idx in range(len(segments)):
         # Identification.
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
