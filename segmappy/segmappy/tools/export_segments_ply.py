@@ -3,6 +3,7 @@
 import numpy as np
 import os
 import open3d as o3d
+import plyfile as pf
 
 from segmappy import Config
 from segmappy import Dataset
@@ -12,13 +13,13 @@ configfile = "default_training.ini"
 config = Config(configfile)
 
 
-
 def main():
     """Extract segment point clouds and save in ply format.
     """
     # Path path to segments_database.csv (what is exported from SegMap).
     base_dir = config.base_dir
     folder = config.cnn_test_folder
+    segment_save_dir = base_dir + folder + "/3DSmoothNet/segment_clouds/"
     print("Data Folder: "+base_dir+folder)
 
     # Load Dataset.
@@ -51,8 +52,8 @@ def main():
     print(".....................")
 
     # Convert each segment and save as .ply point cloud.
-    folder_path = base_dir + folder + "/segment_clouds/"
-    for idx in range(len(segments)):
+    
+    for idx in range(5): #len(segments)):
         # Identification.
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
@@ -62,9 +63,26 @@ def main():
         cent_y = np.mean(cloud_xyz[:,1])
         cent_z = np.mean(cloud_xyz[:,2])     
         cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
-        pc_ply = o3d.geometry.PointCloud()
-        pc_ply.points = o3d.utility.Vector3dVector(cloud_xyz)
-        o3d.io.write_point_cloud(folder_path+"segment_"+str(seg_id)+"_view_"+str(view_id)+".ply", pc_ply)
+
+        # Create structured array (plyfile).
+        dt = [('x', 'f4'), ('y', 'f4'), ('z', 'f4')]
+        cloud_xyz_ply = np.zeros(cloud_xyz.shape[0], dtype=dt)
+        cloud_xyz_ply['x'] = cloud_xyz[:,0]
+        cloud_xyz_ply['y'] = cloud_xyz[:,1]
+        cloud_xyz_ply['z'] = cloud_xyz[:,2]
+
+        # Write to file.
+        vertex = cloud_xyz_ply
+        filename = segment_save_dir + "segment_" +str(seg_id) + "_view_" + str(view_id) + ".ply"
+        el = pf.PlyElement.describe(vertex, 'vertex')
+        pf.PlyData([el]).write(filename)
+
+        # Write ply with open3D (DON'T USE: open3D uses PLY_DOUBLE which will break PCL!).
+        # pc_ply = o3d.geometry.PointCloud()
+        # pc_ply.points = o3d.utility.Vector3dVector(cloud_xyz)
+        # o3d.io.write_point_cloud(segment_save_dir+"open3D_segment_"+str(seg_id)+"_view_"+str(view_id)+".ply", pc_ply)
+        # o3d.io.write_point_cloud(segment_save_dir+"pcd/"+"segment_"+str(seg_id)+"_view_"+str(view_id)+".pcd", pc_ply)
+
     return
 
 if __name__ == '__main__':
