@@ -1,4 +1,4 @@
-# Export the exported segments (from SegMap) as .ply.
+# Export segments (already exported from SegMap) as .ply.
 # To be used as input into 3DSmoothNet.
 import numpy as np
 import os
@@ -53,13 +53,18 @@ def main():
     # Convert each segment and save as .ply point cloud.
     folder_path = base_dir + folder + "/segment_clouds/"
     for idx in range(len(segments)):
+        # Identification.
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
-        cloud_xyz = segments[idx][:,:3]     
+        cloud_xyz = segments[idx][:,:3]
+        # Compute centroid and add.
+        cent_x = np.mean(cloud_xyz[:,0])
+        cent_y = np.mean(cloud_xyz[:,1])
+        cent_z = np.mean(cloud_xyz[:,2])     
+        cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
         pc_ply = o3d.geometry.PointCloud()
         pc_ply.points = o3d.utility.Vector3dVector(cloud_xyz)
         o3d.io.write_point_cloud(folder_path+"segment_"+str(seg_id)+"_view_"+str(view_id)+".ply", pc_ply)
-        # o3d.io.write_point_cloud("TestData/sync"+str(idx)+".pcd", pc_ply)
     return
 
 if __name__ == '__main__':
