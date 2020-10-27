@@ -12,8 +12,9 @@ cs_add_library(${PROJECT_NAME}
   src/descriptors/cnn.cpp
   src/descriptors/descriptors.cpp
   src/descriptors/eigenvalue_based.cpp
-  src/descriptors/fpfh.cpp
   src/descriptors/ensemble_shape_functions.cpp
+  src/descriptors/fpfh.cpp
+  src/descriptors/grsd.cpp
   src/descriptors/tf_interface.cpp
   src/descriptors/tf_cnn_interface.py
   src/descriptors/tf_sem_interface.py
