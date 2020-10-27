@@ -9,10 +9,13 @@ import random
 from sklearn import metrics
 
 import ensure_segmappy_is_installed
-from segmappy import Dataset
+from segmappy import Dataset, Config
 from segmappy.tools.hull import point_in_hull, n_points_in_hull, are_in_hull
 
-DATASET_FOLDER = "with_merge_events/drive18"
+configfile = "default_training.ini"
+config = Config(configfile)
+
+DATASET_FOLDER = config.base_dir + config.cnn_test_folder #"with_merge_events/drive18"
 FILE_PATH = DATASET_FOLDER + "/matches_database.csv"
 if os.path.isfile(FILE_PATH):
     os.remove(FILE_PATH)
@@ -44,7 +47,7 @@ for i in range(ids.size):
 
     if save_view:
         last_n_points = segments[i].shape[0]
-        filtered_segments.append(segments[i])
+        filtered_segments.append(segments[i][:,:3])
         filtered_ids.append(ids[i])
         filtered_features.append(features[i])
 
