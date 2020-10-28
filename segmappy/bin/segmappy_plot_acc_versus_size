@@ -58,13 +58,14 @@ feature_sets = []
 # import tensorflow as tf
 
 # FPFH Features
-# feature_sets.append(dataset.features[:, :33])
-
-# eigen features
-# feature_sets.append(dataset.features[:, 33:])
+feature_sets.append(dataset.features[:, :33])
 
 # GRSD Features
-feature_sets.append(dataset.features[:, :21])
+feature_sets.append(dataset.features[:, 33:54])
+
+# eigen features
+feature_sets.append(dataset.features[:, 54:])
+
 
 # Eigen features
 
@@ -248,10 +249,12 @@ plt.rcParams.update(params)
 if config.ae_model:
     colors = ['green', 'orange', 'red']
 else:
-    colors = ['green', 'red']
+    colors = ['green', 'red', 'blue']
 
 xlim = 0
 xticks = []
+print('nsets')
+print(n_sets)
 for i, b in enumerate(bins):
     positions = np.arange(n_sets) + i * (n_sets + 1) + 1
     xlim = max(xlim, positions[-1])
@@ -279,13 +282,14 @@ ax.set_xticklabels(bin_edges.astype(int))
 ax.set_xticks(xticks)
 ax.tick_params(axis="both", direction="in")
 
-lG = mlines.Line2D([], [], color="green", label="GRSD", linewidth=lw)
-lR = mlines.Line2D([], [], color="red", label="Eigen", linewidth=lw)
+lG = mlines.Line2D([], [], color="green", label="FPFH", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="GRSD", linewidth=lw)
+lB = mlines.Line2D([], [], color="blue", label="EVB", linewidth=lw)
 if config.ae_model:
     lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
     handles = [lG, lO, lR]
 else:
-    handles = [lG, lR]
+    handles = [lG, lR, lB]
 
 plt.legend(handles=handles, loc=3)
 
