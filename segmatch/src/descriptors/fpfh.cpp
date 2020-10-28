@@ -36,7 +36,9 @@ bool swap_if_gt(T& a, T& b) {
 }
 
 // FpfhDescriptor methods definition
-FpfhDescriptor::FpfhDescriptor(const DescriptorsParameters& parameters) {}
+FpfhDescriptor::FpfhDescriptor(const DescriptorsParameters& parameters) {
+  ne_radius_ = parameters.fast_point_feature_histograms_normals_search_radius;
+}
 
 void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   CHECK_NOTNULL(features);
@@ -56,7 +58,8 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_ne(new pcl::search::KdTree<pcl::PointXYZ> ());
   ne.setSearchMethod(tree_ne);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-  ne.setRadiusSearch(0.5);  // ToDo(alaturn) Make adaptive or param.
+  std::cout<<"Raidus "<<ne_radius_<<std::endl;
+  ne.setRadiusSearch(ne_radius_);  // ToDo(alaturn) Make adaptive or param.
   ne.compute(*cloud_normals);
 
   // Get rid off NaNs (FPFH doesn't filter them and will break).
