@@ -33,6 +33,7 @@ class GrsdDescriptor : public Descriptor {
 
  private:
   static constexpr unsigned int kDimension = 8u;
+  float ne_radius_ = 0.5;
 }; // class GrsdDescriptor
 
 } // namespace segmatch
