@@ -40,7 +40,7 @@ class Dataset(object):
         from ..tools.import_export import load_segments, load_positions, load_features
 
         # load all the csv files
-        self.segments, sids, duplicate_sids = load_segments(folder=self.folder)
+        self.segments, self.segments_color, self.segments_class, sids, duplicate_sids = load_segments(folder=self.folder)
         self.positions, pids, duplicate_pids = load_positions(folder=self.folder)
         self.features, self.feature_names, fids, duplicate_fids = load_features(
             folder=self.folder
@@ -321,6 +321,8 @@ class Dataset(object):
         ordered_ids = np.array(ordered_ids)
 
         self.segments = [self.segments[i] for i in ordered_ids]
+        self.segments_color = [self.segments_color[i] for i in ordered_ids]
+        self.segments_class = [self.segments_class[i] for i in ordered_ids]
         self.classes = self.classes[ordered_ids]
 
         if self.positions.size > 0:
@@ -334,6 +336,8 @@ class Dataset(object):
     # keep only segments and corresponding data where the keep parameter is true
     def _trim_data(self, keep):
         self.segments = [segment for (k, segment) in zip(keep, self.segments) if k]
+        self.segments_color = [segment for (k, segment) in zip(keep, self.segments_color) if k]
+        self.segments_class = [segment for (k, segment) in zip(keep, self.segments_class) if k]
         self.classes = self.classes[keep]
 
         if self.positions.size > 0:
