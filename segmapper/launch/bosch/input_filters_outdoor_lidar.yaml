@@ -3,7 +3,7 @@
 - BoundingBoxDataPointsFilter:
     xMin: -inf
     xMax: inf
-    yMin: -inf 
+    yMin: -inf
     yMax: inf
     zMin: -1.0
     zMax: inf
@@ -22,6 +22,4 @@
 - SimpleSensorNoiseDataPointsFilter:
     sensorType: 0
 - ObservationDirectionDataPointsFilter
-- OrientNormalsDataPointsFilter 
-
-
+- OrientNormalsDataPointsFilter
