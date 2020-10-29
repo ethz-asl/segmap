@@ -188,6 +188,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
                          batch_nn_input.size());
   BENCHMARK_STOP("SM.Worker.Describe.Preprocess");
 
+  std::cout << "PROCESSING SEGMENTS " << batch_nn_input.size() << std::endl;
   if (!batch_nn_input.empty()) {
     BENCHMARK_START("SM.Worker.Describe.ForwardPass");
     std::vector<std::vector<float> > cnn_descriptors;
@@ -205,6 +206,9 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
       std::vector<ns_tf_interface::Array3D> mini_batch;
       std::vector<std::vector<float> > mini_batch_scales;
       for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
+        if ((i+1) % 100 == 0) {
+          std::cout << "Progress " << i << std::endl;
+        }
         mini_batch.push_back(batch_nn_input[i]);
         mini_batch_scales.push_back(scales_as_vectors[i]);
         if (mini_batch.size() == mini_batch_size_) {
