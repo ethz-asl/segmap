@@ -118,7 +118,7 @@ void SegMapper::publishMapThread() {
 
   ros::Rate thread_rate(laser_slam_worker_params_.map_publication_rate_hz);
   while (ros::ok()) {
-    LOG(INFO) << "publishing local maps";
+    // LOG(INFO) << "publishing local maps";
     MapCloud local_maps;
     for (size_t i = 0u; i < local_maps_.size(); ++i) {
       std::unique_lock<std::mutex> map_lock(local_maps_mutexes_[i]);
@@ -321,10 +321,12 @@ void SegMapper::segMatchThread() {
 bool SegMapper::saveMapServiceCall(segmapper::SaveMap::Request& request,
                                    segmapper::SaveMap::Response& response) {
   try {
-    pcl::io::savePCDFileASCII(request.filename.data,
-                              local_maps_.front().getFilteredPoints());
-  }
-  catch (const std::runtime_error& e) {
+    auto output_cloud = local_maps_.front().getFilteredPoints();
+    for (auto& point : output_cloud) {
+      point.ed_cluster_id = 0;
+    }
+    pcl::io::savePCDFileASCII(request.filename.data, output_cloud);
+  } catch (const std::runtime_error& e) {
     ROS_ERROR_STREAM("Unable to save: " << e.what());
     return false;
   }
