@@ -1,11 +1,18 @@
-#include <thread>
-
-#include <ros/ros.h>
-
 #include "segmapper/segmapper.hpp"
 
+#include <ros/ros.h>
+#include <signal.h>
+#include <thread>
+
+#include <laser_slam/benchmarker.hpp>
+
+void SigintHandler(int sig) {
+  laser_slam::Benchmarker::logStatistics(LOG(INFO));
+  ros::shutdown();
+}
+
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "SegMapper");
+  ros::init(argc, argv, "SegMapper", ros::init_options::NoSigintHandler);
   ros::NodeHandle node_handle("~");
 
   SegMapper mapper(node_handle);
@@ -13,6 +20,8 @@ int main(int argc, char **argv) {
   std::thread publish_map_thread(&SegMapper::publishMapThread, &mapper);
   std::thread publish_tf_thread(&SegMapper::publishTfThread, &mapper);
   std::thread segmatch_thread(&SegMapper::segMatchThread, &mapper);
+
+  signal(SIGINT, SigintHandler);
 
   try {
     ros::spin();

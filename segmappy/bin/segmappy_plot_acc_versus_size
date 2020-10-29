@@ -41,7 +41,7 @@ duplicate_classes = dataset.duplicate_classes
 duplicate_ids = dataset.duplicate_ids
 
 preprocessor = get_default_preprocessor(config)
-preprocessor.init_segments(segments, classes, positions=positions)
+preprocessor.init_segments(segments, dataset.segments_color, dataset.segments_class, classes, positions=positions)
 
 # calculate all feature sets
 feature_sets = []
@@ -66,6 +66,10 @@ feature_sets.append(dataset.features[:, 33:54])
 # eigen features
 feature_sets.append(dataset.features[:, 54:])
 
+# autoencoder features
+'''if config.ae_model:
+    tf.reset_default_graph()
+>>>>>>> 7a96cd70b27e8048b784a0a33f2956ac96fb0b54
 
 # Eigen features
 
@@ -100,6 +104,10 @@ feature_sets.append(dataset.features[:, 54:])
 
 #             for batch_descriptor in batch_descriptors:
 #                 ae_features.append(batch_descriptor)
+    feature_sets.append(np.array(ae_features))
+'''
+# cnn features
+#tf.reset_default_graph()
 
 #     feature_sets.append(np.array(ae_features))
 

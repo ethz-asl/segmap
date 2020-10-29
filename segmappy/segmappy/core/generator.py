@@ -43,7 +43,6 @@ class Generator(object):
             self.batch_ids, train=self.train
         )
 
-        batch_segments = batch_segments[:, :, :, :, None]
         batch_classes = to_onehot(batch_classes, self.n_classes)
 
         return batch_segments, batch_classes

@@ -85,13 +85,12 @@ void TensorflowInterface::batchFullForwardPass(
   msg.timestamp = msg_time_stamp;
   ROS_DEBUG_STREAM("Sending CNN Input: " << msg.timestamp);
   cnn_input_publisher_.publish(msg);
-  ros::Rate loop_rate(1000);
   ros::spinOnce();
-  loop_rate.sleep();
 
   ros::Rate wait_rate(10);
   segmatch::cnn_output_msg out_msg;
   while (ros::ok()) {
+    ros::spinOnce();
     auto it = returned_cnn_msgs_.find(msg_time_stamp);
     if (it != returned_cnn_msgs_.end()) {
       ROS_DEBUG_STREAM("Found CNN message: " << msg_time_stamp);
@@ -186,13 +185,12 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
   msg.timestamp = msg_time_stamp;
   ROS_DEBUG_STREAM("Sending Semantics Input: " << msg.timestamp);
   sem_input_publisher_.publish(msg);
-  ros::Rate loop_rate(1000);
   ros::spinOnce();
-  loop_rate.sleep();
 
   ros::Rate wait_rate(10);
   segmatch::sem_output_msg out_msg;
   while (ros::ok()) {
+    ros::spinOnce();
     auto it = returned_sem_msgs_.find(msg_time_stamp);
     if (it != returned_sem_msgs_.end()) {
       ROS_DEBUG_STREAM("Found Sem message: " << msg_time_stamp);

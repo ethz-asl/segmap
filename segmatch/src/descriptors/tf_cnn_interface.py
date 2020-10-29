@@ -33,7 +33,6 @@ class TensorflowCNNInterface:
                 scales[i][j] = msg.scales.data[msg.scales.layout.dim[1].stride * i + j]
 
         # Inputs
-
         inputs = empty([msg.inputs.layout.dim[0].size, msg.inputs.layout.dim[1].size,
                         msg.inputs.layout.dim[2].size, msg.inputs.layout.dim[3].size, 1])
 

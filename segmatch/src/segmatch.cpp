@@ -375,6 +375,11 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
 
     // Save the loop closure.
     loop_closures_.push_back(*loop_closure);
+  } else {
+    CHECK_GT(recognizer->getCandidateTransformations().size(), 0u);
+    SE3 w_T_a_b = fromApproximateTransformationMatrix(
+        recognizer->getCandidateTransformations().front());
+    std::cout << w_T_a_b << std::endl;
   }
 
   return last_filtered_matches_;

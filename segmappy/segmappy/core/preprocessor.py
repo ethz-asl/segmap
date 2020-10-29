@@ -39,6 +39,8 @@ class Preprocessor(object):
         self.remove_std = remove_std
         self.batch_size = batch_size
         self.scaler_train_passes = scaler_train_passes
+        self.color = True
+        self.n_semcls = 35
         self._scaler_exists = False
 
         min_voxel_side_length_m = 0.1
@@ -47,10 +49,12 @@ class Preprocessor(object):
         self.last_scales = []
 
     def init_segments(
-        self, segments, classes, positions=None, train_ids=None, scaler_path=None
+        self, segments, segments_color, segments_class, classes, positions=None, train_ids=None, scaler_path=None
     ):
 
         self.segments = segments
+        self.segments_color = segments_color
+        self.segments_class = segments_class
         self.classes = np.array(classes)
 
         if self.align == "robot":
@@ -67,21 +71,25 @@ class Preprocessor(object):
 
     def get_processed(self, segment_ids, train=True, normalize=True):
         batch_segments = []
+        batch_segments_color = []
+        batch_segments_class = []
         for i in segment_ids:
             batch_segments.append(self.segments[i])
+            batch_segments_color.append(self.segments_color[i])
+            batch_segments_class.append(self.segments_class[i])
 
-        batch_segments = self.process(batch_segments, train, normalize)
+        batch_segments = self.process(batch_segments, batch_segments_color, batch_segments_class, train, normalize)
         batch_classes = self.classes[segment_ids]
 
         return batch_segments, batch_classes
 
-    def process(self, segments, train=True, normalize=True):
+    def process(self, segments, segments_color, segments_class, train=True, normalize=True):
         # augment through distorsions
         if train and self.augment_remove_random_max > 0:
-            segments = self._augment_remove_random(segments)
+            segments, segments_color, segments_class = self._augment_remove_random(segments, segments_color, segments_class)
 
         if train and self.augment_remove_plane_max > 0:
-            segments = self._augment_remove_plane(segments)
+            segments, segments_color, segments_class = self._augment_remove_plane(segments, segments_color, segments_class)
 
         # align after distorsions
         if self.align == "eigen":
@@ -100,11 +108,14 @@ class Preprocessor(object):
                 segments = self._augment_jitter(segments)
 
             # insert into voxel grid
-            segments = self._voxelize(segments)
+            segments = self._voxelize(segments, segments_color, segments_class)
 
             # remove mean and/or std
             if normalize and self._scaler_exists:
                 segments = self._normalize_voxel_matrix(segments)
+
+        if not self.color:
+            segments = segments[..., np.newaxis]
 
         return segments
 
@@ -186,9 +197,9 @@ class Preprocessor(object):
 
         return augmented_segments
 
-    def _augment_remove_random(self, segments):
+    def _augment_remove_random(self, segments, segments_color, segments_class):
         augmented_segments = []
-        for segment in segments:
+        for i, segment in enumerate(segments):
             # percentage of points to remove
             remove = (
                 np.random.random()
@@ -203,12 +214,14 @@ class Preprocessor(object):
 
             segment = segment[idx]
             augmented_segments.append(segment)
+            segments_color[i] = segments_color[i][idx]
+            segments_class[i] = segments_class[i][idx]
 
-        return augmented_segments
+        return augmented_segments, segments_color, segments_class
 
-    def _augment_remove_plane(self, segments):
+    def _augment_remove_plane(self, segments, segments_color, segments_class):
         augmented_segments = []
-        for segment in segments:
+        for i, segment in enumerate(segments):
             # center segment
             center = np.mean(segment, axis=0)
             segment = segment - center
@@ -237,6 +250,8 @@ class Preprocessor(object):
                         and remove_percentage < self.augment_remove_plane_max
                     ):
                         segment = segment[keep]
+                        segments_color[i] = segments_color[i][keep]
+                        segments_class[i] = segments_class[i][keep]
                         found = True
                         break
 
@@ -246,7 +261,7 @@ class Preprocessor(object):
             segment = segment + center
             augmented_segments.append(segment)
 
-        return augmented_segments
+        return augmented_segments, segments_color, segments_class
 
     def _augment_jitter(self, segments):
         jitter_segments = []
@@ -299,18 +314,26 @@ class Preprocessor(object):
 
         return rescaled_segments
 
-    def _voxelize(self, segments):
-        voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels))
+    def _voxelize(self, segments, segments_color, segments_class):
+        if self.color:
+            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (3 + self.n_semcls,))
+        else:
+            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels))
+
         for i, segment in enumerate(segments):
             # remove out of bounds points
-            segment = segment[np.all(segment < self.voxels, axis=1), :]
-            segment = segment[np.all(segment >= 0, axis=1), :]
+            keep = np.logical_and(np.all(segment < self.voxels, axis=1), np.all(segment >= 0, axis=1))
+            segment = segment[keep]
 
             # round coordinates
             segment = segment.astype(np.int)
 
             # fill voxel grid
-            voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2]] = 1
+            if self.color:
+                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2], :3] = segments_color[i][keep]
+                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2], segments_class[i][keep] + 3] = 1
+            else:
+                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2]] = 1
 
         return voxelized_segments
 

@@ -4,7 +4,7 @@ import tensorflow as tf
 def init_model(input_shape, n_classes):
     with tf.name_scope("InputScope") as scope:
         cnn_input = tf.placeholder(
-            dtype=tf.float32, shape=(None,) + input_shape + (1,), name="input"
+            dtype=tf.float32, shape=(None,) + input_shape + (3 + 35,), name="input"
         )
 
     # base convolutional layers
@@ -18,7 +18,7 @@ def init_model(input_shape, n_classes):
 
     conv1 = tf.layers.conv3d(
         inputs=cnn_input,
-        filters=32,
+        filters=64,
         kernel_size=(3, 3, 3),
         padding="same",
         activation=tf.nn.relu,
@@ -172,7 +172,7 @@ def init_model(input_shape, n_classes):
     tf.identity(loss_r, "loss_r")
 
     # training
-    LOSS_R_WEIGHT = 200
+    LOSS_R_WEIGHT = 0
     LOSS_C_WEIGHT = 1
     loss = tf.add(LOSS_C_WEIGHT * loss_c, LOSS_R_WEIGHT * loss_r, name="loss")
 
