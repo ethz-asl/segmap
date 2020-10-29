@@ -59,22 +59,22 @@ class CNNDescriptor : public Descriptor {
   segmatch::SegmentedCloud aligned_segments_;
 
   constexpr static float min_voxel_size_m_ = 0.1;
-  
+
   constexpr static unsigned int n_voxels_x_dim_ = 32u;
   constexpr static unsigned int n_voxels_y_dim_ = 32u;
   constexpr static unsigned int n_voxels_z_dim_ = 16u;
   constexpr static unsigned int cnn_input_dim_ = n_voxels_x_dim_ * n_voxels_y_dim_ *
       n_voxels_z_dim_;
-      
+
   constexpr static float min_x_scale_m_ = static_cast<float>(n_voxels_x_dim_) * min_voxel_size_m_;
   constexpr static float min_y_scale_m_ = static_cast<float>(n_voxels_y_dim_) * min_voxel_size_m_;
   constexpr static float min_z_scale_m_ = static_cast<float>(n_voxels_z_dim_) * min_voxel_size_m_;
-  
+
   constexpr static float x_dim_min_1_ = static_cast<float>(n_voxels_x_dim_) - 1.0;
   constexpr static float y_dim_min_1_ = static_cast<float>(n_voxels_y_dim_) - 1.0;
   constexpr static float z_dim_min_1_ = static_cast<float>(n_voxels_z_dim_) - 1.0;
 
-  constexpr static size_t mini_batch_size_ = 10u;
+  constexpr static size_t mini_batch_size_ = 64u;
 
   constexpr static bool save_debug_data_ = true;
 
