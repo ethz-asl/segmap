@@ -28,8 +28,11 @@ struct L2_Segmatch {
         }
 
         if (size > 4) {
-            diff = *a++ - *b++;
-            result += color_weight*diff*diff;
+            diff = abs(*a++ - *b++);
+            if (diff < 0.1 || diff > 0.9) {
+              //result += color_weight*diff*diff;
+              result += color_weight;
+            }
         }
 
         return result;
