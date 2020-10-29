@@ -24,11 +24,15 @@ TfDriftClass::TfDriftClass() {
   // Init.
   T_W_BdLast_.setIdentity();
   T_W_BLast_.setIdentity();
+  dist_x_.param(std::normal_distribution<float>::param_type(noise_x_mean_, noise_x_stddev_));
+  dist_y_.param(std::normal_distribution<float>::param_type(noise_y_mean_, noise_y_stddev_));
+  dist_z_.param(std::normal_distribution<float>::param_type(noise_z_mean_, noise_z_stddev_));
+  dist_yaw_.param(std::normal_distribution<float>::param_type(noise_yaw_mean_, noise_yaw_stddev_));
+  dist_attitude_.param(std::normal_distribution<float>::param_type(noise_attitude_mean_, noise_attitude_stddev_));
 }
 
 void TfDriftClass::driftReal()
 {
-  std::cout<<"Hallo"<<std::endl;
   // T_ = Tf, W = GT Odom Frame, B = GT Base Link, B* = Drifted Base Link, W* = Drifted Odom Frame, W', B', W*', B*' = Previous timestep.
   
   // Get T_WB from TF tree.
@@ -41,45 +45,53 @@ void TfDriftClass::driftReal()
     // ToDo: How to handle? Just don't add noise?
     return;
   }
-  std::cout<<"Hallo1"<<std::endl;
 
   // ToDo Check if enough time has passed since last update.
   tf::Transform T_W_B = TS_W_B;
-  std::cout<<"Hallo2 "<<T_W_B.getOrigin().x()<<" "<<T_W_B.getOrigin().y()<<" "<<T_W_B.getOrigin().z()<<" "<<T_W_B.getRotation().x()<<" "<<T_W_B.getRotation().y()<<" "<<T_W_B.getRotation().z()<<" "<<T_W_B.getRotation().w()<<std::endl;
+
   // Compute T_B'B (GT relative motion since last step).
   tf::Transform T_BLast_B = (T_W_BLast_.inverse())*T_W_B; 
-  std::cout<<"Hallo3 "<<T_BLast_B.getOrigin().x()<<" "<<T_BLast_B.getOrigin().y()<<" "<<T_BLast_B.getOrigin().z()<<" "<<T_BLast_B.getRotation().x()<<" "<<T_BLast_B.getRotation().y()<<" "<<T_BLast_B.getRotation().z()<<" "<<T_BLast_B.getRotation().w()<<std::endl;
-  // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
- 
-  std::normal_distribution<float> dist_x(noise_x_mean_, noise_x_stddev_);
-  float noise_x = dist_x(generator_);
-  tf::Vector3 transl_gt = T_BLast_B.getOrigin();
-  transl_gt.setX(noise_x + T_BLast_B.getOrigin().x());
 
+  // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
+  // Sample noise.
+  // std::normal_distribution<float> dist_x(noise_x_mean_, noise_x_stddev_);
+  float noise_x = dist_x_(generator_);
+  float noise_y = dist_y_(generator_);
+  float noise_z = dist_z_(generator_);
+  float noise_yaw = dist_yaw_(generator_);
+  float noise_roll = dist_attitude_(generator_);
+  float noise_pitch = dist_attitude_(generator_);
+  tf::Vector3 transl_gt = T_BLast_B.getOrigin();
+  tf::Quaternion quat_gt = T_BLast_B.getRotation();
+  tf::Quaternion quat_noise;
+  quat_noise.setRPY(noise_roll, noise_pitch, noise_yaw);
+
+  transl_gt.setX(noise_x + T_BLast_B.getOrigin().x());
+  transl_gt.setY(noise_y + T_BLast_B.getOrigin().y());
+  transl_gt.setZ(noise_z + T_BLast_B.getOrigin().z());
   tf::Transform T_BdLast_Bd = T_BLast_B; // ToDo!! Add the magic here.
   T_BdLast_Bd.setOrigin(transl_gt);
+  T_BdLast_Bd.setRotation(quat_gt*quat_noise);
+
   
-  std::cout<<"Hallo4 "<<T_BdLast_Bd.getOrigin().x()<<" "<<T_BdLast_Bd.getOrigin().y()<<" "<<T_BdLast_Bd.getOrigin().z()<<" "<<T_BdLast_Bd.getRotation().x()<<" "<<T_BdLast_Bd.getRotation().y()<<" "<<T_BdLast_Bd.getRotation().z()<<" "<<T_BdLast_Bd.getRotation().w()<<std::endl;
   // Compute T_WB* = T_WB*' * T_B*'B* (the current drifted base link).
   tf::Transform T_W_Bd = T_W_BdLast_*T_BdLast_Bd;
-  std::cout<<"Hallo5a "<<T_W_BdLast_.getOrigin().x()<<" "<<T_W_BdLast_.getOrigin().y()<<" "<<T_W_BdLast_.getOrigin().z()<<" "<<T_W_BdLast_.getRotation().x()<<" "<<T_W_BdLast_.getRotation().y()<<" "<<T_W_BdLast_.getRotation().z()<<" "<<T_W_BdLast_.getRotation().w()<<std::endl;
-  std::cout<<"Hallo5 "<<T_W_Bd.getOrigin().x()<<" "<<T_W_Bd.getOrigin().y()<<" "<<T_W_Bd.getOrigin().z()<<" "<<T_W_Bd.getRotation().x()<<" "<<T_W_Bd.getRotation().y()<<" "<<T_W_Bd.getRotation().z()<<" "<<T_W_Bd.getRotation().w()<<std::endl;
+  // std::cout<<"Hallo5a "<<T_W_BdLast_.getOrigin().x()<<" "<<T_W_BdLast_.getOrigin().y()<<" "<<T_W_BdLast_.getOrigin().z()<<" "<<T_W_BdLast_.getRotation().x()<<" "<<T_W_BdLast_.getRotation().y()<<" "<<T_W_BdLast_.getRotation().z()<<" "<<T_W_BdLast_.getRotation().w()<<std::endl;
+  
   // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
   tf::Transform T_WdB = T_W_Bd;
-  std::cout<<"Hallo6 "<<T_WdB.getOrigin().x()<<" "<<T_WdB.getOrigin().y()<<" "<<T_WdB.getOrigin().z()<<" "<<T_WdB.getRotation().x()<<" "<<T_WdB.getRotation().y()<<" "<<T_WdB.getRotation().z()<<" "<<T_WdB.getRotation().w()<<std::endl;
+  
   // Compute T_W*W = T_WB* * inv(T_WB)
-  // tf::Transform T_Wd_W = T_W_Bd*(T_W_B.inverse());
   tf::Transform T_Wd_W = T_WdB*(T_W_B.inverse());
-  std::cout<<"Hallo7 "<<T_Wd_W.getOrigin().x()<<" "<<T_Wd_W.getOrigin().y()<<" "<<T_Wd_W.getOrigin().z()<<" "<<T_Wd_W.getRotation().x()<<" "<<T_Wd_W.getRotation().y()<<" "<<T_Wd_W.getRotation().z()<<" "<<T_Wd_W.getRotation().w()<<std::endl;
+  
   // Broadcast T_W*W to TF tree.
   br_.sendTransform(tf::StampedTransform(T_Wd_W, TS_W_B.stamp_, odom_drift_frame_, odom_frame_));
-  std::cout<<"Hallo8"<<std::endl;
+  
   // Store T_WB*' = T_WB*
   T_W_BdLast_ = T_W_Bd;
-  std::cout<<"Hallo9"<<std::endl;
+  
   // Store T_WB' = T_WB
   T_W_BLast_ = T_W_B;
-  std::cout<<"Hallo10"<<std::endl;
 }
 void TfDriftClass::drift() {
   // float test_vel_x = 0.5; // GT odometry.
