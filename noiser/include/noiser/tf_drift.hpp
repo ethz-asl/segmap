@@ -5,6 +5,7 @@
 #include <random>
 
 #include <ros/ros.h>
+#include <std_srvs/Empty.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
@@ -15,6 +16,7 @@ class TfDriftClass {
 
   void drift();
   void driftReal();
+  bool exportDriftValuesServiceCall(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
  private:
   float tf_rate_;
@@ -36,8 +38,12 @@ class TfDriftClass {
   std::normal_distribution<float> dist_yaw_;
   std::normal_distribution<float> dist_attitude_;
 
+  std::vector<std::vector<float>> T_Wd_W_vec_;
+
   float drift_x_ = 0.0, drift_y_ = 0.0, drift_z_ = 0.0;
   float drift_yaw_ = 0.0;
+
+  ros::ServiceServer export_drift_srv_;
 };
 }  // namespace noiser
 #endif  // TF_DRIFT_HPP_

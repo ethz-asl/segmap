@@ -1,5 +1,6 @@
 #include "noiser/tf_drift.hpp"
 
+#include <fstream>
 #include <iostream>
 
 namespace noiser {
@@ -29,6 +30,11 @@ TfDriftClass::TfDriftClass() {
   dist_z_.param(std::normal_distribution<float>::param_type(noise_z_mean_, noise_z_stddev_));
   dist_yaw_.param(std::normal_distribution<float>::param_type(noise_yaw_mean_, noise_yaw_stddev_));
   dist_attitude_.param(std::normal_distribution<float>::param_type(noise_attitude_mean_, noise_attitude_stddev_));
+
+  export_drift_srv_ = nh.advertiseService(
+    "export_drift_transform",
+    &TfDriftClass::exportDriftValuesServiceCall, this);
+
 }
 
 void TfDriftClass::driftReal()
@@ -92,7 +98,21 @@ void TfDriftClass::driftReal()
   
   // Store T_WB' = T_WB
   T_W_BLast_ = T_W_B;
+
+  // Store T_Wd_W.
+  std::vector<float> T_Wd_W_vec = {
+  TS_W_B.stamp_.toSec(),
+  T_Wd_W.getOrigin().x(),
+  T_Wd_W.getOrigin().y(),
+  T_Wd_W.getOrigin().z(),
+  T_Wd_W.getRotation().x(),
+  T_Wd_W.getRotation().y(),
+  T_Wd_W.getRotation().z(),
+  T_Wd_W.getRotation().w()
+  };
+  T_Wd_W_vec_.push_back(T_Wd_W_vec);
 }
+
 void TfDriftClass::drift() {
   // float test_vel_x = 0.5; // GT odometry.
   // x_gt += (1.0/tf_rate_)*test_vel_x;
@@ -125,6 +145,30 @@ void TfDriftClass::drift() {
   transform_drifted_.setRotation(q);
   br_.sendTransform(tf::StampedTransform(transform_drifted_, ros::Time::now(), odom_drift_frame_, odom_frame_));
 }
+
+bool TfDriftClass::exportDriftValuesServiceCall(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
+{
+  std::ofstream output_file;
+  output_file.open("/tmp/online_matcher/drift.csv", std::ofstream::out | std::ofstream::trunc);
+  output_file << "odom_drift_frame: "<<odom_drift_frame_<<" odom_frame: "<<odom_frame_<<" baselink_frame: "<<baselink_frame_<<std::endl;
+  for(auto it = T_Wd_W_vec_.begin();it != T_Wd_W_vec_.end(); it++)
+  {
+    output_file << it->at(0) << " "; // Timestamp.
+    output_file << it->at(1) << " "; // t_x.
+    output_file << it->at(2) << " "; // t_y.
+    output_file << it->at(3) << " "; // t_z.
+    output_file << it->at(4) << " "; // q_x.
+    output_file << it->at(5) << " "; // q_y.
+    output_file << it->at(6) << " "; // q_z.
+    output_file << it->at(7) << " "; // q_w.
+    output_file << std::endl;
+  }
+
+  output_file.close();
+  return true;
+}
+
+
 }  // namespace noiser
 
 int main(int argc, char** argv) {
