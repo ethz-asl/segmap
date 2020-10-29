@@ -12,7 +12,7 @@ import ensure_segmappy_is_installed
 from segmappy import Dataset
 from segmappy.tools.hull import point_in_hull, n_points_in_hull, are_in_hull
 
-DATASET_FOLDER = "with_merge_events/drive18"
+DATASET_FOLDER = "/home/andrei/.segmap/training_datasets/bosch1/"
 FILE_PATH = DATASET_FOLDER + "/matches_database.csv"
 if os.path.isfile(FILE_PATH):
     os.remove(FILE_PATH)
@@ -213,5 +213,5 @@ if PLOT_MAP:
 
 print("Number of matches: ", len(matches))
 
-matches = np.asarray(matches)
-np.savetxt(FILE_PATH, (matches), delimiter=" ")
+matches = np.asarray(matches).astype(np.int)
+np.savetxt(FILE_PATH, (matches), fmt='%d', delimiter=" ")
