@@ -21,6 +21,10 @@ cs_add_executable(${PROJECT_NAME}
     src/noiser.cpp
 )
 
+cs_add_executable(tf_drift
+    src/tf_drift.cpp
+)
+
 find_package(Boost REQUIRED COMPONENTS system thread)
 
 #add_doxygen(NOT_AUTOMATIC)

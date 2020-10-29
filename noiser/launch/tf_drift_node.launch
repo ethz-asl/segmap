@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+
+  <node name="tf_drift" pkg="noiser" type="tf_drift" output="screen">
+	<param name="source_frame" type="string" value="world_drift" />
+  	<param name="target_frame" type="string" value="world" />
+  	<param name="noise_x_mean" type="double" value="0.001" />
+  	<param name="noise_x_stddev" type="double" value="0.0001" />
+  	<param name="noise_y_mean" type="double" value="0.001" />
+  	<param name="noise_y_stddev" type="double" value="0.0001" />
+  	<param name="noise_z_mean" type="double" value="0.001" />
+  	<param name="noise_z_stddev" type="double" value="0.0001" />
+	<param name="noise_yaw_mean" type="double" value="0.0" />
+  	<param name="noise_yaw_stddev" type="double" value="0.0" />
+  	<param name="noise_attitude_mean" type="double" value="0.0" />
+  	<param name="noise_attitude_stddev" type="double" value="0.001" />
+  </node>
+
+</launch>
