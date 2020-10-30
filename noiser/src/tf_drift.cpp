@@ -14,7 +14,7 @@ TfDriftClass::TfDriftClass() {
   nh.param<float>("tf_drift/noise_y_stddev", noise_y_stddev_, 0.1);
   nh.param<float>("tf_drift/noise_z_mean", noise_z_mean_, 0.0);
   nh.param<float>("tf_drift/noise_z_stddev", noise_z_stddev_, 0.1);
-  nh.param<float>("tf_drift/noise_yaw_mean", noise_yaw_stddev_, 0.1);
+  nh.param<float>("tf_drift/noise_yaw_mean", noise_yaw_mean_, 0.1);
   nh.param<float>("tf_drift/noise_yaw_stddev", noise_yaw_stddev_, 0.1);
   nh.param<float>("tf_drift/noise_attitude_mean", noise_attitude_mean_, 0.0);
   nh.param<float>("tf_drift/noise_attitude_stddev", noise_attitude_stddev_, 0.01);
@@ -62,6 +62,10 @@ void TfDriftClass::driftReal()
 
     // Compute T_B'B (GT relative motion since last step).
     tf::Transform T_BLast_B = (T_W_BLast_.inverse())*T_W_B; 
+    tf::Vector3 transl_gt = T_BLast_B.getOrigin();
+    tf::Quaternion quat_gt = T_BLast_B.getRotation();
+
+    float travelled_distance = transl_gt.length();
 
     // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
     // Sample noise.
@@ -72,8 +76,6 @@ void TfDriftClass::driftReal()
     float noise_yaw = dist_yaw_(generator_);
     float noise_roll = dist_attitude_(generator_);
     float noise_pitch = dist_attitude_(generator_);
-    tf::Vector3 transl_gt = T_BLast_B.getOrigin();
-    tf::Quaternion quat_gt = T_BLast_B.getRotation();
     tf::Quaternion quat_noise;
     quat_noise.setRPY(noise_roll, noise_pitch, noise_yaw);
 
