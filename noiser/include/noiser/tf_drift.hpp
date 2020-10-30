@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <random>
+#include <string>
 
 #include <ros/ros.h>
 #include <std_srvs/Empty.h>
@@ -19,6 +20,7 @@ class TfDriftClass {
   bool exportDriftValuesServiceCall(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
  private:
+  bool enable_drift_;
   float tf_rate_;
   std::string odom_drift_frame_, odom_frame_, baselink_frame_;
   tf::TransformBroadcaster br_;
@@ -38,6 +40,7 @@ class TfDriftClass {
   std::normal_distribution<float> dist_yaw_;
   std::normal_distribution<float> dist_attitude_;
 
+  std::vector<std::string> T_Wd_W_stamp_vec_;
   std::vector<std::vector<float>> T_Wd_W_vec_;
 
   float drift_x_ = 0.0, drift_y_ = 0.0, drift_z_ = 0.0;

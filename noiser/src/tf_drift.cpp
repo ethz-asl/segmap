@@ -7,6 +7,7 @@ namespace noiser {
 
 TfDriftClass::TfDriftClass() {
   ros::NodeHandle nh;
+  nh.param<bool>("tf_drift/enable_drift", enable_drift_, false);
   nh.param<float>("tf_drift/noise_x_mean", noise_x_mean_, 0.0);
   nh.param<float>("tf_drift/noise_x_stddev", noise_x_stddev_, 0.1);
   nh.param<float>("tf_drift/noise_y_mean", noise_y_mean_, 0.0);
@@ -39,69 +40,81 @@ TfDriftClass::TfDriftClass() {
 
 void TfDriftClass::driftReal()
 {
-  // T_ = Tf, W = GT Odom Frame, B = GT Base Link, B* = Drifted Base Link, W* = Drifted Odom Frame, W', B', W*', B*' = Previous timestep.
+  tf::Transform T_Wd_W;
+  std::string stamp;
+  if(enable_drift_)
+  {
+    // T_ = Tf, W = GT Odom Frame, B = GT Base Link, B* = Drifted Base Link, W* = Drifted Odom Frame, W', B', W*', B*' = Previous timestep.
   
-  // Get T_WB from TF tree.
-  tf::StampedTransform TS_W_B;
-  try{
-    listener_.lookupTransform(odom_frame_, baselink_frame_, ros::Time(0), TS_W_B);
+    // Get T_WB from TF tree.
+    tf::StampedTransform TS_W_B;
+    try{
+      listener_.lookupTransform(odom_frame_, baselink_frame_, ros::Time(0), TS_W_B);
+    }
+    catch (tf::TransformException ex){
+      ROS_ERROR("%s",ex.what());
+      // ToDo: How to handle? Just don't add noise?
+      return;
+    }
+
+    // ToDo Check if enough time has passed since last update.
+    tf::Transform T_W_B = TS_W_B;
+
+    // Compute T_B'B (GT relative motion since last step).
+    tf::Transform T_BLast_B = (T_W_BLast_.inverse())*T_W_B; 
+
+    // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
+    // Sample noise.
+    // std::normal_distribution<float> dist_x(noise_x_mean_, noise_x_stddev_);
+    float noise_x = dist_x_(generator_);
+    float noise_y = dist_y_(generator_);
+    float noise_z = dist_z_(generator_);
+    float noise_yaw = dist_yaw_(generator_);
+    float noise_roll = dist_attitude_(generator_);
+    float noise_pitch = dist_attitude_(generator_);
+    tf::Vector3 transl_gt = T_BLast_B.getOrigin();
+    tf::Quaternion quat_gt = T_BLast_B.getRotation();
+    tf::Quaternion quat_noise;
+    quat_noise.setRPY(noise_roll, noise_pitch, noise_yaw);
+
+    transl_gt.setX(noise_x + T_BLast_B.getOrigin().x());
+    transl_gt.setY(noise_y + T_BLast_B.getOrigin().y());
+    transl_gt.setZ(noise_z + T_BLast_B.getOrigin().z());
+    tf::Transform T_BdLast_Bd = T_BLast_B; // ToDo!! Add the magic here.
+    T_BdLast_Bd.setOrigin(transl_gt);
+    T_BdLast_Bd.setRotation(quat_gt*quat_noise);
+
+    
+    // Compute T_WB* = T_WB*' * T_B*'B* (the current drifted base link).
+    tf::Transform T_W_Bd = T_W_BdLast_*T_BdLast_Bd;
+    // std::cout<<"Hallo5a "<<T_W_BdLast_.getOrigin().x()<<" "<<T_W_BdLast_.getOrigin().y()<<" "<<T_W_BdLast_.getOrigin().z()<<" "<<T_W_BdLast_.getRotation().x()<<" "<<T_W_BdLast_.getRotation().y()<<" "<<T_W_BdLast_.getRotation().z()<<" "<<T_W_BdLast_.getRotation().w()<<std::endl;
+    
+    // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
+    tf::Transform T_WdB = T_W_Bd;
+    
+    // Compute T_W*W = T_WB* * inv(T_WB)
+    T_Wd_W = T_WdB*(T_W_B.inverse());
+    
+    // Broadcast T_W*W to TF tree.
+    br_.sendTransform(tf::StampedTransform(T_Wd_W, TS_W_B.stamp_, odom_drift_frame_, odom_frame_));
+    stamp = std::to_string(TS_W_B.stamp_.toSec());
+    
+    // Store T_WB*' = T_WB*
+    T_W_BdLast_ = T_W_Bd;
+    
+    // Store T_WB' = T_WB
+    T_W_BLast_ = T_W_B;
   }
-  catch (tf::TransformException ex){
-    ROS_ERROR("%s",ex.what());
-    // ToDo: How to handle? Just don't add noise?
-    return;
+  else
+  {
+    T_Wd_W.setIdentity();
+    br_.sendTransform(tf::StampedTransform(T_Wd_W, ros::Time::now(), odom_drift_frame_, odom_frame_));
+    stamp = std::to_string(ros::Time::now().toSec());
   }
-
-  // ToDo Check if enough time has passed since last update.
-  tf::Transform T_W_B = TS_W_B;
-
-  // Compute T_B'B (GT relative motion since last step).
-  tf::Transform T_BLast_B = (T_W_BLast_.inverse())*T_W_B; 
-
-  // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
-  // Sample noise.
-  // std::normal_distribution<float> dist_x(noise_x_mean_, noise_x_stddev_);
-  float noise_x = dist_x_(generator_);
-  float noise_y = dist_y_(generator_);
-  float noise_z = dist_z_(generator_);
-  float noise_yaw = dist_yaw_(generator_);
-  float noise_roll = dist_attitude_(generator_);
-  float noise_pitch = dist_attitude_(generator_);
-  tf::Vector3 transl_gt = T_BLast_B.getOrigin();
-  tf::Quaternion quat_gt = T_BLast_B.getRotation();
-  tf::Quaternion quat_noise;
-  quat_noise.setRPY(noise_roll, noise_pitch, noise_yaw);
-
-  transl_gt.setX(noise_x + T_BLast_B.getOrigin().x());
-  transl_gt.setY(noise_y + T_BLast_B.getOrigin().y());
-  transl_gt.setZ(noise_z + T_BLast_B.getOrigin().z());
-  tf::Transform T_BdLast_Bd = T_BLast_B; // ToDo!! Add the magic here.
-  T_BdLast_Bd.setOrigin(transl_gt);
-  T_BdLast_Bd.setRotation(quat_gt*quat_noise);
-
-  
-  // Compute T_WB* = T_WB*' * T_B*'B* (the current drifted base link).
-  tf::Transform T_W_Bd = T_W_BdLast_*T_BdLast_Bd;
-  // std::cout<<"Hallo5a "<<T_W_BdLast_.getOrigin().x()<<" "<<T_W_BdLast_.getOrigin().y()<<" "<<T_W_BdLast_.getOrigin().z()<<" "<<T_W_BdLast_.getRotation().x()<<" "<<T_W_BdLast_.getRotation().y()<<" "<<T_W_BdLast_.getRotation().z()<<" "<<T_W_BdLast_.getRotation().w()<<std::endl;
-  
-  // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
-  tf::Transform T_WdB = T_W_Bd;
-  
-  // Compute T_W*W = T_WB* * inv(T_WB)
-  tf::Transform T_Wd_W = T_WdB*(T_W_B.inverse());
-  
-  // Broadcast T_W*W to TF tree.
-  br_.sendTransform(tf::StampedTransform(T_Wd_W, TS_W_B.stamp_, odom_drift_frame_, odom_frame_));
-  
-  // Store T_WB*' = T_WB*
-  T_W_BdLast_ = T_W_Bd;
-  
-  // Store T_WB' = T_WB
-  T_W_BLast_ = T_W_B;
 
   // Store T_Wd_W.
+  // std::cout<<"Timestamp: "<<std::to_string(TS_W_B.stamp_.toSec())<<std::endl;
   std::vector<float> T_Wd_W_vec = {
-  TS_W_B.stamp_.toSec(),
   T_Wd_W.getOrigin().x(),
   T_Wd_W.getOrigin().y(),
   T_Wd_W.getOrigin().z(),
@@ -111,6 +124,7 @@ void TfDriftClass::driftReal()
   T_Wd_W.getRotation().w()
   };
   T_Wd_W_vec_.push_back(T_Wd_W_vec);
+  T_Wd_W_stamp_vec_.push_back(stamp);
 }
 
 void TfDriftClass::drift() {
@@ -151,17 +165,19 @@ bool TfDriftClass::exportDriftValuesServiceCall(std_srvs::Empty::Request& req, s
   std::ofstream output_file;
   output_file.open("/tmp/online_matcher/drift.csv", std::ofstream::out | std::ofstream::trunc);
   output_file << "odom_drift_frame: "<<odom_drift_frame_<<" odom_frame: "<<odom_frame_<<" baselink_frame: "<<baselink_frame_<<std::endl;
+  int i = 0;
   for(auto it = T_Wd_W_vec_.begin();it != T_Wd_W_vec_.end(); it++)
   {
-    output_file << it->at(0) << " "; // Timestamp.
-    output_file << it->at(1) << " "; // t_x.
-    output_file << it->at(2) << " "; // t_y.
-    output_file << it->at(3) << " "; // t_z.
-    output_file << it->at(4) << " "; // q_x.
-    output_file << it->at(5) << " "; // q_y.
-    output_file << it->at(6) << " "; // q_z.
-    output_file << it->at(7) << " "; // q_w.
+    output_file << T_Wd_W_stamp_vec_[i] << " "; // Timestamp.
+    output_file << it->at(0) << " "; // t_x.
+    output_file << it->at(1) << " "; // t_y.
+    output_file << it->at(2) << " "; // t_z.
+    output_file << it->at(3) << " "; // q_x.
+    output_file << it->at(4) << " "; // q_y.
+    output_file << it->at(5) << " "; // q_z.
+    output_file << it->at(6) << " "; // q_w.
     output_file << std::endl;
+    i++;
   }
 
   output_file.close();

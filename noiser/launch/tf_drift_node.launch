@@ -3,6 +3,7 @@
 <launch>
 
   <node name="tf_drift" pkg="noiser" type="tf_drift" output="screen">
+    <param name="enable_drift" type="bool" value="true"/>
     <param name="tf_rate" type="double" value="15.0"/>
     <param name="odom_drift_frame" type="string" value="world_drift"/>
   	<param name="odom_frame" type="string" value="world"/>
