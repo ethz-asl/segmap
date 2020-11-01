@@ -8,6 +8,7 @@
     <param name="odom_drift_frame" type="string" value="world_drift"/>
   	<param name="odom_frame" type="string" value="world"/>
     <param name="baselink_frame" type="string" value="airsim_drone"/>
+    <param name="baselink_drift_frame" type="string" value="airsim_drone_drift"/>
     <param name="noise_x_mean" type="double" value="0.0"/>
     <param name="noise_x_stddev" type="double" value="0.0"/>
     <param name="noise_y_mean" type="double" value="0.0"/>

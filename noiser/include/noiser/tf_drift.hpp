@@ -22,7 +22,7 @@ class TfDriftClass {
  private:
   bool enable_drift_;
   float tf_rate_;
-  std::string odom_drift_frame_, odom_frame_, baselink_frame_;
+  std::string odom_drift_frame_, odom_frame_, baselink_frame_, baselink_drift_frame_;
   tf::TransformBroadcaster br_;
   tf::TransformListener listener_;
   tf::Transform transform_drifted_; 
@@ -40,8 +40,8 @@ class TfDriftClass {
   std::normal_distribution<float> dist_yaw_;
   std::normal_distribution<float> dist_attitude_;
 
-  std::vector<std::string> T_Wd_W_stamp_vec_;
-  std::vector<std::vector<float>> T_Wd_W_vec_;
+  std::vector<std::string> T_B_Bd_stamp_vec_;
+  std::vector<std::vector<float>> T_B_Bd_vec_;
 
   float drift_x_ = 0.0, drift_y_ = 0.0, drift_z_ = 0.0;
   float drift_yaw_ = 0.0;

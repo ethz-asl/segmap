@@ -21,6 +21,7 @@ TfDriftClass::TfDriftClass() {
   nh.param<std::string>("tf_drift/odom_drift_frame", odom_drift_frame_, "world_drift");
   nh.param<std::string>("tf_drift/odom_frame", odom_frame_, "world");
   nh.param<std::string>("tf_drift/baselink_frame", baselink_frame_, "base_link");
+  nh.param<std::string>("tf_drift/baselink_drift_frame", baselink_drift_frame_, "base_link_drift");
   nh.param<float>("tf_drift/tf_rate", tf_rate_, 10.0);
 
   // Init.
@@ -40,7 +41,8 @@ TfDriftClass::TfDriftClass() {
 
 void TfDriftClass::driftReal()
 {
-  tf::Transform T_Wd_W;
+  // tf::Transform T_Wd_W;
+  tf::Transform T_B_Bd;
   std::string stamp;
   if(enable_drift_)
   {
@@ -91,14 +93,17 @@ void TfDriftClass::driftReal()
     tf::Transform T_W_Bd = T_W_BdLast_*T_BdLast_Bd;
     // std::cout<<"Hallo5a "<<T_W_BdLast_.getOrigin().x()<<" "<<T_W_BdLast_.getOrigin().y()<<" "<<T_W_BdLast_.getOrigin().z()<<" "<<T_W_BdLast_.getRotation().x()<<" "<<T_W_BdLast_.getRotation().y()<<" "<<T_W_BdLast_.getRotation().z()<<" "<<T_W_BdLast_.getRotation().w()<<std::endl;
     
+    // ToDo(alaturn) Get T_B_Bd.
+    // T_W_B * T_B_Bd = T_W_Bd <=> T_B_Bd = inv(T_W_B)*T_W_Bd
+    tf::Transform T_B_Bd = (T_W_B.inverse())*T_W_Bd;
+
     // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
-    tf::Transform T_WdB = T_W_Bd;
-    
+    // tf::Transform T_WdB = T_W_Bd;
     // Compute T_W*W = T_WB* * inv(T_WB)
-    T_Wd_W = T_WdB*(T_W_B.inverse());
-    
+    // T_Wd_W = T_WdB*(T_W_B.inverse());
     // Broadcast T_W*W to TF tree.
-    br_.sendTransform(tf::StampedTransform(T_Wd_W, TS_W_B.stamp_, odom_drift_frame_, odom_frame_));
+    // br_.sendTransform(tf::StampedTransform(T_Wd_W, TS_W_B.stamp_, odom_drift_frame_, odom_frame_));
+    br_.sendTransform(tf::StampedTransform(T_B_Bd, TS_W_B.stamp_, baselink_frame_, baselink_drift_frame_));
     stamp = std::to_string(TS_W_B.stamp_.toSec());
     
     // Store T_WB*' = T_WB*
@@ -109,24 +114,25 @@ void TfDriftClass::driftReal()
   }
   else
   {
-    T_Wd_W.setIdentity();
-    br_.sendTransform(tf::StampedTransform(T_Wd_W, ros::Time::now(), odom_drift_frame_, odom_frame_));
+    // T_Wd_W.setIdentity();
+    T_B_Bd.setIdentity();
+    br_.sendTransform(tf::StampedTransform(T_B_Bd, ros::Time::now(), baselink_frame_, baselink_drift_frame_));
     stamp = std::to_string(ros::Time::now().toSec());
   }
 
   // Store T_Wd_W.
   // std::cout<<"Timestamp: "<<std::to_string(TS_W_B.stamp_.toSec())<<std::endl;
-  std::vector<float> T_Wd_W_vec = {
-  T_Wd_W.getOrigin().x(),
-  T_Wd_W.getOrigin().y(),
-  T_Wd_W.getOrigin().z(),
-  T_Wd_W.getRotation().x(),
-  T_Wd_W.getRotation().y(),
-  T_Wd_W.getRotation().z(),
-  T_Wd_W.getRotation().w()
+  std::vector<float> T_B_Bd_vec = {
+  T_B_Bd.getOrigin().x(),
+  T_B_Bd.getOrigin().y(),
+  T_B_Bd.getOrigin().z(),
+  T_B_Bd.getRotation().x(),
+  T_B_Bd.getRotation().y(),
+  T_B_Bd.getRotation().z(),
+  T_B_Bd.getRotation().w()
   };
-  T_Wd_W_vec_.push_back(T_Wd_W_vec);
-  T_Wd_W_stamp_vec_.push_back(stamp);
+  T_B_Bd_vec_.push_back(T_B_Bd_vec);
+  T_B_Bd_stamp_vec_.push_back(stamp);
 }
 
 void TfDriftClass::drift() {
@@ -166,11 +172,11 @@ bool TfDriftClass::exportDriftValuesServiceCall(std_srvs::Empty::Request& req, s
 {
   std::ofstream output_file;
   output_file.open("/tmp/online_matcher/drift.csv", std::ofstream::out | std::ofstream::trunc);
-  output_file << "odom_drift_frame: "<<odom_drift_frame_<<" odom_frame: "<<odom_frame_<<" baselink_frame: "<<baselink_frame_<<std::endl;
+  output_file << "odom_frame: "<<odom_frame_<<" baselink_frame: "<<baselink_frame_<<" baselink_drift_frame: "<<baselink_drift_frame_<<std::endl;
   int i = 0;
-  for(auto it = T_Wd_W_vec_.begin();it != T_Wd_W_vec_.end(); it++)
+  for(auto it = T_B_Bd_vec_.begin();it != T_B_Bd_vec_.end(); it++)
   {
-    output_file << T_Wd_W_stamp_vec_[i] << " "; // Timestamp.
+    output_file << T_B_Bd_stamp_vec_[i] << " "; // Timestamp.
     output_file << it->at(0) << " "; // t_x.
     output_file << it->at(1) << " "; // t_y.
     output_file << it->at(2) << " "; // t_z.
