@@ -45,7 +45,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   std::feclearexcept(FE_ALL_EXCEPT);
 
   // Do Stuff in here.
-  std::cout<<"FPFH START "<<std::endl;
+  // std::cout<<"FPFH START "<<std::endl;
   clock_t startTime = clock(); //Start timer
 
   // Extract point cloud.
@@ -58,7 +58,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_ne(new pcl::search::KdTree<pcl::PointXYZ> ());
   ne.setSearchMethod(tree_ne);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-  std::cout<<"Raidus "<<ne_radius_<<std::endl;
+  // std::cout<<"Raidus "<<ne_radius_<<std::endl;
   ne.setRadiusSearch(ne_radius_);  // ToDo(alaturn) Make adaptive or param.
   ne.compute(*cloud_normals);
 
@@ -88,7 +88,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
     }
   }
 
-  std::cout<<"NanPC: "<<cc1<<" NanPCN: "<<cc2<<std::endl;
+  // std::cout<<"NanPC: "<<cc1<<" NanPCN: "<<cc2<<std::endl;
 
   // ToDo(alaturn) Actually filter out NaNs.
 
@@ -148,7 +148,7 @@ void FpfhDescriptor::describe(const Segment& segment, Features* features) {
   // std::cout<<"F1: "<<hist_f1.rows()<<" "<<hist_f1.cols()<<" F2: "<<hist_f2.rows()<<" "<<hist_f2.cols()<<" F3: "<<hist_f3.rows()<<" "<<hist_f3.cols()<<std::endl;
   // std::raise(SIGINT);
   fpfh.computePointSPFHSignature(*cloud, *cloud_normals, (cloud->size())-1, 0, indices, hist_f1, hist_f2, hist_f3);
-  std::cout<<"sum(F1): "<<(hist_f1.row(0)).sum()<<" sum(F2): "<<(hist_f2.row(0)).sum()<<" sum(F3): "<<(hist_f3.row(0)).sum()<<std::endl;
+  // std::cout<<"sum(F1): "<<(hist_f1.row(0)).sum()<<" sum(F2): "<<(hist_f2.row(0)).sum()<<" sum(F3): "<<(hist_f3.row(0)).sum()<<std::endl;
   
   // ToDo(alatur) Check that each histograms sums up to ~100.
 
