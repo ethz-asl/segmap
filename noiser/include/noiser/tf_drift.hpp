@@ -28,6 +28,7 @@ class TfDriftClass {
   tf::Transform transform_drifted_; 
   tf::Transform T_W_BLast_;
   tf::Transform T_W_BdLast_;
+  float path_length_ = 0.0;
 
   float noise_x_mean_, noise_y_mean_, noise_z_mean_, noise_yaw_mean_, noise_attitude_mean_;
   float noise_x_stddev_, noise_y_stddev_, noise_z_stddev_, noise_yaw_stddev_, noise_attitude_stddev_;

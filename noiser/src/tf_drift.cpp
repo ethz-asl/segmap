@@ -68,6 +68,7 @@ void TfDriftClass::driftReal()
     tf::Quaternion quat_gt = T_BLast_B.getRotation();
 
     float travelled_distance = transl_gt.length();
+    path_length_ += travelled_distance;
 
     // Compute T_B*'B* = addNoise(T_B'B). Noisy relative motion since last step.
     // Sample noise.
@@ -96,6 +97,10 @@ void TfDriftClass::driftReal()
     // ToDo(alaturn) Get T_B_Bd.
     // T_W_B * T_B_Bd = T_W_Bd <=> T_B_Bd = inv(T_W_B)*T_W_Bd
     tf::Transform T_B_Bd = (T_W_B.inverse())*T_W_Bd;
+    float drift_abs = T_B_Bd.getOrigin().length();
+    float drift_rel = (drift_abs/path_length_)*100.0;
+    // float rot_drift_abs = ;
+    std::cout<<"Absolute drift: "<<drift_abs<<"m , Relative Drift: "<<drift_rel<<" %"<<std::endl;
 
     // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
     // tf::Transform T_WdB = T_W_Bd;
@@ -130,6 +135,7 @@ void TfDriftClass::driftReal()
   T_B_Bd.getRotation().y(),
   T_B_Bd.getRotation().z(),
   T_B_Bd.getRotation().w()
+  // ToDo add 
   };
   T_B_Bd_vec_.push_back(T_B_Bd_vec);
   T_B_Bd_stamp_vec_.push_back(stamp);
@@ -177,13 +183,16 @@ bool TfDriftClass::exportDriftValuesServiceCall(std_srvs::Empty::Request& req, s
   for(auto it = T_B_Bd_vec_.begin();it != T_B_Bd_vec_.end(); it++)
   {
     output_file << T_B_Bd_stamp_vec_[i] << " "; // Timestamp.
-    output_file << it->at(0) << " "; // t_x.
-    output_file << it->at(1) << " "; // t_y.
-    output_file << it->at(2) << " "; // t_z.
-    output_file << it->at(3) << " "; // q_x.
-    output_file << it->at(4) << " "; // q_y.
-    output_file << it->at(5) << " "; // q_z.
-    output_file << it->at(6) << " "; // q_w.
+    output_file << "t_x: " << it->at(0) << " "; // t_x.
+    output_file << "t_y: " << it->at(1) << " "; // t_y.
+    output_file << "t_z: " << it->at(2) << " "; // t_z.
+    output_file << "q_x: " << it->at(3) << " "; // q_x.
+    output_file << "q_y: " << it->at(4) << " "; // q_y.
+    output_file << "q_z: " <<it->at(5) << " "; // q_z.
+    output_file << "q_w: " <<it->at(6) << " "; // q_w.
+    output_file << "path_length: " << -1 << " ";
+    output_file << "absolute_drift_m: " << -1 << " ";
+    output_file << "relative_drift: " << -1 << " "; 
     output_file << std::endl;
     i++;
   }
