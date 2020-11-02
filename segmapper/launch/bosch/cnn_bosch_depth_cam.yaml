@@ -33,10 +33,10 @@ SegMapper: {
     noise_z_mean: 0.0,
     noise_yaw_mean: 0.0,
     noise_att_mean: 0.0,
-    noise_x_stddev: 0.0,
+    noise_x_stddev: 0.001,
     noise_y_stddev: 0.0,
     noise_z_stddev: 0.0,
-    noise_yaw_stddev: 0.1,
+    noise_yaw_stddev: 0.001,
     noise_att_stddev: 0.0,
     ###############################
   },

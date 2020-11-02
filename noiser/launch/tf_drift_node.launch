@@ -2,7 +2,7 @@
 
 <launch>
   <arg name="bag_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/BOSCH/train-map-augmented.bag"/>
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 30 -s 0 --topics /tf --clock --pause $(arg bag_file)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 50 -s 0 --topics /tf --clock --pause $(arg bag_file)"/>
 
   <rosparam>use_sim_time: true</rosparam>
 
@@ -14,7 +14,7 @@
     <param name="baselink_frame" type="string" value="airsim_drone"/>
     <param name="baselink_drift_frame" type="string" value="airsim_drone_drift"/>
     <param name="noise_x_mean" type="double" value="0.0"/>
-    <param name="noise_x_stddev" type="double" value="0.0"/>
+    <param name="noise_x_stddev" type="double" value="0.001"/>
     <param name="noise_y_mean" type="double" value="0.0"/>
     <param name="noise_y_stddev" type="double" value="0.0"/>
     <param name="noise_z_mean" type="double" value="0.0"/>

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <cmath>
 
 namespace noiser {
 
@@ -97,10 +98,6 @@ void TfDriftClass::driftReal()
     // ToDo(alaturn) Get T_B_Bd.
     // T_W_B * T_B_Bd = T_W_Bd <=> T_B_Bd = inv(T_W_B)*T_W_Bd
     tf::Transform T_B_Bd = (T_W_B.inverse())*T_W_Bd;
-    float drift_abs = T_B_Bd.getOrigin().length();
-    float drift_rel = (drift_abs/path_length_)*100.0;
-    // float rot_drift_abs = ;
-    std::cout<<"Absolute drift: "<<drift_abs<<"m , Relative Drift: "<<drift_rel<<" %"<<std::endl;
 
     // Swap of drifting variable: T_W*B = T_WB* (keep B, add W* instead).
     // tf::Transform T_WdB = T_W_Bd;
@@ -111,6 +108,15 @@ void TfDriftClass::driftReal()
     br_.sendTransform(tf::StampedTransform(T_B_Bd, TS_W_B.stamp_, baselink_frame_, baselink_drift_frame_));
     stamp = std::to_string(TS_W_B.stamp_.toSec());
     
+    // Some metrics.
+    float drift_abs = T_B_Bd.getOrigin().length();
+    double yaw_offset, pitch_offset, roll_offset;
+    float drift_rel = (drift_abs/path_length_)*100.0;
+    T_B_Bd.getBasis().getEulerYPR(yaw_offset, pitch_offset, roll_offset);
+    std::cout<<"Absolute drift: "<<drift_abs<<" Path Lenght: "<<path_length_<<" Relative Drift: "<<drift_rel<<" %"<<std::endl;
+    std::cout<<"Yaw drift deg/m: "<<std::abs((yaw_offset/M_PI)*180.0)/path_length_<<", Roll Drift: "<<std::abs(pitch_offset)<<", Pitch Drift: "<<std::abs(roll_offset)<<std::endl;
+    // std::cout<<"Yaw Drift/path lenght: "<<std::abs(yaw_offset)
+
     // Store T_WB*' = T_WB*
     T_W_BdLast_ = T_W_Bd;
     
