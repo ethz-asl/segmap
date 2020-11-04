@@ -20,10 +20,24 @@ namespace segmatch {
 typedef kindr::minimal::QuatTransformationTemplate<double> SE3;
 
 template <typename PointCloudT>
-static void loadCloud(const std::string& filename, PointCloudT* cloud) {
+static void loadCloud(const std::string& filename, PointCloudT* out_cloud) {
   LOG(INFO) <<"Loading cloud: " << filename << ".";
-  CHECK_NE(pcl::io::loadPCDFile(filename, *cloud), -1) <<
+
+  PointCloud read_cloud;
+  CHECK_NE(pcl::io::loadPCDFile<pcl::PointXYZRGBA>(filename, read_cloud), -1) <<
       "Failed to load cloud: " << filename << ".";
+
+  for (const auto& point : read_cloud.points) {
+      MapPoint map_point;
+      map_point.x = point.x;
+      map_point.y = point.y;
+      map_point.z = point.z;
+      map_point.rgba = point.rgba;
+      out_cloud->points.push_back(map_point);
+  }
+
+  out_cloud->width = 1;
+  out_cloud->height = out_cloud->points.size();
 }
 
 template <typename PointCloudT>
@@ -166,6 +180,7 @@ static PointCloud mapPoint2PointCloud(const MapCloud& map_cloud) {
         pcl_point.x = point.x;
         pcl_point.y = point.y;
         pcl_point.z = point.z;
+        pcl_point.rgba = point.rgba;
         point_cloud.points.push_back(pcl_point);
     }
     point_cloud.width = 1;

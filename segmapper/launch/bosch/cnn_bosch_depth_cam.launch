@@ -6,7 +6,7 @@
   <!-- boolean: true, false -->
 
   <!-- Bag file path -->
-  <arg name="bag_file" value="/mnt/scratch1/bosch/2020-10-14/base-map-augmented.bag"/>
+  <arg name="bag_file" value="/mnt/scratch1/bosch/2020-10-21/opposite-loop-augmented.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
@@ -17,14 +17,14 @@
   <rosparam command="load" file="$(find segmapper)/launch/bosch/cnn_bosch_depth_cam.yaml"/>
 
   <!-- Target cloud -->
-  <arg name="target_cloud" value="$(env HOME)/src/segmap/bosch/test_map.pcd"/>
+  <arg name="target_cloud" value="/mnt/scratch1/bosch/2020-10-14/base-map.pcd"/>
   <rosparam param="/SegMapper/SegMatchWorker/target_cloud_filename" subst_value="True">$(arg target_cloud)</rosparam>
 
   <!-- rviz node -->
-  <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
+  <!-- node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" / -->
 
   <!-- CNN model path -->
-  <arg name="cnn_model_path" value="$(env HOME)/.segmap/trained_models/segmap64/"/>
+  <arg name="cnn_model_path" value="$(env HOME)/.segmap/trained_models/bosch_segmap/"/>
   <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Descriptors/cnn_model_path" subst_value="True">$(arg cnn_model_path)</rosparam>
 
   <!-- Semantics nn path -->
@@ -38,7 +38,7 @@
   </include>
 
   <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 10 -s 0 --clock --pause $(arg bag_file)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 3 -q -s 0 --clock --pause $(arg bag_file)"/>
 
   <!-- Tensorflow interface -->
   <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen"></node>

@@ -5,33 +5,13 @@
 #include "segmatch/descriptors/descriptors.hpp"
 #include "segmatch/parameters.hpp"
 #include "segmatch/segmented_cloud.hpp"
-
 #include "segmatch/descriptors/tf_interface.hpp"
 
 namespace segmatch {
 
 class CNNDescriptor : public Descriptor {
  public:
-  //AutoencoderDescriptor () {};
-  explicit CNNDescriptor(const DescriptorsParameters& parameters) : params_(parameters) {
-    const std::string model_folder = parameters.cnn_model_path;
-    const std::string semantics_nn_folder = parameters.semantics_nn_path;
-
-    aligned_segments_ = SegmentedCloud(false);
-
-    /*Eigen::MatrixXd voxel_mean_values;
-    laser_slam::loadEigenMatrixXdCSV(model_folder + "scaler_mean.csv", &voxel_mean_values);
-
-    CHECK_EQ(voxel_mean_values.rows(), cnn_input_dim_);
-    CHECK_EQ(voxel_mean_values.cols(), 1u);
-
-    for (size_t i = 0u; i < cnn_input_dim_; ++i) {
-      voxel_mean_values_.push_back(voxel_mean_values(i, 0u));
-    }*/
-
-    ns_tf_interface::TensorflowInterface interface_worker_();
-  }
-
+  explicit CNNDescriptor(const DescriptorsParameters& parameters);
   ~CNNDescriptor () {};
 
   // Use methods common to all descriptor children.
@@ -44,39 +24,28 @@ class CNNDescriptor : public Descriptor {
   virtual void describe(SegmentedCloud* segmented_cloud_ptr);
 
   /// \brief Get the descriptor's dimension.
-  virtual unsigned int dimension() const { return kDimension; };
+  virtual unsigned dimension() const { return kDimension; };
 
   virtual void exportData() const;
 
  private:
   // TODO: the dimension is unknown.
-  static constexpr unsigned int kDimension = 32u;
+  const unsigned kDimension = 32u;
 
-  DescriptorsParameters params_;
+  const unsigned n_voxels_x_dim_ = 32u;
+  const unsigned n_voxels_y_dim_ = 32u;
+  const unsigned n_voxels_z_dim_ = 16u;
 
-  std::vector<float> voxel_mean_values_;
+  const float min_voxel_size_m_ = 0.1;
+  const float min_x_scale_m_ = static_cast<float>(n_voxels_x_dim_) * min_voxel_size_m_;
+  const float min_y_scale_m_ = static_cast<float>(n_voxels_y_dim_) * min_voxel_size_m_;
+  const float min_z_scale_m_ = static_cast<float>(n_voxels_z_dim_) * min_voxel_size_m_;
 
-  segmatch::SegmentedCloud aligned_segments_;
+  const float x_dim_min_1_ = static_cast<float>(n_voxels_x_dim_) - 1.0;
+  const float y_dim_min_1_ = static_cast<float>(n_voxels_y_dim_) - 1.0;
+  const float z_dim_min_1_ = static_cast<float>(n_voxels_z_dim_) - 1.0;
 
-  constexpr static float min_voxel_size_m_ = 0.1;
-
-  constexpr static unsigned int n_voxels_x_dim_ = 32u;
-  constexpr static unsigned int n_voxels_y_dim_ = 32u;
-  constexpr static unsigned int n_voxels_z_dim_ = 16u;
-  constexpr static unsigned int cnn_input_dim_ = n_voxels_x_dim_ * n_voxels_y_dim_ *
-      n_voxels_z_dim_;
-
-  constexpr static float min_x_scale_m_ = static_cast<float>(n_voxels_x_dim_) * min_voxel_size_m_;
-  constexpr static float min_y_scale_m_ = static_cast<float>(n_voxels_y_dim_) * min_voxel_size_m_;
-  constexpr static float min_z_scale_m_ = static_cast<float>(n_voxels_z_dim_) * min_voxel_size_m_;
-
-  constexpr static float x_dim_min_1_ = static_cast<float>(n_voxels_x_dim_) - 1.0;
-  constexpr static float y_dim_min_1_ = static_cast<float>(n_voxels_y_dim_) - 1.0;
-  constexpr static float z_dim_min_1_ = static_cast<float>(n_voxels_z_dim_) - 1.0;
-
-  constexpr static size_t mini_batch_size_ = 64u;
-
-  constexpr static bool save_debug_data_ = true;
+  const size_t mini_batch_size_ = 16u;
 
   const std::string kInputTensorName = "InputScope/input";
   const std::string kFeaturesTensorName = "OutputScope/descriptor_read";
@@ -84,8 +53,8 @@ class CNNDescriptor : public Descriptor {
   const std::string kReconstructionTensorName = "ReconstructionScopeAE/ae_reconstruction_read";
   const std::string kScalesTensorName = "scales";
 
-  ns_tf_interface::TensorflowInterface interface_worker_;
-
+  DescriptorsParameters params_;
+  std::unique_ptr<TensorflowInterface> interface_worker_;
 }; // class CNNDescriptor
 
 } // namespace segmatch
