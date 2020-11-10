@@ -76,7 +76,7 @@ def main():
 
     # ToDo(alaturn) Read these in from file. Just for LB3-Cam5 for now...
     # Intrinsics (given by NCLT).
-    image_width = 1616 #646  
+    image_width = 1616 #u, x #646  
     image_height = 1232 #492
     f_x = 399.433184
     f_y = 399.433184
@@ -87,12 +87,12 @@ def main():
 
     # Scaled intrinsics (because the images on the bag are scaled down).
     scale_img = 0.4
-    image_width_sc = int(scale_img*1232) #*1616) #646  
-    image_height_sc = int(scale_img*1616) #*1232) #492
-    f_x_sc = scale_img*399.433184
-    f_y_sc = scale_img*399.433184
-    c_x_sc = scale_img*621.668624
-    c_y_sc = scale_img*826.361952
+    image_width_sc = int(scale_img*1616) #*1616) #646  
+    image_height_sc = int(scale_img*1232) #*1232) #492
+    f_x_sc = scale_img*f_x
+    f_y_sc = scale_img*f_y
+    c_x_sc = scale_img*c_x
+    c_y_sc = scale_img*c_y
     camera_intrinsics_sc = [[f_x_sc, 0.0, c_x_sc, 0.0], [
         0.0, f_y_sc, c_y_sc, 0.0], [0.0, 0.0, 1.0, 0.0]]    
 
@@ -188,14 +188,14 @@ def main():
     image_iterator = 0
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
         augmented_points = []
-
         # Forward search for getting img<->cloud correspondence.
         while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images)-1):
             image_iterator += 1
         current_image = images[image_iterator]
         current_label = labels[image_iterator]
-        cv_image = bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8')#cv2.rotate(bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image = bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8') #cv2.rotate(bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
         cv_label = cv2.rotate(bridge.imgmsg_to_cv2(current_label, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
+        range_image = np.zeros((image_height_sc,image_width_sc,3), np.uint8)
         # cv2.imshow('lol', cv_image)
         cv2.waitKey(10)
 
@@ -225,31 +225,39 @@ def main():
             v = int(round(image_coordinates[1]))
 
             # Check if projection lies on image.
-            if camera_point[2] > 0 and u > 0 and u < image_width_sc-1 and v > 0 and v < image_height_sc-1:
+            if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
                 pt = [u,v]
                 im_pts.append(pt)
         # Draw point on image and visualize.
-        print(cv_image.shape)
+        # test_pt_cam = [0,2,3,1]
+        # cm_test = np.dot(camera_intrinsics_sc, test_pt_cam)
+        # imc = [int(round(cm_test[0]/cm_test[2])),
+        #         int(round(cm_test[1]/cm_test[2]))]
+        # test_img = np.zeros((int(1616*0.4),int(1232*0.4),3), np.uint8)
+        # test_img[imc[1], imc[0]] =[0,0,255]
+
         red = [0,0,255]
         for pt in im_pts:
             # hacky hack hack because Cam5 got a stupid frame of reference.
-            u_tilde = image_height_sc - pt[1]
-            v_tilde = pt[0]
-            row = v_tilde
-            col = u_tilde
+            # u_tilde = image_height_sc - pt[1]
+            # v_tilde = pt[0]
+            # row = pt[1] #v_tilde
+            # col = pt[0] #u_tilde
             # print (pt)
             # print(u_tilde)
             # print(v_tilde)
             # print(cv_image.shape)
-            if row > 600 or col > 400:
-                continue
-            cv_image[row, col] = red
+            # if row > 600 or col > 400:
+                # continue
+            range_image[pt[1], pt[0]] = red
 
         # cv_image[pt[0],pt[0]] = red
         # for l in range(80):
         #     cv_image[40,l] = red
-        # cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
-        cv2.imshow('lol', cv_image)
+        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv2.imshow('lol', range_image)
+        print(range_image.shape)
+        cv2.imshow('lol2', cv_image)
         cv2.waitKey(5)
 
 
