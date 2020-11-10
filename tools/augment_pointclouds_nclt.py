@@ -87,8 +87,8 @@ def main():
 
     # Scaled intrinsics (because the images on the bag are scaled down).
     scale_img = 0.4
-    image_width_sc = int(scale_img*1616) #646  
-    image_height_sc = int(scale_img*1232) #492
+    image_width_sc = int(scale_img*1232) #*1616) #646  
+    image_height_sc = int(scale_img*1616) #*1232) #492
     f_x_sc = scale_img*399.433184
     f_y_sc = scale_img*399.433184
     c_x_sc = scale_img*621.668624
@@ -105,7 +105,35 @@ def main():
     tf_body_vel = ssc_to_homo(x_body_vel)
 
     tf_c5_vel = np.dot(np.linalg.inv(tf_lb3_c5), np.dot(np.linalg.inv(tf_body_lb3), tf_body_vel))
+    tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
 
+    # Print out the transform.
+    print('tf_body_lb3')
+    rpy = transformations.euler_from_matrix(tf_body_lb3, 'szyx')   
+    rpy = np.array(rpy)
+    print(rpy)
+    # print(tf_body_lb3[:3,3])
+    print('tf_lb3_c5')
+    rpy = transformations.euler_from_matrix(tf_lb3_c5, 'szyx')   
+    rpy = np.array(rpy)
+    print(rpy)
+    # print('tf_body_vel')
+    # rpy = transformations.euler_from_matrix(tf_body_vel, 'szyx')   
+    # rpy = np.array(rpy)*180.0/np.pi
+    # print(tf_body_vel[:3,3])
+    # print(rpy)
+    # print('tf_c5_vel')
+    # rpy = transformations.euler_from_matrix(tf_c5_vel   , 'sxyz')   
+    # rpy = np.array(rpy)*180.0/np.pi
+    # print(rpy)
+    # print('tf_vel_c5')
+    # tf_vel_c5 = np.linalg.inv(tf_c5_vel)
+    # rpy = transformations.euler_from_matrix(tf_vel_c5, 'szyx')#'sxyz')      
+    # rpy = np.array(rpy)*180.0/np.pi
+    # print(tf_vel_c5[:3,3])
+    # print(rpy)
+
+    # print(rpy[0]/np.pi*180.0, rpy[1]/np.pi*180.0, rpy[2]/np.pi*180.0)
     # subsample_locations = numpy.linspace(50, image_height - 50, 64).astype(int)
     # lookup_subsample_locations = numpy.zeros(image_height)
     # lookup_subsample_locations[subsample_locations] = 1
@@ -142,7 +170,6 @@ def main():
         # /tf: Rename odom_link -> base_link TO odom -> airsim_drone
         # /tf: Add identity 'world -> odom' 
         # /tf: Add GT as well.
-
     # Get images and semantic labels, together with timestamps.
     images = []
     img_ts = []
@@ -167,7 +194,7 @@ def main():
             image_iterator += 1
         current_image = images[image_iterator]
         current_label = labels[image_iterator]
-        cv_image = cv2.rotate(bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image = bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8')#cv2.rotate(bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
         cv_label = cv2.rotate(bridge.imgmsg_to_cv2(current_label, desired_encoding='bgr8'), cv2.ROTATE_90_COUNTERCLOCKWISE)
         # cv2.imshow('lol', cv_image)
         cv2.waitKey(10)
@@ -176,9 +203,13 @@ def main():
         points = point_cloud2.read_points(lidar_pcl)
         im_pts = []
         for point in points:
+            point_nclt = np.array(point[:3])
+            point_nclt[1] = -point_nclt[1]  # Massive hack because nclt2ros has bug! Only for viz to check that it works.
+            point_nclt[2] = -point_nclt[2]
             # Convert into camera frame.
-            point_hmg = np.append(np.array(point[:3]), [1])
-            point_cam = np.dot(tf_c5_vel, point_hmg)
+            point_hmg = np.append(np.array(point_nclt), [1])
+            # point_cam = np.dot(tf_c5_vel, point_hmg)
+            point_cam = np.dot(tf_c5_body, point_hmg)
 
         #     # distance filters
         #     dist = point[0]*point[0] + point[1]*point[1] + point[2]*point[2]
@@ -194,16 +225,32 @@ def main():
             v = int(round(image_coordinates[1]))
 
             # Check if projection lies on image.
-            if camera_point[2] > 0 and u > 0 and u < image_height_sc and v > 0 and v < image_height_sc:
+            if camera_point[2] > 0 and u > 0 and u < image_width_sc-1 and v > 0 and v < image_height_sc-1:
                 pt = [u,v]
                 im_pts.append(pt)
         # Draw point on image and visualize.
+        print(cv_image.shape)
         red = [0,0,255]
         for pt in im_pts:
-            cv_image[pt[1],pt[0]] = red
+            # hacky hack hack because Cam5 got a stupid frame of reference.
+            u_tilde = image_height_sc - pt[1]
+            v_tilde = pt[0]
+            row = v_tilde
+            col = u_tilde
+            # print (pt)
+            # print(u_tilde)
+            # print(v_tilde)
+            # print(cv_image.shape)
+            if row > 600 or col > 400:
+                continue
+            cv_image[row, col] = red
 
+        # cv_image[pt[0],pt[0]] = red
+        # for l in range(80):
+        #     cv_image[40,l] = red
+        # cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
         cv2.imshow('lol', cv_image)
-        cv2.waitKey(10)
+        cv2.waitKey(5)
 
 
 
