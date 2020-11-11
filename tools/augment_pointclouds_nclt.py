@@ -56,6 +56,7 @@ def main():
     parser = argparse.ArgumentParser(description="Augment Point Cloud")
     parser.add_argument('input_bag', metavar='input_bag', type=str, help='bag file with LiDAR, image, labels and TF')
     parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
+    parser.add_argument('camera_param_dir', metavar='cam_par_dir', type=str, help='directory with camera intrinsics/extrinsics')
     args = parser.parse_args()
 
     bridge = CvBridge()
@@ -104,52 +105,108 @@ def main():
     scale_img = 0.4
     image_width_sc = int(scale_img*1616) #*1616) #646  
     image_height_sc = int(scale_img*1232) #*1232) #492
-    f_x_sc = scale_img*f_x
-    f_y_sc = scale_img*f_y
-    c_x_sc = scale_img*c_x
-    c_y_sc = scale_img*c_y
-    camera_intrinsics_sc = [[f_x_sc, 0.0, c_x_sc, 0.0], [
-        0.0, f_y_sc, c_y_sc, 0.0], [0.0, 0.0, 1.0, 0.0]]    
+    # f_x_sc = scale_img*f_x
+    # f_y_sc = scale_img*f_y
+    # c_x_sc = scale_img*c_x
+    # c_y_sc = scale_img*c_y
+    # camera_intrinsics_sc = [[f_x_sc, 0.0, c_x_sc, 0.0], [
+    #     0.0, f_y_sc, c_y_sc, 0.0], [0.0, 0.0, 1.0, 0.0]]    
 
     # Extrinsics (given by NCLT).
     x_body_lb3 = [0.035, 0.002, -1.23, -179.93, -0.23, 0.50] # (x, y, z, phi, theta, psi).
     tf_body_lb3 = ssc_to_homo(x_body_lb3)    # a 4x4 homogenous transformation matrix.
-    x_lb3_c5 = [0.041862, -0.001905, -0.000212, 160.868615, 89.9114152, 160.619894]
+    # x_lb3_c5 = [0.041862, -0.001905, -0.000212, 160.868615, 89.9114152, 160.619894]
+    # tf_lb3_c5 = ssc_to_homo(x_lb3_c5)
+    # x_body_vel = [0.002, -0.004, -0.957, 0.807, 0.166, -90.703]
+    # tf_body_vel = ssc_to_homo(x_body_vel)
+
+    # tf_c5_vel = np.dot(np.linalg.inv(tf_lb3_c5), np.dot(np.linalg.inv(tf_body_lb3), tf_body_vel))
+    # tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
+    # print('scale')
+    # print(camera_intrinsics_sc)
+    # print('tf_c5_body')
+    # print(tf_c5_body)
+
+    # # Print out the transform.
+    # print('tf_body_lb3')
+    # rpy = transformations.euler_from_matrix(tf_body_lb3, 'szyx')   
+    # rpy = np.array(rpy)
+    # print(rpy)
+    #######################################################################
+    K_cam1 = scale_img*np.loadtxt(camera_param_dir + 'K_cam1.csv', delimiter=',')
+    K_cam2 = scale_img*np.loadtxt(camera_param_dir + 'K_cam2.csv', delimiter=',')
+    K_cam3 = scale_img*np.loadtxt(camera_param_dir + 'K_cam3.csv', delimiter=',')
+    K_cam4 = scale_img*np.loadtxt(camera_param_dir + 'K_cam4.csv', delimiter=',')
+    K_cam5 = scale_img*np.loadtxt(camera_param_dir + 'K_cam5.csv', delimiter=',')
+    K_cam1[2,2] = 1.0
+    K_cam2[2,2] = 1.0
+    K_cam3[2,2] = 1.0
+    K_cam4[2,2] = 1.0
+    K_cam5[2,2] = 1.0
+
+    x_lb3_c1 = np.loadtxt(camera_param_dir + 'x_lb3_c1.csv', delimiter=',')
+    x_lb3_c2 = np.loadtxt(camera_param_dir + 'x_lb3_c2.csv', delimiter=',')
+    x_lb3_c3 = np.loadtxt(camera_param_dir + 'x_lb3_c3.csv', delimiter=',')
+    x_lb3_c4 = np.loadtxt(camera_param_dir + 'x_lb3_c4.csv', delimiter=',')
+    x_lb3_c5 = np.loadtxt(camera_param_dir + 'x_lb3_c5.csv', delimiter=',')
+
+    tf_lb3_c1 = ssc_to_homo(x_lb3_c1)
+    tf_lb3_c2 = ssc_to_homo(x_lb3_c2)
+    tf_lb3_c3 = ssc_to_homo(x_lb3_c3)
+    tf_lb3_c4 = ssc_to_homo(x_lb3_c4)
     tf_lb3_c5 = ssc_to_homo(x_lb3_c5)
-    x_body_vel = [0.002, -0.004, -0.957, 0.807, 0.166, -90.703]
-    tf_body_vel = ssc_to_homo(x_body_vel)
 
-    tf_c5_vel = np.dot(np.linalg.inv(tf_lb3_c5), np.dot(np.linalg.inv(tf_body_lb3), tf_body_vel))
+    tf_c1_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c1))
+    tf_c2_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c2))
+    tf_c3_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c3))
+    tf_c4_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c4))
     tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
-    print('scale')
-    print(camera_intrinsics_sc)
-    print('tf_c5_body')
-    print(tf_c5_body)
-
-    # Print out the transform.
-    print('tf_body_lb3')
-    rpy = transformations.euler_from_matrix(tf_body_lb3, 'szyx')   
-    rpy = np.array(rpy)
-    print(rpy)
+    ########################################################################
 
     # subsample_locations = numpy.linspace(50, image_height - 50, 64).astype(int)
     # lookup_subsample_locations = numpy.zeros(image_height)
     # lookup_subsample_locations[subsample_locations] = 1
 
     # Get images and semantic labels, together with timestamps.
-    images = []
+    images1 = []
     img_ts = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw5'):
-        # ToDo(alaturn) Rotate back images.
-        images.append(image)
+    for topic, image, t in in_bag.read_messages(topics='/images/raw1'):
+        images1.append(image)
         img_ts.append(t)    # Cause the images are not stamped. ToDo(alaturn) Fix inside nclt2ros.
+    images2 = []
+    for topic, image, t in in_bag.read_messages(topics='/images/raw2'):
+        images2.append(image)
+    images3 = []
+    for topic, image, t in in_bag.read_messages(topics='/images/raw3'):
+        images3.append(image)
+    images4 = []
+    for topic, image, t in in_bag.read_messages(topics='/images/raw4'):
+        images4.append(image)
+    images5 = []
+    for topic, image, t in in_bag.read_messages(topics='/images/raw5'):
+        images5.append(image)
 
-    labels = []
-    lab_ts = []
+    # labels = []
+    # lab_ts = []
+    # for topic, label, t in in_bag.read_messages(topics='/images/prediction5'):
+    #     labels.append(label)
+    #     lab_ts.append(t)
+    # assert(len(img_ts)==len(lab_ts))
+    labels1 = []
+    for topic, label, t in in_bag.read_messages(topics='/images/prediction1'):
+        labels1.append(label)
+    labels2 = []
+    for topic, label, t in in_bag.read_messages(topics='/images/prediction2'):
+        labels2.append(label)
+    labels3 = []
+    for topic, label, t in in_bag.read_messages(topics='/images/prediction3'):
+        labels3.append(label)
+    labels4 = []
+    for topic, label, t in in_bag.read_messages(topics='/images/prediction4'):
+        labels4.append(label)
+    labels5 = []
     for topic, label, t in in_bag.read_messages(topics='/images/prediction5'):
-        labels.append(label)
-        lab_ts.append(t)
-    assert(len(img_ts)==len(lab_ts))
+        labels5.append(label)
 
     image_iterator = 0
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
@@ -157,69 +214,167 @@ def main():
         # Forward search for getting img<->cloud correspondence. NCLT has already synced lidar and image...
         while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images)-1):
             image_iterator += 1
-        current_image = images[image_iterator]
-        current_label = labels[image_iterator]
-        cv_image = bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8')
-        cv_label = bridge.imgmsg_to_cv2(current_label, desired_encoding='bgr8')
-        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        current_image1 = images1[image_iterator]
+        current_image2 = images2[image_iterator]
+        current_image3 = images3[image_iterator]
+        current_image4 = images4[image_iterator]
+        current_image5 = images5[image_iterator]
+
+        current_label1 = labels1[image_iterator]
+        current_label2 = labels2[image_iterator]
+        current_label3 = labels3[image_iterator]
+        current_label4 = labels4[image_iterator]
+        current_label5 = labels5[image_iterator]
+
+        cv_image1 = bridge.imgmsg_to_cv2(current_image1, desired_encoding='bgr8')
+        cv_image2 = bridge.imgmsg_to_cv2(current_image2, desired_encoding='bgr8')
+        cv_image3 = bridge.imgmsg_to_cv2(current_image3, desired_encoding='bgr8')
+        cv_image4 = bridge.imgmsg_to_cv2(current_image4, desired_encoding='bgr8')
+        cv_image5 = bridge.imgmsg_to_cv2(current_image5, desired_encoding='bgr8')
+        
+        cv_label1 = bridge.imgmsg_to_cv2(current_label1, desired_encoding='bgr8')
+        cv_label2 = bridge.imgmsg_to_cv2(current_label2, desired_encoding='bgr8')
+        cv_label3 = bridge.imgmsg_to_cv2(current_label3, desired_encoding='bgr8')
+        cv_label4 = bridge.imgmsg_to_cv2(current_label4, desired_encoding='bgr8')
+        cv_label5 = bridge.imgmsg_to_cv2(current_label5, desired_encoding='bgr8')
+        
+        cv_image1 = cv2.rotate(cv_image1, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image2 = cv2.rotate(cv_image2, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image3 = cv2.rotate(cv_image3, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image4 = cv2.rotate(cv_image4, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_image5 = cv2.rotate(cv_image5, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        
+        cv_label1 = cv2.rotate(cv_label1, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_label2 = cv2.rotate(cv_label2, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_label3 = cv2.rotate(cv_label3, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_label4 = cv2.rotate(cv_label4, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_label5 = cv2.rotate(cv_label5, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         # Process pointcloud.
         points = point_cloud2.read_points(lidar_pcl)
         im_pts = np.array([0, 0, 0, 0, 0])
         for point in points:
-            point_nclt = np.array(point[:3])
-            point_nclt[1] = -point_nclt[1]  # Massive hack because nclt2ros rotates body to get base_link, but the given extrinsics are for body.
-            point_nclt[2] = -point_nclt[2]
-            # Convert into camera frame.
-            point_hmg = np.append(np.array(point_nclt), [1])
-            point_cam = np.dot(tf_c5_body, point_hmg)   # Note: nclt2ros stamps LiDAR in 'velodyne' frame, but actually they are still in base_link frame (vel_synced).
-
         #     # distance filters
         #     dist = point[0]*point[0] + point[1]*point[1] + point[2]*point[2]
         #     if dist > 2500 or dist < 6:
         #         continue
-
+            point_nclt = np.array(point[:3])
+            point_nclt[1] = -point_nclt[1]  # Massive hack because nclt2ros rotates body to get base_link, but the given extrinsics are for body.
+            point_nclt[2] = -point_nclt[2]
+            
+            # Convert into camera frame.
+            point_hmg = np.append(np.array(point_nclt), [1])
+            # point_cam = np.dot(tf_c5_body, point_hmg)   # Note: nclt2ros stamps LiDAR in 'velodyne' frame, but actually they are still in base_link frame (vel_synced).
+            point_c1 = np.dot(tf_c1_body, point_hmg)
+            point_c2 = np.dot(tf_c2_body, point_hmg)
+            point_c3 = np.dot(tf_c3_body, point_hmg)
+            point_c4 = np.dot(tf_c4_body, point_hmg)
+            point_c5 = np.dot(tf_c5_body, point_hmg)
+            
             # Project onto image.
-            camera_point = np.dot(camera_intrinsics_sc, point_cam)
-            image_coordinates = [
-                camera_point[0] / camera_point[2],
-                camera_point[1] / camera_point[2]]
-            u = int(round(image_coordinates[0]))
-            v = int(round(image_coordinates[1]))
+            # camera_point = np.dot(camera_intrinsics_sc, point_cam)
+            # image_coordinates = [
+                # camera_point[0] / camera_point[2],
+                # camera_point[1] / camera_point[2]]
+            # u = int(round(image_coordinates[0]))
+            # v = int(round(image_coordinates[1]))
+            camera1_point = np.dot(K_cam1, point_c1)
+            camera2_point = np.dot(K_cam2, point_c2)
+            camera3_point = np.dot(K_cam3, point_c3)
+            camera4_point = np.dot(K_cam4, point_c4)
+            camera5_point = np.dot(K_cam5, point_c5)
+
+            im_coordinates1 = [
+                camera1_point[0] / camera1_point[2],
+                camera1_point[1] / camera1_point[2]]
+            im_coordinates2 = [
+                camera2_point[0] / camera2_point[2],
+                camera2_point[1] / camera2_point[2]]
+            im_coordinates3 = [
+                camera3_point[0] / camera3_point[2],
+                camera3_point[1] / camera3_point[2]]
+            im_coordinates4 = [
+                camera4_point[0] / camera4_point[2],
+                camera4_point[1] / camera4_point[2]]
+            im_coordinates5 = [
+                camera5_point[0] / camera5_point[2],
+                camera5_point[1] / camera5_point[2]]
+
+            u1 = int(round(im_coordinates1[0]))
+            v1 = int(round(im_coordinates1[1]))
+            u2 = int(round(im_coordinates2[0]))
+            v2 = int(round(im_coordinates2[1]))
+            u3 = int(round(im_coordinates3[0]))
+            v3 = int(round(im_coordinates3[1]))
+            u4 = int(round(im_coordinates4[0]))
+            v4 = int(round(im_coordinates4[1]))
+            u5 = int(round(im_coordinates5[0]))
+            v5 = int(round(im_coordinates5[1]))
 
             # Check if projection lies on image.
-            if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
-                pt = np.array([u,v])
+            bgr = []
+            bgr_sem = []
+            if im_coordinates1[2] > 0 and u1 > 0 and u1 < image_width_sc and v1 > 0 and v1 < image_height_sc:
+                # Image 1.
+                bgr = cv_image1[v1, u1]
+                bgr_sem = cv_label1[v1, u1]
+            else if im_coordinates2[2] > 0 and u2 > 0 and u2 < image_width_sc and v2 > 0 and v2 < image_height_sc:
+                # Image 2.
+                bgr = cv_image2[v2, u2]
+                bgr_sem = cv_label2[v2, u2]
+            else if im_coordinates3[2] > 0 and u3 > 0 and u3 < image_width_sc and v3 > 0 and v3 < image_height_sc:
+                # Image 3.
+                bgr = cv_image3[v3, u3]
+                bgr_sem = cv_label3[v3, u3]
+            else if im_coordinates4[2] > 0 and u4 > 0 and u4 < image_width_sc and v4 > 0 and v4 < image_height_sc:
+                # Image 4.
+                bgr = cv_image4[v4, u4]
+                bgr_sem = cv_label4[v4, u4]
+            else if im_coordinates5[2] > 0 and u5 > 0 and u5 < image_width_sc and v5 > 0 and v5 < image_height_sc:
+                # Image 5.
+                bgr = cv_image5[v5, u5]
+                bgr_sem = cv_label5[v5, u5]
+            else:
+                continue
 
-                # Get color and label 'color' at projected position.
-                bgr = cv_image[v, u]
-                bgr_sem = cv_label[v, u]
+            # Create PointXYZRGBA
+            label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
+            rgba = struct.unpack('I', struct.pack(
+                    'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
+            aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
+            augmented_points.append(aug_pt)
 
-                # For viz
-                pt = np.append(pt, bgr_sem)
-                im_pts = np.vstack((im_pts, pt))               
+            # if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
+            #     pt = np.array([u,v])
 
-                # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
-                label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
-                rgba = struct.unpack('I', struct.pack(
-                        'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
-                aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
-                augmented_points.append(aug_pt)
+            #     # Get color and label 'color' at projected position.
+            #     bgr = cv_image[v, u]
+            #     bgr_sem = cv_label[v, u]
+
+            #     # For viz
+            #     pt = np.append(pt, bgr_sem)
+            #     im_pts = np.vstack((im_pts, pt))               
+
+            #     # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
+            #     label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
+            #     rgba = struct.unpack('I', struct.pack(
+            #             'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
+            #     aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
+            #     augmented_points.append(aug_pt)
 
         # Draw on image.
-        red = [0,0,255]
-        for pt in im_pts:
-            # print(pt[2:].shape)
-            cv_image[pt[1], pt[0]] = pt[2:]
-            cv_label[pt[1], pt[0]] = red
+        # red = [0,0,255]
+        # for pt in im_pts:
+        #     # print(pt[2:].shape)
+        #     cv_image[pt[1], pt[0]] = pt[2:]
+        #     cv_label[pt[1], pt[0]] = red
 
-        # Show overlaid image.
-        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
-        cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_CLOCKWISE)
-        cv2.imshow('cv_image', cv_image)
-        cv2.imshow('cv_label', cv_label)
-        cv2.waitKey(1)
+        # # Show overlaid image.
+        # cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
+        # cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_CLOCKWISE)
+        # cv2.imshow('cv_image', cv_image)
+        # cv2.imshow('cv_label', cv_label)
+        # cv2.waitKey(1)
 
         # Create augmented cloud.
         fields = [PointField('x', 0, PointField.FLOAT32, 1),
