@@ -60,6 +60,7 @@ def main():
 
     bridge = CvBridge()
 
+    # ToDO(alaturn) Adapt this to the colors of nvidia and ids of SegMap
     # segmentation_id_color = {1:[42,174,203], 2:[224,172,177], 3:[145,183,160], 4:[137,241,224], 5:[132,224,232], 6:[105,64,153],
                # 7:[227,217,179], 8:[91,214,208], 9:[219,213,192], 10:[229,90,95], 11:[248,71,170], 12:[199,173,249],
                # 13:[205,228,85], 14:[208,160,121], 15:[180,238,141], 16:[53,246,59], 17:[50,96,227],
@@ -143,10 +144,12 @@ def main():
         current_label = labels[image_iterator]
         cv_image = bridge.imgmsg_to_cv2(current_image, desired_encoding='bgr8')
         cv_label = bridge.imgmsg_to_cv2(current_label, desired_encoding='bgr8')
+        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         # Process pointcloud.
         points = point_cloud2.read_points(lidar_pcl)
-        im_pts = []
+        im_pts = np.array([0, 0, 0, 0, 0])
         for point in points:
             point_nclt = np.array(point[:3])
             point_nclt[1] = -point_nclt[1]  # Massive hack because nclt2ros rotates body to get base_link, but the given extrinsics are for body.
@@ -170,20 +173,45 @@ def main():
 
             # Check if projection lies on image.
             if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
-                pt = [u,v]
-                im_pts.append(pt)
+                pt = np.array([u,v])
+
+                # Get color at projected position.
+                bgr = cv_label[v, u]
+                pt = np.append(pt, bgr)
+                # print(bgr.shape)
+                # print(pt.shape)
+                # print(im_pts.shape)
+                im_pts = np.vstack((im_pts, pt))
+                # print(im_pts.shape)
+                # print(im_pts.shape)
+                # Get 'label-color' at projected position.
+
+                # Convert to SegMap label convention.
+
+                # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
 
         # Draw on image.
-        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         red = [0,0,255]
         for pt in im_pts:
-            range_image[pt[1], pt[0]] = red
-            cv_image[pt[1], pt[0]] = red
+            # print(pt[2:].shape)
+            cv_image[pt[1], pt[0]] = pt[2:]
+            cv_label[pt[1], pt[0]] = red
 
-        
+        # Show overlaid image.
         cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
+        cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_CLOCKWISE)
         cv2.imshow('lol2', cv_image)
+        cv2.imshow('lol', cv_label)
         cv2.waitKey(5)
+
+        # Create out cloud.
+        # header = depth_cam_pcl.header
+        # header.frame_id = '/airsim_drone'
+        # augmented_cloud = point_cloud2.create_cloud(
+        # header, fields, augmented_points)
+
+        # out_bag.write('/augmented_cloud', augmented_cloud,
+        #               augmented_cloud.header.stamp, False)
 
 
 
