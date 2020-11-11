@@ -80,8 +80,8 @@ def main():
     image_height = 1232 #492
     f_x = 399.433184
     f_y = 399.433184
-    c_x = 621.668624
-    c_y = 826.361952
+    c_x = 826.361952 #621.668624
+    c_y = 621.668624 #826.361952
     camera_intrinsics = [[f_x, 0.0, c_x, 0.0], [
         0.0, f_y, c_y, 0.0], [0.0, 0.0, 1.0, 0.0]]
 
@@ -106,6 +106,10 @@ def main():
 
     tf_c5_vel = np.dot(np.linalg.inv(tf_lb3_c5), np.dot(np.linalg.inv(tf_body_lb3), tf_body_vel))
     tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
+    print('scale')
+    print(camera_intrinsics_sc)
+    print('tf_c5_body')
+    print(tf_c5_body)
 
     # Print out the transform.
     print('tf_body_lb3')
@@ -137,33 +141,6 @@ def main():
     # subsample_locations = numpy.linspace(50, image_height - 50, 64).astype(int)
     # lookup_subsample_locations = numpy.zeros(image_height)
     # lookup_subsample_locations[subsample_locations] = 1
-
-
-    # tf_lidar_cam = transformations.quaternion_matrix(numpy.array(
-    #     [0.5, -0.5, 0.5, -0.5]))
-    # tf_lidar_cam[0, 3] = 0.0
-    # tf_lidar_cam[1, 3] = 0.0
-    # tf_lidar_cam[2, 3] = 0.0
-
-    # For each LiDAR cloud in bag
-        # Timestamp -> TS1.
-        # Find tf_odom_baselink at TS1.
-        # Find image with closest TS -> TS2.
-        # Also get the corresponding labelled image.
-        # Find tf_odom_baselink at TS2
-        # Find relative motion tf_2_1
-        # Transform pointcloud to pose where image was taken.
-        # Transform cloud into LB3 frame.
-        # Create new point cloud
-        # For each point in cloud
-            # Select camera (FoV split).
-            # Transform point into frame of respective camera.
-            # Apply (scaled) intrinsics to project to camera plane.
-            # Get RGB from image, 'RGB' from label (or was it BGR?).
-            # Update RGB field.
-            # Convert Label RGB to Alpha value (according to SemSegMap).
-            # Append point to augmented cloud.
-            # Write cloud to out bag (which time stamp to use?).
 
     # Out bag.
         # /augmented_cloud
@@ -235,7 +212,7 @@ def main():
         #         int(round(cm_test[1]/cm_test[2]))]
         # test_img = np.zeros((int(1616*0.4),int(1232*0.4),3), np.uint8)
         # test_img[imc[1], imc[0]] =[0,0,255]
-
+        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         red = [0,0,255]
         for pt in im_pts:
             # hacky hack hack because Cam5 got a stupid frame of reference.
@@ -250,13 +227,15 @@ def main():
             # if row > 600 or col > 400:
                 # continue
             range_image[pt[1], pt[0]] = red
+            cv_image[pt[1], pt[0]] = red
 
         # cv_image[pt[0],pt[0]] = red
         # for l in range(80):
         #     cv_image[40,l] = red
-        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        cv2.imshow('lol', range_image)
-        print(range_image.shape)
+        
+        cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
+        # cv2.imshow('lol', range_image)
+        # print(range_image.shape)
         cv2.imshow('lol2', cv_image)
         cv2.waitKey(5)
 
