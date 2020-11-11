@@ -55,7 +55,7 @@ def ssc_to_homo(ssc):
 def main():
     parser = argparse.ArgumentParser(description="Augment Point Cloud")
     parser.add_argument('input_bag', metavar='input_bag', type=str, help='bag file with LiDAR, image, labels and TF')
-    # parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
+    parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
     args = parser.parse_args()
 
     bridge = CvBridge()
@@ -70,7 +70,7 @@ def main():
         # lookup_id_color[value[0], value[1], value[2]] = key
 
     in_bag = rosbag.Bag(args.input_bag)
-    # out_bag = rosbag.Bag(args.output_bag, 'w')
+    out_bag = rosbag.Bag(args.output_bag, 'w')
 
     # ToDo(alaturn) Read these in from file. Just for LB3-Cam5 for now...
     # Intrinsics (given by NCLT).
@@ -178,17 +178,20 @@ def main():
                 # Get color at projected position.
                 bgr = cv_label[v, u]
                 pt = np.append(pt, bgr)
-                # print(bgr.shape)
-                # print(pt.shape)
-                # print(im_pts.shape)
                 im_pts = np.vstack((im_pts, pt))
-                # print(im_pts.shape)
-                # print(im_pts.shape)
+
                 # Get 'label-color' at projected position.
 
                 # Convert to SegMap label convention.
 
                 # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
+                b = int(bgr[0])
+                g = int(bgr[1])
+                r = int(bgr[2])
+                a = 255 # ToDo(alaturn) Change to label.
+                rgb = struct.unpack('I', struct.pack('BBBB', b, g, r, a))[0]
+                aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgb]
+                augmented_points.append(aug_pt)
 
         # Draw on image.
         red = [0,0,255]
@@ -205,15 +208,18 @@ def main():
         cv2.waitKey(5)
 
         # Create out cloud.
-        # header = depth_cam_pcl.header
-        # header.frame_id = '/airsim_drone'
-        # augmented_cloud = point_cloud2.create_cloud(
-        # header, fields, augmented_points)
+        fields = [PointField('x', 0, PointField.FLOAT32, 1),
+          PointField('y', 4, PointField.FLOAT32, 1),
+          PointField('z', 8, PointField.FLOAT32, 1),
+          PointField('rgba', 12, PointField.UINT32, 1)]
+        header = lidar_pcl.header
+        header.frame_id = '/base_link'  #'/airsim_drone'
+        augmented_cloud = point_cloud2.create_cloud(header, fields, augmented_points)
 
-        # out_bag.write('/augmented_cloud', augmented_cloud,
-        #               augmented_cloud.header.stamp, False)
+        out_bag.write('/augmented_cloud', augmented_cloud,
+                      augmented_cloud.header.stamp, False)
 
-
+        print('Wrote cloud!')
 
     #         if not lookup_subsample_locations[v]:
     #             continue
@@ -263,7 +269,7 @@ def main():
     # for topic, tf, t in bag.read_messages(topics=['/tf']):
     #     out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)
 
-    # out_bag.close()
+    out_bag.close()
 
 if __name__ == '__main__':
     main()
