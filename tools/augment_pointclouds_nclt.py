@@ -133,22 +133,22 @@ def main():
     # rpy = np.array(rpy)
     # print(rpy)
     #######################################################################
-    K_cam1 = scale_img*np.loadtxt(camera_param_dir + 'K_cam1.csv', delimiter=',')
-    K_cam2 = scale_img*np.loadtxt(camera_param_dir + 'K_cam2.csv', delimiter=',')
-    K_cam3 = scale_img*np.loadtxt(camera_param_dir + 'K_cam3.csv', delimiter=',')
-    K_cam4 = scale_img*np.loadtxt(camera_param_dir + 'K_cam4.csv', delimiter=',')
-    K_cam5 = scale_img*np.loadtxt(camera_param_dir + 'K_cam5.csv', delimiter=',')
+    K_cam1 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam1.csv', delimiter=',')
+    K_cam2 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam2.csv', delimiter=',')
+    K_cam3 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam3.csv', delimiter=',')
+    K_cam4 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam4.csv', delimiter=',')
+    K_cam5 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam5.csv', delimiter=',')
     K_cam1[2,2] = 1.0
     K_cam2[2,2] = 1.0
     K_cam3[2,2] = 1.0
     K_cam4[2,2] = 1.0
     K_cam5[2,2] = 1.0
 
-    x_lb3_c1 = np.loadtxt(camera_param_dir + 'x_lb3_c1.csv', delimiter=',')
-    x_lb3_c2 = np.loadtxt(camera_param_dir + 'x_lb3_c2.csv', delimiter=',')
-    x_lb3_c3 = np.loadtxt(camera_param_dir + 'x_lb3_c3.csv', delimiter=',')
-    x_lb3_c4 = np.loadtxt(camera_param_dir + 'x_lb3_c4.csv', delimiter=',')
-    x_lb3_c5 = np.loadtxt(camera_param_dir + 'x_lb3_c5.csv', delimiter=',')
+    x_lb3_c1 = np.loadtxt(args.camera_param_dir + 'x_lb3_c1.csv', delimiter=',')
+    x_lb3_c2 = np.loadtxt(args.camera_param_dir + 'x_lb3_c2.csv', delimiter=',')
+    x_lb3_c3 = np.loadtxt(args.camera_param_dir + 'x_lb3_c3.csv', delimiter=',')
+    x_lb3_c4 = np.loadtxt(args.camera_param_dir + 'x_lb3_c4.csv', delimiter=',')
+    x_lb3_c5 = np.loadtxt(args.camera_param_dir + 'x_lb3_c5.csv', delimiter=',')
 
     tf_lb3_c1 = ssc_to_homo(x_lb3_c1)
     tf_lb3_c2 = ssc_to_homo(x_lb3_c2)
@@ -212,7 +212,7 @@ def main():
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
         augmented_points = []
         # Forward search for getting img<->cloud correspondence. NCLT has already synced lidar and image...
-        while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images)-1):
+        while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images1)-1):
             image_iterator += 1
         current_image1 = images1[image_iterator]
         current_image2 = images2[image_iterator]
@@ -265,11 +265,11 @@ def main():
             # Convert into camera frame.
             point_hmg = np.append(np.array(point_nclt), [1])
             # point_cam = np.dot(tf_c5_body, point_hmg)   # Note: nclt2ros stamps LiDAR in 'velodyne' frame, but actually they are still in base_link frame (vel_synced).
-            point_c1 = np.dot(tf_c1_body, point_hmg)
-            point_c2 = np.dot(tf_c2_body, point_hmg)
-            point_c3 = np.dot(tf_c3_body, point_hmg)
-            point_c4 = np.dot(tf_c4_body, point_hmg)
-            point_c5 = np.dot(tf_c5_body, point_hmg)
+            point_c1 = np.dot(tf_c1_body, point_hmg)[:3]
+            point_c2 = np.dot(tf_c2_body, point_hmg)[:3]
+            point_c3 = np.dot(tf_c3_body, point_hmg)[:3]
+            point_c4 = np.dot(tf_c4_body, point_hmg)[:3]
+            point_c5 = np.dot(tf_c5_body, point_hmg)[:3]
             
             # Project onto image.
             # camera_point = np.dot(camera_intrinsics_sc, point_cam)
@@ -314,23 +314,23 @@ def main():
             # Check if projection lies on image.
             bgr = []
             bgr_sem = []
-            if im_coordinates1[2] > 0 and u1 > 0 and u1 < image_width_sc and v1 > 0 and v1 < image_height_sc:
+            if camera1_point[2] > 0 and u1 > 0 and u1 < image_width_sc and v1 > 0 and v1 < image_height_sc:
                 # Image 1.
                 bgr = cv_image1[v1, u1]
                 bgr_sem = cv_label1[v1, u1]
-            else if im_coordinates2[2] > 0 and u2 > 0 and u2 < image_width_sc and v2 > 0 and v2 < image_height_sc:
+            elif camera2_point[2] > 0 and u2 > 0 and u2 < image_width_sc and v2 > 0 and v2 < image_height_sc:
                 # Image 2.
                 bgr = cv_image2[v2, u2]
                 bgr_sem = cv_label2[v2, u2]
-            else if im_coordinates3[2] > 0 and u3 > 0 and u3 < image_width_sc and v3 > 0 and v3 < image_height_sc:
+            elif camera3_point[2] > 0 and u3 > 0 and u3 < image_width_sc and v3 > 0 and v3 < image_height_sc:
                 # Image 3.
                 bgr = cv_image3[v3, u3]
                 bgr_sem = cv_label3[v3, u3]
-            else if im_coordinates4[2] > 0 and u4 > 0 and u4 < image_width_sc and v4 > 0 and v4 < image_height_sc:
+            elif camera4_point[2] > 0 and u4 > 0 and u4 < image_width_sc and v4 > 0 and v4 < image_height_sc:
                 # Image 4.
                 bgr = cv_image4[v4, u4]
                 bgr_sem = cv_label4[v4, u4]
-            else if im_coordinates5[2] > 0 and u5 > 0 and u5 < image_width_sc and v5 > 0 and v5 < image_height_sc:
+            elif camera5_point[2] > 0 and u5 > 0 and u5 < image_width_sc and v5 > 0 and v5 < image_height_sc:
                 # Image 5.
                 bgr = cv_image5[v5, u5]
                 bgr_sem = cv_label5[v5, u5]
