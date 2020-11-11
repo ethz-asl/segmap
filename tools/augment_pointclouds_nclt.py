@@ -60,14 +60,31 @@ def main():
 
     bridge = CvBridge()
 
-    # ToDO(alaturn) Adapt this to the colors of nvidia and ids of SegMap
-    # segmentation_id_color = {1:[42,174,203], 2:[224,172,177], 3:[145,183,160], 4:[137,241,224], 5:[132,224,232], 6:[105,64,153],
-               # 7:[227,217,179], 8:[91,214,208], 9:[219,213,192], 10:[229,90,95], 11:[248,71,170], 12:[199,173,249],
-               # 13:[205,228,85], 14:[208,160,121], 15:[180,238,141], 16:[53,246,59], 17:[50,96,227],
-               # 18:[190,247,227], 19:[0,0,0], 31:[142,190,77], 32:[190,247,227], 33:[216,254,163], 34:[158,253,220]}
-    # lookup_id_color = numpy.zeros((256, 256, 256))
-    # for key, value in segmentation_id_color.items():
-        # lookup_id_color[value[0], value[1], value[2]] = key
+    # LookUp BGR (cityscapes) -> ID (segmap).
+    segmentation_id_color = {
+        33:[128,64,128],      # Road -> Road
+        33:[232,35,244],      # Sidewalk -> Road
+        34:[70,70,70],       # Building -> Small house
+        34:[156,102,102],    # Wall -> Small house
+        5:[153,153,190],     # Fence -> Fence
+        10:[153,153,153],    # Pole -> LightGenerator
+        19:[30,170,250],     # Traffic Light -> SignBoard
+        19:[0,220,220],      # Traffic Sign -> SignBoard
+        2:[35,142,107],      # Vegetation -> Tree
+        32:[152,251,152],    # Terrain -> Landscape
+        31:[180,130,70],     # Sky -> Sky
+        12:[60,20,220],      # Person -> Portapotty 
+        12:[0,0,255],        # Rider -> Portapotty
+        1:[142,0,0],         # Car -> Car
+        7:[70,0,0],          # Truck -> Truck
+        7:[100,60,0],        # Bus -> Truck
+        7:[100,80,0],        # Train -> Truck
+        3:[230,0,0],         # Motorcycle -> Bench
+        3:[32,11,119]       # Bicycle -> Bench 
+    }
+    lookup_id_color = np.zeros((256, 256, 256))
+    for key, value in segmentation_id_color.items():
+        lookup_id_color[value[0], value[1], value[2]] = key
 
     in_bag = rosbag.Bag(args.input_bag)
     out_bag = rosbag.Bag(args.output_bag, 'w')
@@ -175,22 +192,19 @@ def main():
             if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
                 pt = np.array([u,v])
 
-                # Get color at projected position.
-                bgr = cv_label[v, u]
-                pt = np.append(pt, bgr)
-                im_pts = np.vstack((im_pts, pt))
+                # Get color and label 'color' at projected position.
+                bgr = cv_image[v, u]
+                bgr_sem = cv_label[v, u]
 
-                # Get 'label-color' at projected position.
-
-                # Convert to SegMap label convention.
+                # For viz
+                pt = np.append(pt, bgr_sem)
+                im_pts = np.vstack((im_pts, pt))               
 
                 # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
-                b = int(bgr[0])
-                g = int(bgr[1])
-                r = int(bgr[2])
-                a = 255 # ToDo(alaturn) Change to label.
-                rgb = struct.unpack('I', struct.pack('BBBB', b, g, r, a))[0]
-                aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgb]
+                label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
+                rgba = struct.unpack('I', struct.pack(
+                        'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
+                aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
                 augmented_points.append(aug_pt)
 
         # Draw on image.
@@ -203,17 +217,17 @@ def main():
         # Show overlaid image.
         cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
         cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_CLOCKWISE)
-        cv2.imshow('lol2', cv_image)
-        cv2.imshow('lol', cv_label)
-        cv2.waitKey(5)
+        cv2.imshow('cv_image', cv_image)
+        cv2.imshow('cv_label', cv_label)
+        cv2.waitKey(1)
 
-        # Create out cloud.
+        # Create augmented cloud.
         fields = [PointField('x', 0, PointField.FLOAT32, 1),
           PointField('y', 4, PointField.FLOAT32, 1),
           PointField('z', 8, PointField.FLOAT32, 1),
           PointField('rgba', 12, PointField.UINT32, 1)]
         header = lidar_pcl.header
-        header.frame_id = '/base_link'  #'/airsim_drone'
+        header.frame_id = '/base_link'  #'/airsim_drone'    # ToDo(alaturn) Use naming from BOSCH
         augmented_cloud = point_cloud2.create_cloud(header, fields, augmented_points)
 
         out_bag.write('/augmented_cloud', augmented_cloud,
