@@ -11,7 +11,7 @@
   <arg name="rviz_config_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/kitti_localization.rviz"/>
 
   <!-- ROS parameters -->
-  <rosparam>use_sim_time: true</rosparam>
+  <rosparam>use_sim_time: false</rosparam>
 
   <rosparam command="load" file="$(find segmapper)/launch/kitti/kitti_localization.yaml"/>
   

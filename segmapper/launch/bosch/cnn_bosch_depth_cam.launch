@@ -45,9 +45,9 @@
   <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 12 -s 0 --clock --pause $(arg bag_file)"/>
 
   <!-- Tensorflow interface -->
-<!--   <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen"></node>
+  <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen"></node>
   <node pkg="segmatch" name="tf_sem_interface" type="tf_sem_interface.py" output="screen"></node>
- -->
+
   <node pkg="noiser" name="noiser" type="noiser" output="screen">
   <rosparam command="load" file="$(find noiser)/config/noiser_config.yaml"/>
   </node>

@@ -75,14 +75,14 @@ SegMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["EigenvalueBased"], # "EigenvalueBased" EnsembleShapeFunctions"
+      descriptor_types: ["FPFH"], # "EigenvalueBased" EnsembleShapeFunctions"
 
     },
 
     Classifier: {
      threshold_to_accept_match: 0.60,
      n_nearest_neighbours: 120, 
-     knn_feature_dim: 7, #33, 
+     knn_feature_dim: 33, #33, 
      enable_two_stage_retrieval: true, 
      apply_hard_threshold_on_feature_distance: true, 
      feature_distance_threshold: 0.01, #900.0, #Note: it's used for the SQUARED norm! # #0.01, # Used

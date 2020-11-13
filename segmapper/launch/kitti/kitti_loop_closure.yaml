@@ -26,6 +26,8 @@ SegMapper: {
     publish_distant_map: false,
     publish_full_map: false,
     map_publication_rate_hz: 3,
+    enable_drift: false,
+
   },
  
   # SegMatchWorker parameters
@@ -71,7 +73,7 @@ SegMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["FPFH", "EigenvalueBased"], # "EnsembleShapeFunctions"
+      descriptor_types: ["FPFH"], # "EnsembleShapeFunctions"
     },
 
     Classifier: {
