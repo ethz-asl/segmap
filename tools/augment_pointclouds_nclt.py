@@ -63,8 +63,9 @@ def main():
 
     # LookUp BGR (cityscapes) -> ID (segmap).
     segmentation_id_color = {
-        33:[128,64,128],      # Road -> Road
-        33:[232,35,244],      # Sidewalk -> Road
+        0:[0,0,0],     # Undefined   
+        33:[128,64,128],     # Road -> Road
+        33:[232,35,244],     # Sidewalk -> Road
         34:[70,70,70],       # Building -> Small house
         34:[156,102,102],    # Wall -> Small house
         5:[153,153,190],     # Fence -> Fence
@@ -90,18 +91,24 @@ def main():
     in_bag = rosbag.Bag(args.input_bag)
     out_bag = rosbag.Bag(args.output_bag, 'w')
 
+    # Re-Write TFs.
+    for topic, tf, t in in_bag.read_messages(topics=['/tf', '/tf_static']):
+        out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)  
+    print('Wrote all TFs!')
+
     # ToDo(alaturn) Read these in from file. Just for LB3-Cam5 for now...
     # Intrinsics (given by NCLT).
     image_width = 1616 #u, x #646  
     image_height = 1232 #492
-    f_x = 399.433184
-    f_y = 399.433184
-    c_x = 826.361952 #621.668624
-    c_y = 621.668624 #826.361952
-    camera_intrinsics = [[f_x, 0.0, c_x, 0.0], [
-        0.0, f_y, c_y, 0.0], [0.0, 0.0, 1.0, 0.0]]
+    # f_x = 399.433184
+    # f_y = 399.433184
+    # c_x = 826.361952 #621.668624
+    # c_y = 621.668624 #826.361952
+    # camera_intrinsics = [[f_x, 0.0, c_x, 0.0], [
+    #     0.0, f_y, c_y, 0.0], [0.0, 0.0, 1.0, 0.0]]
 
-    # Scaled intrinsics (because the images on the bag are scaled down).
+
+    # Scaled intrinsics (because the images on the bag are scaled down during postprocessing).
     scale_img = 0.4
     image_width_sc = int(scale_img*1616) #*1616) #646  
     image_height_sc = int(scale_img*1232) #*1232) #492
@@ -162,6 +169,18 @@ def main():
     tf_c4_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c4))
     tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
     ########################################################################
+
+    # The actual image boundaries (zero padding during postprocessing) -> Applies to the unrotated image BEFORE scaling down!!!.
+    xc, yc = 804, 617
+    height_crop, width_crop = 800, 1238
+    top = int(yc-height_crop/2)
+    bot = int(yc+height_crop/2)
+    left = int(xc-width_crop/2)
+    right = int(xc+width_crop/2)
+    top_sc = scale_img*top
+    bot_sc = bot*scale_img
+    left_sc = left*scale_img
+    right_sc = right*scale_img
 
     # subsample_locations = numpy.linspace(50, image_height - 50, 64).astype(int)
     # lookup_subsample_locations = numpy.zeros(image_height)
@@ -226,6 +245,7 @@ def main():
         current_label4 = labels4[image_iterator]
         current_label5 = labels5[image_iterator]
 
+        # Rotate it into native LB3 orientation.
         cv_image1 = bridge.imgmsg_to_cv2(current_image1, desired_encoding='bgr8')
         cv_image2 = bridge.imgmsg_to_cv2(current_image2, desired_encoding='bgr8')
         cv_image3 = bridge.imgmsg_to_cv2(current_image3, desired_encoding='bgr8')
@@ -314,28 +334,29 @@ def main():
             # Check if projection lies on image.
             bgr = []
             bgr_sem = []
-            if camera1_point[2] > 0 and u1 > 0 and u1 < image_width_sc and v1 > 0 and v1 < image_height_sc:
+            if camera1_point[2] > 0 and u1 > left_sc and u1 < right_sc and v1 > top_sc and v1 < bot_sc:
                 # Image 1.
                 bgr = cv_image1[v1, u1]
                 bgr_sem = cv_label1[v1, u1]
-            elif camera2_point[2] > 0 and u2 > 0 and u2 < image_width_sc and v2 > 0 and v2 < image_height_sc:
+            elif camera2_point[2] > 0 and u2 > left_sc and u2 < right_sc and v2 > top_sc and v2 < bot_sc:
                 # Image 2.
                 bgr = cv_image2[v2, u2]
                 bgr_sem = cv_label2[v2, u2]
-            elif camera3_point[2] > 0 and u3 > 0 and u3 < image_width_sc and v3 > 0 and v3 < image_height_sc:
+            elif camera3_point[2] > 0 and u3 > left_sc and u3 < right_sc and v3 > top_sc and v3 < bot_sc:
                 # Image 3.
                 bgr = cv_image3[v3, u3]
                 bgr_sem = cv_label3[v3, u3]
-            elif camera4_point[2] > 0 and u4 > 0 and u4 < image_width_sc and v4 > 0 and v4 < image_height_sc:
+            elif camera4_point[2] > 0 and u4 > left_sc and u4 < right_sc and v4 > top_sc and v4 < bot_sc:
                 # Image 4.
                 bgr = cv_image4[v4, u4]
                 bgr_sem = cv_label4[v4, u4]
-            elif camera5_point[2] > 0 and u5 > 0 and u5 < image_width_sc and v5 > 0 and v5 < image_height_sc:
+            elif camera5_point[2] > 0 and u5 > left_sc and u5 < right_sc and v5 > top_sc and v5 < bot_sc:
                 # Image 5.
                 bgr = cv_image5[v5, u5]
                 bgr_sem = cv_label5[v5, u5]
             else:
-                continue
+                bgr = [0,0,0]
+                bgr_sem = [0,0,0]
 
             # Create PointXYZRGBA
             label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
@@ -434,9 +455,6 @@ def main():
     #     if i == 200:
     #         break
     #     print('Pointcloud: ' + str(i))
-
-    # for topic, tf, t in bag.read_messages(topics=['/tf']):
-    #     out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)
 
     out_bag.close()
 

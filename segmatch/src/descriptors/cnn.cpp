@@ -249,8 +249,8 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     }
 
     // Execute semantics graph.
-    semantics = interface_worker_.batchExecuteGraph(
-        cnn_descriptors, kInputTensorName, kSemanticsOutputName);
+    // semantics = interface_worker_.batchExecuteGraph(
+        // cnn_descriptors, kInputTensorName, kSemanticsOutputName);
 
     CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
     BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
@@ -276,11 +276,11 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
 
       segment->getLastView().features.replaceByName(cnn_feature);
 
-      std::vector<float> semantic_nn_output = semantics[i];
-      segment->getLastView().semantic =
-          std::distance(semantic_nn_output.begin(),
-                        std::max_element(semantic_nn_output.begin(),
-                                         semantic_nn_output.end()));
+      // std::vector<float> semantic_nn_output = semantics[i];
+      segment->getLastView().semantic = 0;
+          // std::distance(semantic_nn_output.begin(),
+                        // std::max_element(semantic_nn_output.begin(),
+                                         // semantic_nn_output.end()));
 
       // Generate the reconstructions.
       PointCloud reconstruction;
