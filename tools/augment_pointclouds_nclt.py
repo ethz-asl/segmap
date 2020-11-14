@@ -92,53 +92,25 @@ def main():
     out_bag = rosbag.Bag(args.output_bag, 'w')
 
     # Re-Write TFs.
+    '''
     for topic, tf, t in in_bag.read_messages(topics=['/tf', '/tf_static']):
         out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)  
     print('Wrote all TFs!')
+    '''
 
-    # ToDo(alaturn) Read these in from file. Just for LB3-Cam5 for now...
     # Intrinsics (given by NCLT).
     image_width = 1616 #u, x #646  
     image_height = 1232 #492
-    # f_x = 399.433184
-    # f_y = 399.433184
-    # c_x = 826.361952 #621.668624
-    # c_y = 621.668624 #826.361952
-    # camera_intrinsics = [[f_x, 0.0, c_x, 0.0], [
-    #     0.0, f_y, c_y, 0.0], [0.0, 0.0, 1.0, 0.0]]
-
 
     # Scaled intrinsics (because the images on the bag are scaled down during postprocessing).
     scale_img = 0.4
     image_width_sc = int(scale_img*1616) #*1616) #646  
     image_height_sc = int(scale_img*1232) #*1232) #492
-    # f_x_sc = scale_img*f_x
-    # f_y_sc = scale_img*f_y
-    # c_x_sc = scale_img*c_x
-    # c_y_sc = scale_img*c_y
-    # camera_intrinsics_sc = [[f_x_sc, 0.0, c_x_sc, 0.0], [
-    #     0.0, f_y_sc, c_y_sc, 0.0], [0.0, 0.0, 1.0, 0.0]]    
 
     # Extrinsics (given by NCLT).
     x_body_lb3 = [0.035, 0.002, -1.23, -179.93, -0.23, 0.50] # (x, y, z, phi, theta, psi).
     tf_body_lb3 = ssc_to_homo(x_body_lb3)    # a 4x4 homogenous transformation matrix.
-    # x_lb3_c5 = [0.041862, -0.001905, -0.000212, 160.868615, 89.9114152, 160.619894]
-    # tf_lb3_c5 = ssc_to_homo(x_lb3_c5)
-    # x_body_vel = [0.002, -0.004, -0.957, 0.807, 0.166, -90.703]
-    # tf_body_vel = ssc_to_homo(x_body_vel)
 
-    # tf_c5_vel = np.dot(np.linalg.inv(tf_lb3_c5), np.dot(np.linalg.inv(tf_body_lb3), tf_body_vel))
-    # tf_c5_body = np.linalg.inv(np.dot(tf_body_lb3, tf_lb3_c5))
-    # print('scale')
-    # print(camera_intrinsics_sc)
-    # print('tf_c5_body')
-    # print(tf_c5_body)
-
-    # # Print out the transform.
-    # print('tf_body_lb3')
-    # rpy = transformations.euler_from_matrix(tf_body_lb3, 'szyx')   
-    # rpy = np.array(rpy)
-    # print(rpy)
     #######################################################################
     K_cam1 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam1.csv', delimiter=',')
     K_cam2 = scale_img*np.loadtxt(args.camera_param_dir + 'K_cam2.csv', delimiter=',')
@@ -182,10 +154,7 @@ def main():
     left_sc = left*scale_img
     right_sc = right*scale_img
 
-    # subsample_locations = numpy.linspace(50, image_height - 50, 64).astype(int)
-    # lookup_subsample_locations = numpy.zeros(image_height)
-    # lookup_subsample_locations[subsample_locations] = 1
-
+    '''
     # Get images and semantic labels, together with timestamps.
     images1 = []
     img_ts = []
@@ -205,12 +174,6 @@ def main():
     for topic, image, t in in_bag.read_messages(topics='/images/raw5'):
         images5.append(image)
 
-    # labels = []
-    # lab_ts = []
-    # for topic, label, t in in_bag.read_messages(topics='/images/prediction5'):
-    #     labels.append(label)
-    #     lab_ts.append(t)
-    # assert(len(img_ts)==len(lab_ts))
     labels1 = []
     for topic, label, t in in_bag.read_messages(topics='/images/prediction1'):
         labels1.append(label)
@@ -226,13 +189,93 @@ def main():
     labels5 = []
     for topic, label, t in in_bag.read_messages(topics='/images/prediction5'):
         labels5.append(label)
+    
 
     image_iterator = 0
+    '''
+    # i = 0
+    # for topic, lidar_pcl, t in in_bag.read_messages(topics='/images/raw1'):
+    #     i+=1
+    # print('Have ' + str(i) + ' msgs.')
+    i =  0
+    img1_gen = in_bag.read_messages(topics='/images/raw1')
+    img2_gen = in_bag.read_messages(topics='/images/raw2')
+    img3_gen = in_bag.read_messages(topics='/images/raw3')
+    img4_gen = in_bag.read_messages(topics='/images/raw4')
+    img5_gen = in_bag.read_messages(topics='/images/raw5')
+    lab1_gen = in_bag.read_messages(topics='/images/prediction1')
+    lab2_gen = in_bag.read_messages(topics='/images/prediction2')
+    lab3_gen = in_bag.read_messages(topics='/images/prediction3')
+    lab4_gen = in_bag.read_messages(topics='/images/prediction4')
+    lab5_gen = in_bag.read_messages(topics='/images/prediction5')
+    print('Whaat    ')
+
+    skip = 0
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
+        print('hey')
         augmented_points = []
+        try:
+            topic, im1, ti1 = img1_gen.next()
+            topic, im2, ti2 = img2_gen.next()
+            topic, im3, ti3 = img3_gen.next()
+            topic, im4, ti4 = img4_gen.next()
+            topic, im5, ti5 = img5_gen.next()
+        except StopIteration:
+            print('End of images, exit process...')
+            break
+
+        skip = False
+        while not(t==ti1):  # Assumption: Images are time synced.
+            try:
+                topic, im1, ti1 = img1_gen.next()
+                topic, im2, ti2 = img2_gen.next()
+                topic, im3, ti3 = img3_gen.next()
+                topic, im4, ti4 = img4_gen.next()
+                topic, im5, ti5 = img5_gen.next()
+            except StopIteration:
+                print('OhOh, reset gen and try next time')
+                i+=1
+                skip = True
+                img1_gen = in_bag.read_messages(topics='/images/raw1')
+                img2_gen = in_bag.read_messages(topics='/images/raw2')
+                img3_gen = in_bag.read_messages(topics='/images/raw3')
+                img4_gen = in_bag.read_messages(topics='/images/raw4')
+                img5_gen = in_bag.read_messages(topics='/images/raw5')
+                break
+        if skip:
+            print('No matching image to this cloud, will try next one...')
+            continue
+
+        print(t)
+        print(ti1)
+        print(ti2)
+        print(ti3)
+        print(ti4)
+        print(ti5)
+        assert ((((t == ti1) == ti2) == ti3) ==ti4) == ti5, "Some timestamp is out of sync!"
+        print('Cool')
+        # i = 0
+        # for topic1, img1, t1 in in_bag.read_messages(topics='/images/raw1'):
+        #     i+=1
+        #     if t==t1:
+        #         print('Found match after it ' + str(i))
+        #         break
+
+        # assert t1==t, "Whaat"
+
+        # Increase img gen til matching stamp found, if end, break so next lidar stamp can be checked.
+
+        # assert t_im1==t, "Fuck"
+        # print('Lol')
+        # topic, image, t in in_bag.read_messages(topics='/images/raw1'):
+
+        '''
         # Forward search for getting img<->cloud correspondence. NCLT has already synced lidar and image...
         while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images1)-1):
             image_iterator += 1
+
+        # Version2:
+
         current_image1 = images1[image_iterator]
         current_image2 = images2[image_iterator]
         current_image3 = images3[image_iterator]
@@ -408,7 +451,7 @@ def main():
 
         out_bag.write('/augmented_cloud', augmented_cloud,
                       augmented_cloud.header.stamp, False)
-
+        '''
         print('Wrote cloud!')
 
     #         if not lookup_subsample_locations[v]:
@@ -457,6 +500,8 @@ def main():
     #     print('Pointcloud: ' + str(i))
 
     out_bag.close()
+    print('Bag closed!')
+    print(i)
 
 if __name__ == '__main__':
     main()
