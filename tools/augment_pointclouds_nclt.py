@@ -197,6 +197,7 @@ def main():
     # for topic, lidar_pcl, t in in_bag.read_messages(topics='/images/raw1'):
     #     i+=1
     # print('Have ' + str(i) + ' msgs.')
+    print('Heyoo')
     i =  0
     img1_gen = in_bag.read_messages(topics='/images/raw1')
     img2_gen = in_bag.read_messages(topics='/images/raw2')
@@ -210,50 +211,99 @@ def main():
     lab5_gen = in_bag.read_messages(topics='/images/prediction5')
     print('Whaat    ')
 
-    skip = 0
+    skip_pcl = 0
+    topic, im1, ti1 = img1_gen.next()
+    topic, im2, ti1 = img2_gen.next()
+    topic, im3, ti1 = img3_gen.next()
+    topic, im4, ti1 = img4_gen.next()
+    topic, im5, ti1 = img5_gen.next()
+    topic, lab1, tl1 = lab1_gen.next()
+    topic, lab2, tl1 = lab2_gen.next()
+    topic, lab3, tl1 = lab3_gen.next()
+    topic, lab4, tl1 = lab4_gen.next()
+    topic, lab5, tl1 = lab5_gen.next()
+
+    first_sync = True
+    i=0
+    skip_pcl = 0
+    skip_2 = 0
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
+
         print('hey')
         augmented_points = []
-        try:
-            topic, im1, ti1 = img1_gen.next()
-            topic, im2, ti2 = img2_gen.next()
-            topic, im3, ti3 = img3_gen.next()
-            topic, im4, ti4 = img4_gen.next()
-            topic, im5, ti5 = img5_gen.next()
-        except StopIteration:
-            print('End of images, exit process...')
-            break
-
-        skip = False
-        while not(t==ti1):  # Assumption: Images are time synced.
+        # Sync up lidar and images: Assume lidar started earlier.
+        if not(t==ti1) and first_sync:
+            skip_pcl+=1
+            print('Bad luck, try next pcl msg!')
+            print(t)
+            print(ti1)
+            print(skip_pcl)
+            continue
+    
+        if first_sync:
+            first_sync = False
+            print('Sync good, byebye')
+        else:
             try:
                 topic, im1, ti1 = img1_gen.next()
-                topic, im2, ti2 = img2_gen.next()
-                topic, im3, ti3 = img3_gen.next()
-                topic, im4, ti4 = img4_gen.next()
-                topic, im5, ti5 = img5_gen.next()
             except StopIteration:
-                print('OhOh, reset gen and try next time')
-                i+=1
-                skip = True
-                img1_gen = in_bag.read_messages(topics='/images/raw1')
-                img2_gen = in_bag.read_messages(topics='/images/raw2')
-                img3_gen = in_bag.read_messages(topics='/images/raw3')
-                img4_gen = in_bag.read_messages(topics='/images/raw4')
-                img5_gen = in_bag.read_messages(topics='/images/raw5')
+                print('No images left!')
                 break
-        if skip:
-            print('No matching image to this cloud, will try next one...')
-            continue
 
+        print('Yo')
         print(t)
         print(ti1)
-        print(ti2)
-        print(ti3)
-        print(ti4)
-        print(ti5)
-        assert ((((t == ti1) == ti2) == ti3) ==ti4) == ti5, "Some timestamp is out of sync!"
-        print('Cool')
+        # Very seldom, there is an image without a point cloud! In that case, skip this stamp and avoid
+        if not(t==ti1):
+            print('Skippy')
+            topic, im1, ti1 = img1_gen.next()
+            skip_2+=1
+            continue
+
+        assert t==ti1, "Timestamp not synced!"
+        print('Alright, lets roll!')
+        i+=1
+        print(i)
+        # try:
+        #     topic, im1, ti1 = img1_gen.next()
+        #     topic, im2, ti2 = img2_gen.next()
+        #     topic, im3, ti3 = img3_gen.next()
+        #     topic, im4, ti4 = img4_gen.next()
+        #     topic, im5, ti5 = img5_gen.next()
+        # except StopIteration:
+        #     print('End of images, exit process...')
+        #     break
+
+        # skip = False
+        # while not(t==ti1):  # Assumption: Images are time synced.
+        #     try:
+        #         topic, im1, ti1 = img1_gen.next()
+        #         topic, im2, ti2 = img2_gen.next()
+        #         topic, im3, ti3 = img3_gen.next()
+        #         topic, im4, ti4 = img4_gen.next()
+        #         topic, im5, ti5 = img5_gen.next()
+        #     except StopIteration:
+        #         print('OhOh, reset gen and try next time')
+        #         i+=1
+        #         skip = True
+        #         img1_gen = in_bag.read_messages(topics='/images/raw1')
+        #         img2_gen = in_bag.read_messages(topics='/images/raw2')
+        #         img3_gen = in_bag.read_messages(topics='/images/raw3')
+        #         img4_gen = in_bag.read_messages(topics='/images/raw4')
+        #         img5_gen = in_bag.read_messages(topics='/images/raw5')
+        #         break
+        # if skip:
+        #     print('No matching image to this cloud, will try next one...')
+        #     continue
+
+        # print(t)
+        # print(ti1)
+        # print(ti2)
+        # print(ti3)
+        # print(ti4)
+        # print(ti5)
+        # assert ((((t == ti1) == ti2) == ti3) ==ti4) == ti5, "Some timestamp is out of sync!"
+        # print('Cool')
         # i = 0
         # for topic1, img1, t1 in in_bag.read_messages(topics='/images/raw1'):
         #     i+=1
@@ -501,7 +551,8 @@ def main():
 
     out_bag.close()
     print('Bag closed!')
-    print(i)
+    # print(i)
+    print(skip_2)
 
 if __name__ == '__main__':
     main()
