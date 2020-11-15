@@ -193,12 +193,8 @@ def main():
 
     image_iterator = 0
     '''
-    # i = 0
-    # for topic, lidar_pcl, t in in_bag.read_messages(topics='/images/raw1'):
-    #     i+=1
-    # print('Have ' + str(i) + ' msgs.')
-    print('Heyoo')
-    i =  0
+
+    # Generators
     img1_gen = in_bag.read_messages(topics='/images/raw1')
     img2_gen = in_bag.read_messages(topics='/images/raw2')
     img3_gen = in_bag.read_messages(topics='/images/raw3')
@@ -209,59 +205,71 @@ def main():
     lab3_gen = in_bag.read_messages(topics='/images/prediction3')
     lab4_gen = in_bag.read_messages(topics='/images/prediction4')
     lab5_gen = in_bag.read_messages(topics='/images/prediction5')
-    print('Whaat    ')
 
-    skip_pcl = 0
     topic, im1, ti1 = img1_gen.next()
-    topic, im2, ti1 = img2_gen.next()
-    topic, im3, ti1 = img3_gen.next()
-    topic, im4, ti1 = img4_gen.next()
-    topic, im5, ti1 = img5_gen.next()
+    topic, im2, ti2 = img2_gen.next()
+    topic, im3, ti3 = img3_gen.next()
+    topic, im4, ti4 = img4_gen.next()
+    topic, im5, ti5 = img5_gen.next()
     topic, lab1, tl1 = lab1_gen.next()
-    topic, lab2, tl1 = lab2_gen.next()
-    topic, lab3, tl1 = lab3_gen.next()
-    topic, lab4, tl1 = lab4_gen.next()
-    topic, lab5, tl1 = lab5_gen.next()
+    topic, lab2, tl2 = lab2_gen.next()
+    topic, lab3, tl3 = lab3_gen.next()
+    topic, lab4, tl4 = lab4_gen.next()
+    topic, lab5, tl5 = lab5_gen.next()
 
     first_sync = True
     i=0
-    skip_pcl = 0
-    skip_2 = 0
+    skip_pcl1 = 0
+    skip_pcl2 = 0
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
-
-        print('hey')
         augmented_points = []
+
         # Sync up lidar and images: Assume lidar started earlier.
         if not(t==ti1) and first_sync:
-            skip_pcl+=1
+            skip_pcl1+=1
             print('Bad luck, try next pcl msg!')
             print(t)
             print(ti1)
-            print(skip_pcl)
+            print(skip_pcl1)
             continue
     
         if first_sync:
             first_sync = False
-            print('Sync good, byebye')
+            print('In-Sync!')
         else:
             try:
                 topic, im1, ti1 = img1_gen.next()
+                topic, im2, ti2 = img2_gen.next()
+                topic, im3, ti3 = img3_gen.next()
+                topic, im4, ti4 = img4_gen.next()
+                topic, im5, ti5 = img5_gen.next()
+                topic, lab1, tl1 = lab1_gen.next()
+                topic, lab2, tl2 = lab2_gen.next()
+                topic, lab3, tl3 = lab3_gen.next()
+                topic, lab4, tl4 = lab4_gen.next()
+                topic, lab5, tl5 = lab5_gen.next()
             except StopIteration:
                 print('No images left!')
                 break
 
-        print('Yo')
-        print(t)
-        print(ti1)
-        # Very seldom, there is an image without a point cloud! In that case, skip this stamp and avoid
+        # Very rarely, there is an image without a corresponding point cloud! Assume next one will be synced again.
         if not(t==ti1):
-            print('Skippy')
+            print('Missing pcl message!')
             topic, im1, ti1 = img1_gen.next()
-            skip_2+=1
+            topic, im2, ti2 = img2_gen.next()
+            topic, im3, ti3 = img3_gen.next()
+            topic, im4, ti4 = img4_gen.next()
+            topic, im5, ti5 = img5_gen.next()
+            topic, lab1, tl1 = lab1_gen.next()
+            topic, lab2, tl2 = lab2_gen.next()
+            topic, lab3, tl3 = lab3_gen.next()
+            topic, lab4, tl4 = lab4_gen.next()
+            topic, lab5, tl5 = lab5_gen.next()
+            skip_pcl2+=1
             continue
 
-        assert t==ti1, "Timestamp not synced!"
-        print('Alright, lets roll!')
+        # Last line of defense.
+        assert (t==ti1) and (t==ti2) and (t==ti3) and (t==ti4) and (t==ti5) and (t==tl1) and (t==tl2) and (t==tl3) and (t==tl4) and (t==tl5), "Timestamp not synced!"
         i+=1
         print(i)
         # try:
@@ -551,8 +559,9 @@ def main():
 
     out_bag.close()
     print('Bag closed!')
-    # print(i)
-    print(skip_2)
+    print(i)
+    print(skip_pcl1)
+    print(skip_pcl2)
 
 if __name__ == '__main__':
     main()
