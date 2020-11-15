@@ -8,6 +8,7 @@ import yaml
 import struct
 import sys
 import tf.transformations as transformations
+import time
 import rosbag
 import rospy
 from sensor_msgs import point_cloud2
@@ -92,11 +93,9 @@ def main():
     out_bag = rosbag.Bag(args.output_bag, 'w')
 
     # Re-Write TFs.
-    '''
     for topic, tf, t in in_bag.read_messages(topics=['/tf', '/tf_static']):
         out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)  
     print('Wrote all TFs!')
-    '''
 
     # Intrinsics (given by NCLT).
     image_width = 1616 #u, x #646  
@@ -221,6 +220,8 @@ def main():
     i=0
     skip_pcl1 = 0
     skip_pcl2 = 0
+    start_t = 0
+    time_st = time.time()
     for topic, lidar_pcl, t in in_bag.read_messages(topics=['/velodyne_points']):
         augmented_points = []
 
@@ -235,6 +236,8 @@ def main():
     
         if first_sync:
             first_sync = False
+            start_t = t
+            time_st = time.time()
             print('In-Sync!')
         else:
             try:
@@ -271,68 +274,11 @@ def main():
         # Last line of defense.
         assert (t==ti1) and (t==ti2) and (t==ti3) and (t==ti4) and (t==ti5) and (t==tl1) and (t==tl2) and (t==tl3) and (t==tl4) and (t==tl5), "Timestamp not synced!"
         i+=1
-        print(i)
-        # try:
-        #     topic, im1, ti1 = img1_gen.next()
-        #     topic, im2, ti2 = img2_gen.next()
-        #     topic, im3, ti3 = img3_gen.next()
-        #     topic, im4, ti4 = img4_gen.next()
-        #     topic, im5, ti5 = img5_gen.next()
-        # except StopIteration:
-        #     print('End of images, exit process...')
-        #     break
-
-        # skip = False
-        # while not(t==ti1):  # Assumption: Images are time synced.
-        #     try:
-        #         topic, im1, ti1 = img1_gen.next()
-        #         topic, im2, ti2 = img2_gen.next()
-        #         topic, im3, ti3 = img3_gen.next()
-        #         topic, im4, ti4 = img4_gen.next()
-        #         topic, im5, ti5 = img5_gen.next()
-        #     except StopIteration:
-        #         print('OhOh, reset gen and try next time')
-        #         i+=1
-        #         skip = True
-        #         img1_gen = in_bag.read_messages(topics='/images/raw1')
-        #         img2_gen = in_bag.read_messages(topics='/images/raw2')
-        #         img3_gen = in_bag.read_messages(topics='/images/raw3')
-        #         img4_gen = in_bag.read_messages(topics='/images/raw4')
-        #         img5_gen = in_bag.read_messages(topics='/images/raw5')
-        #         break
-        # if skip:
-        #     print('No matching image to this cloud, will try next one...')
-        #     continue
-
-        # print(t)
-        # print(ti1)
-        # print(ti2)
-        # print(ti3)
-        # print(ti4)
-        # print(ti5)
-        # assert ((((t == ti1) == ti2) == ti3) ==ti4) == ti5, "Some timestamp is out of sync!"
-        # print('Cool')
-        # i = 0
-        # for topic1, img1, t1 in in_bag.read_messages(topics='/images/raw1'):
-        #     i+=1
-        #     if t==t1:
-        #         print('Found match after it ' + str(i))
-        #         break
-
-        # assert t1==t, "Whaat"
-
-        # Increase img gen til matching stamp found, if end, break so next lidar stamp can be checked.
-
-        # assert t_im1==t, "Fuck"
-        # print('Lol')
-        # topic, image, t in in_bag.read_messages(topics='/images/raw1'):
 
         '''
         # Forward search for getting img<->cloud correspondence. NCLT has already synced lidar and image...
         while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images1)-1):
             image_iterator += 1
-
-        # Version2:
 
         current_image1 = images1[image_iterator]
         current_image2 = images2[image_iterator]
@@ -345,19 +291,20 @@ def main():
         current_label3 = labels3[image_iterator]
         current_label4 = labels4[image_iterator]
         current_label5 = labels5[image_iterator]
+        '''
 
         # Rotate it into native LB3 orientation.
-        cv_image1 = bridge.imgmsg_to_cv2(current_image1, desired_encoding='bgr8')
-        cv_image2 = bridge.imgmsg_to_cv2(current_image2, desired_encoding='bgr8')
-        cv_image3 = bridge.imgmsg_to_cv2(current_image3, desired_encoding='bgr8')
-        cv_image4 = bridge.imgmsg_to_cv2(current_image4, desired_encoding='bgr8')
-        cv_image5 = bridge.imgmsg_to_cv2(current_image5, desired_encoding='bgr8')
+        cv_image1 = bridge.imgmsg_to_cv2(im1, desired_encoding='bgr8')
+        cv_image2 = bridge.imgmsg_to_cv2(im2, desired_encoding='bgr8')
+        cv_image3 = bridge.imgmsg_to_cv2(im3, desired_encoding='bgr8')
+        cv_image4 = bridge.imgmsg_to_cv2(im4, desired_encoding='bgr8')
+        cv_image5 = bridge.imgmsg_to_cv2(im5, desired_encoding='bgr8')
         
-        cv_label1 = bridge.imgmsg_to_cv2(current_label1, desired_encoding='bgr8')
-        cv_label2 = bridge.imgmsg_to_cv2(current_label2, desired_encoding='bgr8')
-        cv_label3 = bridge.imgmsg_to_cv2(current_label3, desired_encoding='bgr8')
-        cv_label4 = bridge.imgmsg_to_cv2(current_label4, desired_encoding='bgr8')
-        cv_label5 = bridge.imgmsg_to_cv2(current_label5, desired_encoding='bgr8')
+        cv_label1 = bridge.imgmsg_to_cv2(lab1, desired_encoding='bgr8')
+        cv_label2 = bridge.imgmsg_to_cv2(lab2, desired_encoding='bgr8')
+        cv_label3 = bridge.imgmsg_to_cv2(lab3, desired_encoding='bgr8')
+        cv_label4 = bridge.imgmsg_to_cv2(lab4, desired_encoding='bgr8')
+        cv_label5 = bridge.imgmsg_to_cv2(lab5, desired_encoding='bgr8')
         
         cv_image1 = cv2.rotate(cv_image1, cv2.ROTATE_90_COUNTERCLOCKWISE)
         cv_image2 = cv2.rotate(cv_image2, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -456,7 +403,7 @@ def main():
                 bgr = cv_image5[v5, u5]
                 bgr_sem = cv_label5[v5, u5]
             else:
-                bgr = [0,0,0]
+                bgr = [254,254,254]
                 bgr_sem = [0,0,0]
 
             # Create PointXYZRGBA
@@ -504,58 +451,17 @@ def main():
           PointField('z', 8, PointField.FLOAT32, 1),
           PointField('rgba', 12, PointField.UINT32, 1)]
         header = lidar_pcl.header
-        header.frame_id = '/base_link'  #'/airsim_drone'    # ToDo(alaturn) Use naming from BOSCH
+        header.frame_id = '/base_link'
         augmented_cloud = point_cloud2.create_cloud(header, fields, augmented_points)
 
         out_bag.write('/augmented_cloud', augmented_cloud,
                       augmented_cloud.header.stamp, False)
-        '''
-        print('Wrote cloud!')
-
-    #         if not lookup_subsample_locations[v]:
-    #             continue
-
-    #         projected_point = numpy.dot(
-    #             tf_lidar_cam, (point[0], point[1], point[2], 1))
-
-    #         rgb = bytearray(struct.pack("f", point[3]))
-    #         rgb = struct.unpack('<i', str(rgb))[0]
-    #         r = (rgb >> 16) & 0xff
-    #         g = (rgb >> 8) & 0xff
-    #         b = rgb & 0xff
-
-    #         b_sem = current_image.data[3*(u + v * image_width)]
-    #         b_sem = struct.unpack('B', str(b_sem))[0]
-    #         g_sem = current_image.data[3*(u + v * image_width) + 1]
-    #         g_sem = struct.unpack('B', str(g_sem))[0]
-    #         r_sem = current_image.data[3*(u + v * image_width) + 2]
-    #         r_sem = struct.unpack('B', str(r_sem))[0]
-
-    #         label = lookup_id_color[b_sem, g_sem, r_sem]
-
-    #         rgba = struct.unpack('I', struct.pack(
-    #                     'BBBB', b, g, r, int(label) * 7))[0]
-    #         augmented_points.append(
-    #             [projected_point[0], projected_point[1], projected_point[2], rgba])
-
-
-    #     fields = [PointField('x', 0, PointField.FLOAT32, 1),
-    #               PointField('y', 4, PointField.FLOAT32, 1),
-    #               PointField('z', 8, PointField.FLOAT32, 1),
-    #               PointField('rgba', 12, PointField.UINT32, 1)]
-
-    #     header = depth_cam_pcl.header
-    #     header.frame_id = '/airsim_drone'
-    #     augmented_cloud = point_cloud2.create_cloud(
-    #         header, fields, augmented_points)
-
-    #     out_bag.write('/augmented_cloud', augmented_cloud,
-    #                   augmented_cloud.header.stamp, False)
-
-    #     i += 1
-    #     if i == 200:
-    #         break
-    #     print('Pointcloud: ' + str(i))
+        
+        if i%20==0:
+            print('Written ' + str(i) + ' clouds!')
+            print('Written ' + str(t.secs - start_t.secs) + ' seconds')
+            print('Took ' + str(time.time() - time_st) + ' seconds so far to process.')
+            # ToDo: Add some more stats.
 
     out_bag.close()
     print('Bag closed!')
