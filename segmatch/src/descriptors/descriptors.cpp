@@ -9,6 +9,7 @@
 #include "segmatch/descriptors/ensemble_shape_functions.hpp"
 #include "segmatch/descriptors/fpfh.hpp"
 #include "segmatch/descriptors/grsd.hpp"
+#include "segmatch/descriptors/shot.hpp"
 
 namespace segmatch {
 
@@ -44,6 +45,9 @@ Descriptors::Descriptors(const DescriptorsParameters& parameters) {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new FpfhDescriptor(parameters)));
     } else if (parameters.descriptor_types[i] == "GRSD") {
       descriptors_.push_back(std::unique_ptr<Descriptor>(new GrsdDescriptor(parameters)));
+    }  
+    else if (parameters.descriptor_types[i] == "SHOT") {
+    descriptors_.push_back(std::unique_ptr<Descriptor>(new ShotDescriptor(parameters)));
     }
      else {
       CHECK(false) << "The descriptor '" << parameters.descriptor_types[i] <<

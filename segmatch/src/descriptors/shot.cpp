@@ -54,7 +54,7 @@ void ShotDescriptor::describe(const Segment& segment, Features* features) {
   ne.setRadiusSearch(ne_radius_);
   ne.compute(*cloud_normals);
 
-  // Get rid off NaNs (Shot doesn't filter them and will break).
+  // Get rid off NaNs.
   pcl::PointCloud<pcl::PointXYZ>::Ptr test_cloud(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::Normal>::Ptr test_cloud_normals (new pcl::PointCloud<pcl::Normal>);
   std::vector<int> indices_good_cloud;
@@ -88,25 +88,31 @@ void ShotDescriptor::describe(const Segment& segment, Features* features) {
   PclPoint centroid = segment.getLastView().centroid;
   pcl::Normal centroid_normal(0.0,0.0,1.0); // Fake normal. Shouldn't matter too much for 2D motion..
   pcl::PointXYZ centroid1(centroid.x, centroid.y, centroid.z);
-  cloud->push_back(centroid1);
-  cloud_normals->push_back(centroid_normal);
 
+  // A fake point cloud only containing the centroid (= single keypoint).
+  pcl::PointCloud<pcl::PointXYZ>::Ptr centroid_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  centroid_cloud->push_back(centroid1);
+  pcl::PointCloud<pcl::Normal>::Ptr centroid_cloud_normals(new pcl::PointCloud<pcl::Normal>);
+  centroid_cloud_normals->push_back(centroid_normal);
+
+  std::cout<<"Size cloud: "<<centroid_cloud->size()<<" size cloud normals: "<<centroid_cloud_normals->size()<<std::endl;
+  std::cout<<"Surface size: "<<cloud->size()<<std::endl;  
   // Create ShotE class and pass data+normals to it.
   pcl::SHOTEstimation<pcl::PointXYZ, pcl::Normal, pcl::SHOT352> shot;
-  shot.setInputCloud(cloud);
+  shot.setInputCloud(centroid_cloud);
   shot.setInputNormals(cloud_normals);
-  shot.computePointSHOT();  
-
-  //###############################################
+  shot.setSearchSurface(cloud);
+  shot.setRadiusSearch(10.0); // ToDo(alaturn) Find actual radius of enclosing sphere!
+  pcl::PointCloud<pcl::SHOT352>::Ptr descriptors(new pcl::PointCloud<pcl::SHOT352>());
+  shot.compute(*descriptors);
+  pcl::SHOT352 descriptor = descriptors->points[0];
 
   // Return descriptor.
-  Eigen::VectorXf shot_vec(30);
-
   Feature shot_feature("shot");
-  for (size_t j = 0u; j < shot_vec.size(); ++j){
+  for (size_t j = 0u; j < 352; ++j){
 
       shot_feature.push_back(
-      FeatureValue("shot_" + std::to_string(j), double(shot_vec[j])));
+      FeatureValue("shot_" + std::to_string(j), double(descriptor.descriptor[j])));
       // std::cout<<double(shot_vec[j])<<std::endl;
   }
 
