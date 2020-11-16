@@ -379,7 +379,14 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
     CHECK_GT(recognizer->getCandidateTransformations().size(), 0u);
     SE3 w_T_a_b = fromApproximateTransformationMatrix(
         recognizer->getCandidateTransformations().front());
-    std::cout << w_T_a_b << std::endl;
+
+    std::ofstream outfile("/tmp/localizations.txt", std::ios_base::app);
+    outfile << timestamp_ns << ","
+      << w_T_a_b.getPosition()(0) << ","
+      << w_T_a_b.getPosition()(1) << ","
+      << w_T_a_b.getPosition()(2) << ","
+      << recognizer->getCandidateClusters().front().size() << std::endl;
+    outfile.close();
   }
 
   return last_filtered_matches_;

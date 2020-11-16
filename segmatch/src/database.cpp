@@ -132,7 +132,7 @@ bool ensureDirectoryExists(const std::string& directory) {
     }
   } else {
     LOG(ERROR) << "Directory '" << directory << "' starts with invalid character: '" <<
-        directory[0u] << "'"; 
+        directory[0u] << "'";
   }
   return false;
 }
@@ -165,15 +165,14 @@ bool exportSegments(const std::string& filename, const SegmentedCloud& segmented
           } else {
             point_cloud = segment.views[i].point_cloud;
           }
-          uint8_t r, g, b, a;
+          uint8_t r, g, b;
           uint8_t semantic_class;
           for (const auto& point : point_cloud) {
             uint32_t point_rgba = static_cast<uint32_t>(point.rgba);
-            a = (point_rgba >> 24) & 0xff;
             r = (point_rgba >> 16) & 0xff;
             g = (point_rgba >> 8) & 0xff;
             b = point_rgba & 0xff;
-            semantic_class = a / 7;
+            semantic_class = ((point_rgba >> 24) & 0xff) / 7;
 
             output_file << segment.segment_id << " ";
             output_file << i << " ";  // Index of the view.
@@ -189,7 +188,7 @@ bool exportSegments(const std::string& filename, const SegmentedCloud& segmented
         }
       } else {
         PointCloud point_cloud;
-        if (export_reconstructions) { 
+        if (export_reconstructions) {
           point_cloud = segment.getLastView().reconstruction;
         } else {
           point_cloud = segment.getLastView().point_cloud;
@@ -246,7 +245,7 @@ bool exportPositions(const std::string& filename, const SegmentedCloud& segmente
   } else {
     LOG(ERROR) << "Could not open file " << filename << " for writing segment positions.";
     return false;
-  }	
+  }
 }
 
 bool exportFeatures(const std::string& filename, const SegmentedCloud& segmented_cloud,

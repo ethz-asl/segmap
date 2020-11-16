@@ -39,9 +39,6 @@ struct SegmentView {
   // Trajectory pose to which the segment is linked.
   laser_slam::SE3 T_w_linkpose;
 
-  // Number of occupied voxels during voxelization for CNN descriptor.
-  unsigned int n_occupied_voxels;
-
   // Number of points the segment had when last described
   unsigned int n_points_when_last_described = 0u;
 

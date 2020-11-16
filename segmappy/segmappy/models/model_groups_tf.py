@@ -5,6 +5,7 @@ def init_model(input_shape, n_classes):
     with tf.name_scope("InputScope") as scope:
         cnn_input = tf.placeholder(
             dtype=tf.float32, shape=(None,) + input_shape + (3 + 35,), name="input"
+            #dtype=tf.float32, shape=(None,) + input_shape + (1,), name="input"
         )
 
     # base convolutional layers
@@ -75,7 +76,7 @@ def init_model(input_shape, n_classes):
     )
 
     dropout_dense1 = tf.layers.dropout(
-        bn_dense1, rate=0.5, training=training, name="dropout_dense1"
+        bn_dense1, rate=0.75, training=training, name="dropout_dense1"
     )
 
     descriptor = tf.layers.dense(
@@ -96,7 +97,7 @@ def init_model(input_shape, n_classes):
         tf.add(descriptor, 0, name="descriptor_read")
 
     dropout_descriptor = tf.layers.dropout(
-        bn_descriptor, rate=0.35, training=training, name="dropout_descriptor"
+        bn_descriptor, rate=0.5, training=training, name="dropout_descriptor"
     )
 
     y_pred = tf.layers.dense(

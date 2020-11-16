@@ -56,7 +56,7 @@ class SegMapper {
     /// \brief Call back of the save_local_map service.
   bool saveLocalMapServiceCall(segmapper::SaveMap::Request& request,
                                segmapper::SaveMap::Response& response);
-  
+
  private:
   // Get ROS parameters.
   void getParameters();
@@ -99,12 +99,11 @@ class SegMapper {
   std::vector<unsigned int> skip_counters_;
   unsigned int deactivate_track_when_skipped_x_ = 5u;
   std::vector<bool> first_points_received_;
-  
+
   // Pose of the robot when localization occured. Used to compute statistics on dead-reckoning
   // distances.
   laser_slam::SE3 pose_at_last_localization_;
   bool pose_at_last_localization_set_ = false;
-
 
   static constexpr laser_slam::Time kHeadDurationToExport_ns = 60000000000u;
 }; // SegMapper

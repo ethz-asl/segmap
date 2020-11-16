@@ -43,6 +43,11 @@ typedef std::pair<std::string, std::string> FilenamePair;
 
 typedef std::pair<PointICloudPtr, PointICloudPtr> CloudPair;
 
+typedef struct {
+  uint32_t x, y, z, r, g, b, semantic_class;
+} VoxelPoint;
+typedef std::vector<VoxelPoint> VoxelPointCloud;
+
 /*
  * \brief Type representing IDs, for example for segments or clouds
  * Warning: the current implementation sometimes uses IDs as array indices.

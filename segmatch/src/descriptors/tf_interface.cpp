@@ -1,6 +1,6 @@
 #include "segmatch/descriptors/tf_interface.hpp"
 
-namespace ns_tf_interface {
+namespace segmatch {
 
 TensorflowInterface::TensorflowInterface() {
   ros::NodeHandle nh;
@@ -18,13 +18,13 @@ TensorflowInterface::TensorflowInterface() {
 }
 
 void TensorflowInterface::batchFullForwardPass(
-    const std::vector<Array3D>& inputs, const std::string& input_tensor_name,
+    const std::vector<VoxelPointCloud>& inputs, const std::string& input_tensor_name,
     const std::vector<std::vector<float>>& scales,
     const std::string& scales_tensor_name,
     const std::string& descriptor_values_name,
     const std::string& reconstruction_values_name,
     std::vector<std::vector<float>>& descriptors,
-    std::vector<Array3D>& reconstructions) {
+    std::vector<PointCloud>& reconstructions) {
   CHECK(!inputs.empty());
 
   segmatch::cnn_input_msg msg;
@@ -52,35 +52,39 @@ void TensorflowInterface::batchFullForwardPass(
   }
 
   // Inputs
-  size_t dim_1 = inputs.size();
-  size_t dim_2 = inputs[0].container.size();
-  size_t dim_3 = inputs[0].container[0].size();
-  size_t dim_4 = inputs[0].container[0][0].size();
+  layout_dim.size = inputs.size();
+  layout_dim.stride = inputs.size();
+  msg.input_indexes.layout.dim.push_back(layout_dim);
+
+  size_t total_points = 0;
+  for (const VoxelPointCloud& input : inputs) {
+    total_points += input.size();
+    msg.input_indexes.data.push_back(total_points);
+  }
+
+  size_t dim_1 = total_points;
+  size_t dim_2 = 7u;
+
   layout_dim.size = dim_1;
-  layout_dim.stride = dim_1 * dim_2 * dim_3 * dim_4;
+  layout_dim.stride = dim_1 * dim_2;
   msg.inputs.layout.dim.push_back(layout_dim);
 
   layout_dim.size = dim_2;
-  layout_dim.stride = dim_2 * dim_3 * dim_4;
+  layout_dim.stride = dim_2;
   msg.inputs.layout.dim.push_back(layout_dim);
 
-  layout_dim.size = dim_3;
-  layout_dim.stride = dim_3 * dim_4;
-  msg.inputs.layout.dim.push_back(layout_dim);
-
-  layout_dim.size = dim_4;
-  layout_dim.stride = dim_4;
-  msg.inputs.layout.dim.push_back(layout_dim);
-
-  for (int i = 0; i < msg.inputs.layout.dim[0].size; ++i) {
-    for (int j = 0; j < msg.inputs.layout.dim[1].size; ++j) {
-      for (int k = 0; k < msg.inputs.layout.dim[2].size; ++k) {
-        for (int l = 0; l < msg.inputs.layout.dim[3].size; ++l) {
-          msg.inputs.data.push_back(inputs[i].container[j][k][l]);
-        }
-      }
+  for (const VoxelPointCloud& input : inputs) {
+    for (const VoxelPoint& point : input) {
+      msg.inputs.data.push_back(point.x);
+      msg.inputs.data.push_back(point.y);
+      msg.inputs.data.push_back(point.z);
+      msg.inputs.data.push_back(point.r);
+      msg.inputs.data.push_back(point.g);
+      msg.inputs.data.push_back(point.b);
+      msg.inputs.data.push_back(point.semantic_class);
     }
   }
+
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
   ROS_DEBUG_STREAM("Sending CNN Input: " << msg.timestamp);
@@ -107,11 +111,11 @@ void TensorflowInterface::batchFullForwardPass(
   }
 
   // Decoding message
-
   if (out_msg.descriptors.data.empty()) {
     ROS_WARN_STREAM("No descriptor data");
     return;
   }
+
   if (out_msg.reconstructions.data.empty()) {
     ROS_WARN_STREAM("No reconstruction data");
     return;
@@ -123,14 +127,13 @@ void TensorflowInterface::batchFullForwardPass(
   for (int i = 0; i < out_msg.descriptors.layout.dim[0].size; ++i) {
     std::vector<float> descriptor;
     for (int j = 0; j < out_msg.descriptors.layout.dim[1].size; ++j) {
-      descriptor.push_back(
-          out_msg.descriptors
-              .data[i * out_msg.descriptors.layout.dim[1].stride + j]);
+      descriptor.push_back(out_msg.descriptors.data[
+          i * out_msg.descriptors.layout.dim[1].stride + j]);
     }
     descriptors.push_back(descriptor);
   }
 
-  for (int i = 0; i < out_msg.reconstructions.layout.dim[0].size; ++i) {
+  /*for (int i = 0; i < out_msg.reconstructions.layout.dim[0].size; ++i) {
     Array3D reconstruction(out_msg.reconstructions.layout.dim[1].size,
                            out_msg.reconstructions.layout.dim[2].size,
                            out_msg.reconstructions.layout.dim[3].size);
@@ -146,7 +149,7 @@ void TensorflowInterface::batchFullForwardPass(
       }
     }
     reconstructions.push_back(reconstruction);
-  }
+  }*/
 }
 
 void TensorflowInterface::cnn_output_callback(segmatch::cnn_output_msg msg) {
@@ -225,4 +228,4 @@ std::vector<std::vector<float>> TensorflowInterface::batchExecuteGraph(
   return semantics;
 }
 
-}  // namespace ns_tf_interface
+}  // namespace segmatch

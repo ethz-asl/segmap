@@ -8,6 +8,7 @@
 
 void SigintHandler(int sig) {
   laser_slam::Benchmarker::logStatistics(LOG(INFO));
+  laser_slam::Benchmarker::saveData();
   ros::shutdown();
 }
 
