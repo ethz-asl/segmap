@@ -146,7 +146,7 @@ class TensorflowCNNInterface:
             'OutputScope/descriptor_read:0')
         self.cnn_reconstruction = cnn_graph.get_tensor_by_name(
             'ReconstructionScopeAE/ae_reconstruction_read:0')
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+        gpu_options = tf.GPUOptions(allow_growth=True)
         self.cnn_sess = tf.compat.v1.Session(
             config=tf.ConfigProto(gpu_options=gpu_options))
         self.cnn_saver.restore(self.cnn_sess, tf.train.latest_checkpoint(
