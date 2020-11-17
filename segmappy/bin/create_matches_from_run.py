@@ -12,7 +12,7 @@ import ensure_segmappy_is_installed
 from segmappy import Dataset, Config
 from segmappy.tools.hull import point_in_hull, n_points_in_hull, are_in_hull
 
-DATASET_FOLDER = "/home/nikhilesh/.segmap/training_datasets/Paper/BOSCH_TRAIN_MAP_AUGMENTED_FPFH_EVB/"
+DATASET_FOLDER = "/home/nikhilesh/.segmap/training_datasets/BOSCH1_SHOT_FPFH_EVB/"
 FILE_PATH = DATASET_FOLDER + "matches_database.csv"
 if os.path.isfile(FILE_PATH):
     os.remove(FILE_PATH)

@@ -57,16 +57,21 @@ feature_sets = []
 
 # import tensorflow as tf
 
-# FPFH Features
 print('hallo')
 print(dataset.features.shape)
-feature_sets.append(dataset.features[:, :33])
+
+# FPFH Features
+feature_sets.append(dataset.features[:, :352])
 
 # GRSD Features
 # feature_sets.append(dataset.features[:, 33:54])
 
-# eigen features
-feature_sets.append(dataset.features[:, 33:])
+# SHOT Features
+feature_sets.append(dataset.features[:, 352:385])
+
+# EVB features.
+feature_sets.append(dataset.features[:, 385:])
+
 
 # autoencoder features
 '''if config.ae_model:
@@ -292,14 +297,14 @@ ax.set_xticklabels(bin_edges.astype(int))
 ax.set_xticks(xticks)
 ax.tick_params(axis="both", direction="in")
 
-lG = mlines.Line2D([], [], color="green", label="FPFH", linewidth=lw)
-lR = mlines.Line2D([], [], color="red", label="Eigen", linewidth=lw)
-# lB = mlines.Line2D([], [], color="blue", label="EVB", linewidth=lw)
+lG = mlines.Line2D([], [], color="green", label="SHOT", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="FPFH", linewidth=lw)
+lB = mlines.Line2D([], [], color="blue", label="EVB", linewidth=lw)
 if config.ae_model:
     lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
     handles = [lG, lO, lR]
 else:
-    handles = [lG, lR]
+    handles = [lG, lR, lB]
 
 plt.legend(handles=handles, loc=3)
 
@@ -307,4 +312,4 @@ plt.xlabel("Segment completness [-]")
 plt.ylabel("k-neighbours needed [-]")
 plt.tight_layout()
 
-plt.savefig("acc_versus_size_BOSCH_TRAIN_MAP_AUGMENTED_FPFH_EVB.pdf")
+plt.savefig("acc_versus_size_BOSCH1_SHOT_FPFH_EVB.pdf")
