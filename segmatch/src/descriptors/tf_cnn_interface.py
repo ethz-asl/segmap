@@ -151,6 +151,8 @@ class TensorflowCNNInterface:
             config=tf.ConfigProto(gpu_options=gpu_options))
         self.cnn_saver.restore(self.cnn_sess, tf.train.latest_checkpoint(
             self.cnn_model_path))
+        print("[INFO] Descriptor CNN model loaded.")
+
         rospy.spin()
 
 

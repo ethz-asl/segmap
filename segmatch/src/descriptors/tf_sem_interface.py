@@ -82,6 +82,8 @@ class TensorflowSemanticsInterface:
             config=tf.ConfigProto(gpu_options=gpu_options))
         self.saver.restore(self.sem_session, tf.train.latest_checkpoint(
             self.semantics_model_path))
+        print("[INFO] Semantic CNN model loaded.")
+
         rospy.spin()
 
 
