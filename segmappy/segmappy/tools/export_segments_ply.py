@@ -5,6 +5,8 @@ import os
 import open3d as o3d
 import plyfile as pf
 
+import tf.transformations as tf
+
 from segmappy import Config
 from segmappy import Dataset
 
@@ -19,8 +21,8 @@ def main():
     # Path path to segments_database.csv (what is exported from SegMap).
     base_dir = config.base_dir
     folder = config.cnn_test_folder
-    segment_save_dir = base_dir + folder + "/3DSmoothNet/segment_clouds/"
-    print("Data Folder: "+base_dir+folder)
+    segment_save_dir = '/home/nikhilesh/Documents/3DSmoothNet/segments/' # base_dir + folder + "/3DSmoothNet/segment_clouds/"
+    print("Data Folder: "+ base_dir + folder)
 
     # Load Dataset.
     dataset = Dataset(
@@ -54,15 +56,25 @@ def main():
     # Convert each segment and save as .ply point cloud.
     
     for idx in range(len(segments)):
+        if idx%50==0:
+            print('Processing cloud ' + str(idx) + ' out of ' + str(len(segments)))
         # Identification.
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
         cloud_xyz = segments[idx][:,:3]
+
         # Compute centroid and add.
         cent_x = np.mean(cloud_xyz[:,0])
         cent_y = np.mean(cloud_xyz[:,1])
-        cent_z = np.mean(cloud_xyz[:,2])     
+        cent_z = np.mean(cloud_xyz[:,2])
         cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
+
+        # Just for some testing: Add random noise transformation.
+        # T_rand = np.identity(4) 
+        T_rand = tf.random_rotation_matrix(np.random.rand(3))
+        T_rand[:3,3] = np.random.uniform(low=-2.0, high=2.0, size=(3,))
+        noisy_cloud = np.matmul(T_rand, np.vstack((cloud_xyz.transpose(),np.ones(cloud_xyz.shape[0]))))
+        cloud_xyz = noisy_cloud[:3,:].transpose()
 
         # Create structured array (plyfile).
         dt = [('x', 'f4'), ('y', 'f4'), ('z', 'f4')]
@@ -70,6 +82,7 @@ def main():
         cloud_xyz_ply['x'] = cloud_xyz[:,0]
         cloud_xyz_ply['y'] = cloud_xyz[:,1]
         cloud_xyz_ply['z'] = cloud_xyz[:,2]
+
 
         # Write to file.
         vertex = cloud_xyz_ply
