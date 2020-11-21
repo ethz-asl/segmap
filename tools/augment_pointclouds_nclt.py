@@ -227,12 +227,27 @@ def main():
 
         # Sync up lidar and images: Assume lidar started earlier.
         if not(t==ti1) and first_sync:
-            skip_pcl1+=1
-            print('Bad luck, try next pcl msg!')
-            print(t)
-            print(ti1)
-            print(skip_pcl1)
-            continue
+            if t < ti1:
+                # LiDAR before images.
+                skip_pcl1+=1
+                print('Bad luck, try next pcl msg!')
+                print(t)
+                print(ti1)
+                print(skip_pcl1)
+                continue
+            if t > ti1:
+                # Images before LiDAR.
+                while not (t==ti1):
+                    topic, im1, ti1 = img1_gen.next()
+                    topic, im2, ti2 = img2_gen.next()
+                    topic, im3, ti3 = img3_gen.next()
+                    topic, im4, ti4 = img4_gen.next()
+                    topic, im5, ti5 = img5_gen.next()
+                    topic, lab1, tl1 = lab1_gen.next()
+                    topic, lab2, tl2 = lab2_gen.next()
+                    topic, lab3, tl3 = lab3_gen.next()
+                    topic, lab4, tl4 = lab4_gen.next()
+                    topic, lab5, tl5 = lab5_gen.next()
     
         if first_sync:
             first_sync = False
