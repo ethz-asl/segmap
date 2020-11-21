@@ -217,6 +217,7 @@ def main():
     topic, lab5, tl5 = lab5_gen.next()
 
     first_sync = True
+    skip_img_incr = False
     i=0
     skip_pcl1 = 0
     skip_pcl2 = 0
@@ -249,42 +250,53 @@ def main():
                     topic, lab4, tl4 = lab4_gen.next()
                     topic, lab5, tl5 = lab5_gen.next()
     
+        # Now, should be synced and should be able to go to normal mode...
+
         if first_sync:
             first_sync = False
             start_t = t
             time_st = time.time()
             print('In-Sync!')
         else:
-            try:
-                topic, im1, ti1 = img1_gen.next()
-                topic, im2, ti2 = img2_gen.next()
-                topic, im3, ti3 = img3_gen.next()
-                topic, im4, ti4 = img4_gen.next()
-                topic, im5, ti5 = img5_gen.next()
-                topic, lab1, tl1 = lab1_gen.next()
-                topic, lab2, tl2 = lab2_gen.next()
-                topic, lab3, tl3 = lab3_gen.next()
-                topic, lab4, tl4 = lab4_gen.next()
-                topic, lab5, tl5 = lab5_gen.next()
-            except StopIteration:
-                print('No images left!')
-                break
+            if not skip_img_incr:
+                try:
+                    topic, im1, ti1 = img1_gen.next()
+                    topic, im2, ti2 = img2_gen.next()
+                    topic, im3, ti3 = img3_gen.next()
+                    topic, im4, ti4 = img4_gen.next()
+                    topic, im5, ti5 = img5_gen.next()
+                    topic, lab1, tl1 = lab1_gen.next()
+                    topic, lab2, tl2 = lab2_gen.next()
+                    topic, lab3, tl3 = lab3_gen.next()
+                    topic, lab4, tl4 = lab4_gen.next()
+                    topic, lab5, tl5 = lab5_gen.next()
+                except StopIteration:
+                    print('No images left!')
+                    break
 
         # Very rarely, there is an image without a corresponding point cloud! Assume next one will be synced again.
         if not(t==ti1):
-            print('Missing pcl message!')
-            topic, im1, ti1 = img1_gen.next()
-            topic, im2, ti2 = img2_gen.next()
-            topic, im3, ti3 = img3_gen.next()
-            topic, im4, ti4 = img4_gen.next()
-            topic, im5, ti5 = img5_gen.next()
-            topic, lab1, tl1 = lab1_gen.next()
-            topic, lab2, tl2 = lab2_gen.next()
-            topic, lab3, tl3 = lab3_gen.next()
-            topic, lab4, tl4 = lab4_gen.next()
-            topic, lab5, tl5 = lab5_gen.next()
-            skip_pcl2+=1
-            continue
+            print('Out of Sync again, very weird...')
+            if(t<ti1):
+                print('PCL lagging behind')
+                skip_img_incr = True # Will increase PCL without increasing image.
+                skip_pcl2+=1
+                continue
+            elif(t>ti1):
+                print('Image lagging behind!')
+                while not (t==ti1): # Increase images till in-sync again...
+                    topic, im1, ti1 = img1_gen.next()
+                    topic, im2, ti2 = img2_gen.next()
+                    topic, im3, ti3 = img3_gen.next()
+                    topic, im4, ti4 = img4_gen.next()
+                    topic, im5, ti5 = img5_gen.next()
+                    topic, lab1, tl1 = lab1_gen.next()
+                    topic, lab2, tl2 = lab2_gen.next()
+                    topic, lab3, tl3 = lab3_gen.next()
+                    topic, lab4, tl4 = lab4_gen.next()
+                    topic, lab5, tl5 = lab5_gen.next()
+        else:
+            skip_img_incr = False
 
         # Last line of defense.
         assert (t==ti1) and (t==ti2) and (t==ti3) and (t==ti4) and (t==ti5) and (t==tl1) and (t==tl2) and (t==tl3) and (t==tl4) and (t==tl5), "Timestamp not synced!"
