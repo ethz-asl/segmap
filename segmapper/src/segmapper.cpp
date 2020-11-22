@@ -200,9 +200,11 @@ void SegMapper::segMatchThread() {
       local_maps_[track_id].updatePoseAndAddPoints(new_points, current_pose);
     }
 
+    RelativePose loop_closure;
+
     // Process the source cloud.
     if (segmatch_worker_params_.localize) {
-      if (segmatch_worker_.processLocalMap(local_maps_[track_id], current_pose, track_id)) {
+      if (segmatch_worker_.processLocalMap(local_maps_[track_id], current_pose, track_id, &loop_closure)) {
         if (!pose_at_last_localization_set_) {
           pose_at_last_localization_set_ = true;
           pose_at_last_localization_ = current_pose.T_w;
@@ -211,10 +213,21 @@ void SegMapper::segMatchThread() {
               pose_at_last_localization_, current_pose.T_w));
           pose_at_last_localization_ = current_pose.T_w;
         }
+
+        std::shared_ptr<LaserTrack> laser_track =
+            incremental_estimator_->getLaserTrack(track_id);
+        SE3 T_w_b = loop_closure.T_a_b * laser_track->getCurrentPose().T_w;
+        SE3 T_w_bgt = laser_slam_workers_[track_id]->getGrountTruthPose();
+        SE3 T_b_bgt = T_w_b * T_w_bgt.inverse();
+
+        std::ofstream outfile("/tmp/localizations.txt", std::ios_base::app);
+        outfile << laser_track->getCurrentPose().time_ns << ","
+          << T_b_bgt.getPosition()(0) << ","
+          << T_b_bgt.getPosition()(1) << ","
+          << T_b_bgt.getPosition()(2) << std::endl;
+        outfile.close();
       }
     } else {
-      RelativePose loop_closure;
-
       // If there is a loop closure.
       if (segmatch_worker_.processLocalMap(local_maps_[track_id], current_pose,
                                            track_id, &loop_closure)) {
