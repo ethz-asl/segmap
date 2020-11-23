@@ -99,23 +99,34 @@ void ShotDescriptor::describe(const Segment& segment, Features* features) {
   std::cout<<"Surface size: "<<cloud->size()<<std::endl;  
   // Create ShotE class and pass data+normals to it.
   pcl::SHOTEstimation<pcl::PointXYZ, pcl::Normal, pcl::SHOT352> shot;
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree_shot(new pcl::search::KdTree<pcl::PointXYZ>);
+  shot.setSearchMethod(tree_shot);
   shot.setInputCloud(centroid_cloud);
-  shot.setInputNormals(cloud_normals);
+  shot.setInputNormals(cloud_normals);  // Is this correct? using different input cloud...
   shot.setSearchSurface(cloud);
-  shot.setRadiusSearch(10.0); // ToDo(alaturn) Find actual radius of enclosing sphere!
+  shot.setRadiusSearch(25.0); // ToDo(alaturn) Find actual radius of enclosing sphere!
   pcl::PointCloud<pcl::SHOT352>::Ptr descriptors(new pcl::PointCloud<pcl::SHOT352>());
   shot.compute(*descriptors);
-  pcl::SHOT352 descriptor = descriptors->points[0];
 
+  std::cout<<"----------------HALLLOOOOOO--------------"<<std::endl;
+  std::cout<<"XYZ: "<<centroid1<<std::endl;
+  std::cout<<"Number of histograms "<<descriptors->size()<<std::endl; 
+  std::cout<<"HIST1: "<<descriptors->points[0]<<std::endl;
+  pcl::SHOT352 descriptor = descriptors->points[0];
+  std::cout<<"LOOL: "<<descriptor.getNumberOfDimensions()<<std::endl;
+  // std::cout<<" LRF Radius: "<<shot.getLRFRadius()<<std::endl;
+  std::cout<<"HIST2: "<<descriptor<<std::endl;
+  std::cout<<"HIST3: "<<descriptor.descriptor<<std::endl;
   // Return descriptor.
   Feature shot_feature("shot");
+  std::cout<<"YOOOOOOO"<<std::endl;
   for (size_t j = 0u; j < 352; ++j){
-
+      // std::cout<<j<<std::endl;
       shot_feature.push_back(
       FeatureValue("shot_" + std::to_string(j), double(descriptor.descriptor[j])));
-      // std::cout<<double(shot_vec[j])<<std::endl;
+      std::cout<<double(descriptor.descriptor[j])<<std::endl;
   }
-
+  std::cout<<"DOOONE"<<std::endl;
   features->replaceByName(shot_feature);
 
   double secondsPassed =  (clock() - startTime) / CLOCKS_PER_SEC;
