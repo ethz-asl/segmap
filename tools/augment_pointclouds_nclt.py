@@ -58,36 +58,32 @@ def main():
     parser.add_argument('input_bag', metavar='input_bag', type=str, help='bag file with LiDAR, image, labels and TF')
     parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
     parser.add_argument('camera_param_dir', metavar='cam_par_dir', type=str, help='directory with camera intrinsics/extrinsics')
+    parser.add_argument('scale', metavar='scale', type=float, help='how much images were scaled down from raw NCLT dimensions')
     args = parser.parse_args()
 
     bridge = CvBridge()
 
-    # LookUp BGR (cityscapes) -> ID (segmap).
-    segmentation_id_color = {
-        0:[0,0,0],     # Undefined   
-        33:[128,64,128],     # Road -> Road
-        33:[232,35,244],     # Sidewalk -> Road
-        34:[70,70,70],       # Building -> Small house
-        34:[156,102,102],    # Wall -> Small house
-        5:[153,153,190],     # Fence -> Fence
-        10:[153,153,153],    # Pole -> LightGenerator
-        19:[30,170,250],     # Traffic Light -> SignBoard
-        19:[0,220,220],      # Traffic Sign -> SignBoard
-        2:[35,142,107],      # Vegetation -> Tree
-        32:[152,251,152],    # Terrain -> Landscape
-        31:[180,130,70],     # Sky -> Sky
-        12:[60,20,220],      # Person -> Portapotty 
-        12:[0,0,255],        # Rider -> Portapotty
-        1:[142,0,0],         # Car -> Car
-        7:[70,0,0],          # Truck -> Truck
-        7:[100,60,0],        # Bus -> Truck
-        7:[100,80,0],        # Train -> Truck
-        3:[230,0,0],         # Motorcycle -> Bench
-        3:[32,11,119]       # Bicycle -> Bench 
-    }
     lookup_id_color = np.zeros((256, 256, 256))
-    for key, value in segmentation_id_color.items():
-        lookup_id_color[value[0], value[1], value[2]] = key
+    lookup_id_color[0,0,0] = 0              # Undefined   
+    lookup_id_color[128,64,128] = 33        # Road -> Road
+    lookup_id_color[232,35,244] = 33        # Sidewalk -> Road
+    lookup_id_color[70,70,70] = 34          # Building -> Small house
+    lookup_id_color[156,102,102] = 34       # Wall -> Small house
+    lookup_id_color[153,153,190] = 5        # Fence -> Fence
+    lookup_id_color[153,153,153] = 10       # Pole -> LightGenerator
+    lookup_id_color[30,170,250] = 19        # Traffic Light -> SignBoard
+    lookup_id_color[0,220,220] = 19         # Traffic Sign -> SignBoard
+    lookup_id_color[35,142,107] =  2        # Vegetation -> Tree
+    lookup_id_color[152,251,152] = 32       # Terrain -> Landscape
+    lookup_id_color[180,130,70] = 31        # Sky -> Sky
+    lookup_id_color[60,20,220] = 12         # Person -> Portapotty 
+    lookup_id_color[0,0,255] = 12           # Rider -> Portapotty
+    lookup_id_color[142,0,0] = 1            # Car -> Car
+    lookup_id_color[70,0,0] = 7             # Truck -> Truck
+    lookup_id_color[100,60,0] = 7           # Bus -> Truck
+    lookup_id_color[100,80,0] = 7           # Train -> Truck
+    lookup_id_color[230,0,0] = 3            # Motorcycle -> Bench
+    lookup_id_color[32,11,119] = 3          # Bicycle -> Bench 
 
     in_bag = rosbag.Bag(args.input_bag)
     out_bag = rosbag.Bag(args.output_bag, 'w')
@@ -96,13 +92,13 @@ def main():
     for topic, tf, t in in_bag.read_messages(topics=['/tf', '/tf_static']):
         out_bag.write('/tf', tf, tf.transforms[0].header.stamp, False)  
     print('Wrote all TFs!')
-
+    
     # Intrinsics (given by NCLT).
-    image_width = 1616 #u, x #646  
-    image_height = 1232 #492
+    image_width = 1616
+    image_height = 1232
 
     # Scaled intrinsics (because the images on the bag are scaled down during postprocessing).
-    scale_img = 0.4
+    scale_img = args.scale #0.4
     image_width_sc = int(scale_img*1616) #*1616) #646  
     image_height_sc = int(scale_img*1232) #*1232) #492
 
@@ -152,46 +148,6 @@ def main():
     bot_sc = bot*scale_img
     left_sc = left*scale_img
     right_sc = right*scale_img
-
-    '''
-    # Get images and semantic labels, together with timestamps.
-    images1 = []
-    img_ts = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw1'):
-        images1.append(image)
-        img_ts.append(t)    # Cause the images are not stamped. ToDo(alaturn) Fix inside nclt2ros.
-    images2 = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw2'):
-        images2.append(image)
-    images3 = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw3'):
-        images3.append(image)
-    images4 = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw4'):
-        images4.append(image)
-    images5 = []
-    for topic, image, t in in_bag.read_messages(topics='/images/raw5'):
-        images5.append(image)
-
-    labels1 = []
-    for topic, label, t in in_bag.read_messages(topics='/images/prediction1'):
-        labels1.append(label)
-    labels2 = []
-    for topic, label, t in in_bag.read_messages(topics='/images/prediction2'):
-        labels2.append(label)
-    labels3 = []
-    for topic, label, t in in_bag.read_messages(topics='/images/prediction3'):
-        labels3.append(label)
-    labels4 = []
-    for topic, label, t in in_bag.read_messages(topics='/images/prediction4'):
-        labels4.append(label)
-    labels5 = []
-    for topic, label, t in in_bag.read_messages(topics='/images/prediction5'):
-        labels5.append(label)
-    
-
-    image_iterator = 0
-    '''
 
     # Generators
     img1_gen = in_bag.read_messages(topics='/images/raw1')
@@ -251,7 +207,6 @@ def main():
                     topic, lab5, tl5 = lab5_gen.next()
     
         # Now, should be synced and should be able to go to normal mode...
-
         if first_sync:
             first_sync = False
             start_t = t
@@ -302,24 +257,6 @@ def main():
         assert (t==ti1) and (t==ti2) and (t==ti3) and (t==ti4) and (t==ti5) and (t==tl1) and (t==tl2) and (t==tl3) and (t==tl4) and (t==tl5), "Timestamp not synced!"
         i+=1
 
-        '''
-        # Forward search for getting img<->cloud correspondence. NCLT has already synced lidar and image...
-        while(img_ts[image_iterator] < lidar_pcl.header.stamp and image_iterator < len(images1)-1):
-            image_iterator += 1
-
-        current_image1 = images1[image_iterator]
-        current_image2 = images2[image_iterator]
-        current_image3 = images3[image_iterator]
-        current_image4 = images4[image_iterator]
-        current_image5 = images5[image_iterator]
-
-        current_label1 = labels1[image_iterator]
-        current_label2 = labels2[image_iterator]
-        current_label3 = labels3[image_iterator]
-        current_label4 = labels4[image_iterator]
-        current_label5 = labels5[image_iterator]
-        '''
-
         # Rotate it into native LB3 orientation.
         cv_image1 = bridge.imgmsg_to_cv2(im1, desired_encoding='bgr8')
         cv_image2 = bridge.imgmsg_to_cv2(im2, desired_encoding='bgr8')
@@ -368,11 +305,6 @@ def main():
             
             # Project onto image.
             # camera_point = np.dot(camera_intrinsics_sc, point_cam)
-            # image_coordinates = [
-                # camera_point[0] / camera_point[2],
-                # camera_point[1] / camera_point[2]]
-            # u = int(round(image_coordinates[0]))
-            # v = int(round(image_coordinates[1]))
             camera1_point = np.dot(K_cam1, point_c1)
             camera2_point = np.dot(K_cam2, point_c2)
             camera3_point = np.dot(K_cam3, point_c3)
@@ -430,53 +362,23 @@ def main():
                 bgr = cv_image5[v5, u5]
                 bgr_sem = cv_label5[v5, u5]
             else:
-                bgr = [254,254,254]
+                bgr = [255,255,255]
                 bgr_sem = [0,0,0]
 
             # Create PointXYZRGBA
             label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
             rgba = struct.unpack('I', struct.pack(
                     'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
-            aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
+            
+            aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba] # Swap back from NCLT to ROS frames.
             augmented_points.append(aug_pt)
-
-            # if camera_point[2] > 0 and u > 0 and u < image_width_sc and v > 0 and v < image_height_sc:
-            #     pt = np.array([u,v])
-
-            #     # Get color and label 'color' at projected position.
-            #     bgr = cv_image[v, u]
-            #     bgr_sem = cv_label[v, u]
-
-            #     # For viz
-            #     pt = np.append(pt, bgr_sem)
-            #     im_pts = np.vstack((im_pts, pt))               
-
-            #     # Create PointXYZRGBA (need to signswap y, z again to fit nclt2ros convention of 'base_link').
-            #     label = lookup_id_color[bgr_sem[0], bgr_sem[1], bgr_sem[2]]
-            #     rgba = struct.unpack('I', struct.pack(
-            #             'BBBB', bgr[0], bgr[1], bgr[2], int(label) * 7))[0]
-            #     aug_pt = [float(point_nclt[0]), float(-point_nclt[1]), float(-point_nclt[2]), rgba]
-            #     augmented_points.append(aug_pt)
-
-        # Draw on image.
-        # red = [0,0,255]
-        # for pt in im_pts:
-        #     # print(pt[2:].shape)
-        #     cv_image[pt[1], pt[0]] = pt[2:]
-        #     cv_label[pt[1], pt[0]] = red
-
-        # # Show overlaid image.
-        # cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
-        # cv_label = cv2.rotate(cv_label, cv2.ROTATE_90_CLOCKWISE)
-        # cv2.imshow('cv_image', cv_image)
-        # cv2.imshow('cv_label', cv_label)
-        # cv2.waitKey(1)
 
         # Create augmented cloud.
         fields = [PointField('x', 0, PointField.FLOAT32, 1),
           PointField('y', 4, PointField.FLOAT32, 1),
           PointField('z', 8, PointField.FLOAT32, 1),
           PointField('rgba', 12, PointField.UINT32, 1)]
+
         header = lidar_pcl.header
         header.frame_id = '/base_link'
         augmented_cloud = point_cloud2.create_cloud(header, fields, augmented_points)
@@ -488,7 +390,6 @@ def main():
             print('Written ' + str(i) + ' clouds!')
             print('Written ' + str(t.secs - start_t.secs) + ' seconds')
             print('Took ' + str(time.time() - time_st) + ' seconds so far to process.')
-            # ToDo: Add some more stats.
 
     out_bag.close()
     print('Bag closed!')
