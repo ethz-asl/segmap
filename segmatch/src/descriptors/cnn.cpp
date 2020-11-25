@@ -1,21 +1,29 @@
 #include "segmatch/descriptors/cnn.hpp"
 
 #include <glog/logging.h>
-#include <math.h>
+#include <cmath>
 #include <pcl/common/common.h>
 #include <pcl/common/transforms.h>
-#include <stdlib.h> /* system, NULL, EXIT_FAILURE */
-
+#include <laser_slam/benchmarker.hpp>
+#include <stdlib.h>
 #include <Eigen/Core>
 #include <algorithm>
 #include <cstdio>
-#include <laser_slam/benchmarker.hpp>
 #include <string>
 
 #include "segmatch/database.hpp"
 #include "segmatch/utilities.hpp"
 
 namespace segmatch {
+
+CNNDescriptor::CNNDescriptor(const DescriptorsParameters& parameters)
+    : params_(parameters) {
+  const std::string model_folder = parameters.cnn_model_path;
+  const std::string semantics_nn_folder = parameters.semantics_nn_path;
+
+  interface_worker_ = std::unique_ptr<TensorflowInterface>(
+      new TensorflowInterface());
+}
 
 void CNNDescriptor::describe(const Segment& segment, Features* features) {
   CHECK(false) << "Not implemented";
@@ -41,7 +49,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   BENCHMARK_START("SM.Worker.Describe.Preprocess");
   BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsTotal",
                          segmented_cloud_ptr->getNumberOfValidSegments());
-  std::vector<ns_tf_interface::Array3D> batch_nn_input;
+  std::vector<VoxelPointCloud> batch_nn_input;
   std::vector<Id> described_segment_ids;
   std::vector<PclPoint> scales;
   std::vector<PclPoint> thresholded_scales;
@@ -49,7 +57,6 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   std::vector<PclPoint> rescaled_point_cloud_centroids;
   std::vector<PclPoint> point_mins;
   std::vector<double> alignments_rad;
-  std::vector<size_t> nums_occupied_voxels;
 
   for (std::unordered_map<Id, Segment>::iterator it =
            segmented_cloud_ptr->begin();
@@ -61,8 +68,11 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     if (static_cast<double>(num_points) <
         static_cast<double>(
             it->second.getLastView().n_points_when_last_described) *
-            (1.0 + kMinChangeBeforeDescription))
+            (1.0 + kMinChangeBeforeDescription)) {
       continue;
+    }
+
+    it->second.getLastView().n_points_when_last_described = num_points;
     described_segment_ids.push_back(it->second.segment_id);
 
     // Align with PCA.
@@ -94,7 +104,7 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     PclPoint point_min, point_max;
     pcl::getMinMax3D(rotated_point_cloud, point_min, point_max);
     double centroid_y = point_min.y + (point_max.y - point_min.y) / 2.0;
-    unsigned int n_below = 0;
+    uint32_t n_below = 0;
     for (const auto& point : rotated_point_cloud.points) {
       if (point.y < centroid_y) ++n_below;
     }
@@ -109,12 +119,6 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
     }
 
     alignments_rad.push_back(alignment_rad);
-
-    if (save_debug_data_) {
-      Segment aligned_segment = it->second;
-      aligned_segment.getLastView().point_cloud = rotated_point_cloud;
-      aligned_segments_.addValidSegment(aligned_segment);
-    }
 
     PointCloud rescaled_point_cloud;
     pcl::getMinMax3D(rotated_point_cloud, point_min, point_max);
@@ -148,41 +152,42 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
                     static_cast<float>(n_voxels_y_dim_ - 1u);
       point_new.z = (point.z - point_min.z) / thresholded_scale.z *
                     static_cast<float>(n_voxels_z_dim_ - 1u);
+      point_new.rgba = point.rgba;
 
       rescaled_point_cloud.points.push_back(point_new);
     }
+
     rescaled_point_cloud.width = 1;
     rescaled_point_cloud.height = rescaled_point_cloud.points.size();
 
     PclPoint centroid = calculateCentroid(rescaled_point_cloud);
     rescaled_point_cloud_centroids.push_back(centroid);
 
-    unsigned int n_occupied_voxels = 0;
-
-    ns_tf_interface::Array3D nn_input(n_voxels_x_dim_, n_voxels_y_dim_,
-                                      n_voxels_z_dim_);
+    VoxelPointCloud voxel_point_cloud;
     for (const auto& point : rescaled_point_cloud.points) {
-      const unsigned int ind_x = floor(
+      const uint32_t ind_x = floor(
           point.x + static_cast<float>(n_voxels_x_dim_ - 1) / 2.0 - centroid.x);
-      const unsigned int ind_y = floor(
+      const uint32_t ind_y = floor(
           point.y + static_cast<float>(n_voxels_y_dim_ - 1) / 2.0 - centroid.y);
-      const unsigned int ind_z = floor(
+      const uint32_t ind_z = floor(
           point.z + static_cast<float>(n_voxels_z_dim_ - 1) / 2.0 - centroid.z);
 
       if (ind_x >= 0 && ind_x < n_voxels_x_dim_ && ind_y >= 0 &&
           ind_y < n_voxels_y_dim_ && ind_z >= 0 && ind_z < n_voxels_z_dim_) {
-        if (nn_input.container[ind_x][ind_y][ind_z] == 0.0) {
-          ++n_occupied_voxels;
-        }
-        nn_input.container[ind_x][ind_y][ind_z] = 1.0;
+        VoxelPoint voxel_point;
+        voxel_point.x = ind_x;
+        voxel_point.y = ind_y;
+        voxel_point.z = ind_z;
+        voxel_point.r = (point.rgba >> 16) & 0xff;
+        voxel_point.g = (point.rgba >> 8) & 0xff;
+        voxel_point.b = point.rgba & 0xff;
+        voxel_point.semantic_class = ((point.rgba >> 24) & 0xff) / 7;
+
+        voxel_point_cloud.push_back(voxel_point);
       }
     }
-    nums_occupied_voxels.push_back(n_occupied_voxels);
 
-    it->second.getLastView().n_occupied_voxels = n_occupied_voxels;
-    it->second.getLastView().n_points_when_last_described = num_points;
-
-    batch_nn_input.push_back(nn_input);
+    batch_nn_input.push_back(voxel_point_cloud);
   }
   BENCHMARK_RECORD_VALUE("SM.Worker.Describe.NumSegmentsDescribed",
                          batch_nn_input.size());
@@ -191,31 +196,33 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
   std::cout << "PROCESSING SEGMENTS " << batch_nn_input.size() << std::endl;
   if (!batch_nn_input.empty()) {
     BENCHMARK_START("SM.Worker.Describe.ForwardPass");
-    std::vector<std::vector<float> > cnn_descriptors;
-    std::vector<ns_tf_interface::Array3D> reconstructions;
-    std::vector<std::vector<float> > semantics;
+    std::vector<std::vector<float>> cnn_descriptors;
+    std::vector<PointCloud> reconstructions;
+    std::vector<std::vector<float>> semantics;
     if (batch_nn_input.size() < mini_batch_size_) {
 
-      interface_worker_.batchFullForwardPass(
+      interface_worker_->batchFullForwardPass(
           batch_nn_input, kInputTensorName, scales_as_vectors,
           kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
           cnn_descriptors, reconstructions);
 
 
     } else {
-      std::vector<ns_tf_interface::Array3D> mini_batch;
+      std::vector<VoxelPointCloud> mini_batch;
       std::vector<std::vector<float> > mini_batch_scales;
       for (size_t i = 0u; i < batch_nn_input.size(); ++i) {
         if ((i+1) % 100 == 0) {
           std::cout << "Progress " << i << std::endl;
         }
+
         mini_batch.push_back(batch_nn_input[i]);
         mini_batch_scales.push_back(scales_as_vectors[i]);
-        if (mini_batch.size() == mini_batch_size_) {
-          std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-          std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
 
-          interface_worker_.batchFullForwardPass(
+        if (mini_batch.size() == mini_batch_size_ || i == batch_nn_input.size() - 1) {
+          std::vector<std::vector<float> > mini_batch_cnn_descriptors;
+          std::vector<PointCloud> mini_batch_reconstructions;
+
+          interface_worker_->batchFullForwardPass(
               mini_batch, kInputTensorName, mini_batch_scales,
               kScalesTensorName, kFeaturesTensorName, kReconstructionTensorName,
               mini_batch_cnn_descriptors, mini_batch_reconstructions);
@@ -226,37 +233,22 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
           reconstructions.insert(reconstructions.end(),
                                  mini_batch_reconstructions.begin(),
                                  mini_batch_reconstructions.end());
+
           mini_batch_scales.clear();
           mini_batch.clear();
         }
       }
-      if (!mini_batch.empty()) {
-        std::vector<std::vector<float> > mini_batch_cnn_descriptors;
-        std::vector<ns_tf_interface::Array3D> mini_batch_reconstructions;
-
-        interface_worker_.batchFullForwardPass(
-            mini_batch, kInputTensorName, mini_batch_scales, kScalesTensorName,
-            kFeaturesTensorName, kReconstructionTensorName,
-            mini_batch_cnn_descriptors, mini_batch_reconstructions);
-
-        cnn_descriptors.insert(cnn_descriptors.end(),
-                               mini_batch_cnn_descriptors.begin(),
-                               mini_batch_cnn_descriptors.end());
-        reconstructions.insert(reconstructions.end(),
-                               mini_batch_reconstructions.begin(),
-                               mini_batch_reconstructions.end());
-      }
     }
 
     // Execute semantics graph.
-    semantics = interface_worker_.batchExecuteGraph(
+    semantics = interface_worker_->batchExecuteGraph(
         cnn_descriptors, kInputTensorName, kSemanticsOutputName);
 
     CHECK_EQ(cnn_descriptors.size(), described_segment_ids.size());
     BENCHMARK_STOP("SM.Worker.Describe.ForwardPass");
 
-    BENCHMARK_START("SM.Worker.Describe.SaveFeatures");
     // Write the features.
+    BENCHMARK_START("SM.Worker.Describe.SaveFeatures");
     for (size_t i = 0u; i < described_segment_ids.size(); ++i) {
       Segment* segment;
       CHECK(segmented_cloud_ptr->findValidSegmentPtrById(
@@ -283,83 +275,27 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
                                          semantic_nn_output.end()));
 
       // Generate the reconstructions.
-      PointCloud reconstruction;
+      /*PointCloud reconstruction;
       const double reconstruction_threshold = 0.75;
-      const double ratio_voxels_to_reconstruct = 1.5;
-      const bool reconstruct_by_probability = true;
 
       PclPoint point;
       const PclPoint point_min = point_mins[i];
       const PclPoint scale = thresholded_scales[i];
       const PclPoint centroid = rescaled_point_cloud_centroids[i];
 
-      if (reconstruct_by_probability) {
-        for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
-          for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
-            for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
-              if (reconstructions[i].container[x][y][z] >=
-                  reconstruction_threshold) {
-                point.x = point_min.x + scale.x *
-                                            (static_cast<float>(x) -
-                                             x_dim_min_1_ / 2.0 + centroid.x) /
-                                            x_dim_min_1_;
-                point.y = point_min.y + scale.y *
-                                            (static_cast<float>(y) -
-                                             y_dim_min_1_ / 2.0 + centroid.y) /
-                                            y_dim_min_1_;
-                point.z = point_min.z + scale.z *
-                                            (static_cast<float>(z) -
-                                             z_dim_min_1_ / 2.0 + centroid.z) /
-                                            z_dim_min_1_;
-                reconstruction.points.push_back(point);
-              }
+      for (uint32_t x = 0u; x < n_voxels_x_dim_; ++x) {
+        for (uint32_t y = 0u; y < n_voxels_y_dim_; ++y) {
+          for (uint32_t z = 0u; z < n_voxels_z_dim_; ++z) {
+            if (reconstructions[i].at(x, y, z) >= reconstruction_threshold) {
+              point.x = point_min.x + scale.x * (static_cast<float>(x) -
+                  x_dim_min_1_ / 2.0 + centroid.x) / x_dim_min_1_;
+              point.y = point_min.y + scale.y * (static_cast<float>(y) -
+                  y_dim_min_1_ / 2.0 + centroid.y) / y_dim_min_1_;
+              point.z = point_min.z + scale.z * (static_cast<float>(z) -
+                  z_dim_min_1_ / 2.0 + centroid.z) / z_dim_min_1_;
+              reconstruction.points.push_back(point);
             }
           }
-        }
-      } else {
-        const unsigned int n_voxels_in_original_segment =
-            nums_occupied_voxels[i];
-        const unsigned int n_voxels_in_reconstructed_segment = floor(
-            double(n_voxels_in_original_segment) * ratio_voxels_to_reconstruct);
-
-        // Order by occupancy probability.
-        std::vector<double> probs;
-        std::vector<PclPoint> indices;
-        for (unsigned int x = 0u; x < n_voxels_x_dim_; ++x) {
-          for (unsigned int y = 0u; y < n_voxels_y_dim_; ++y) {
-            for (unsigned int z = 0u; z < n_voxels_z_dim_; ++z) {
-              // probs.push_back(reconstructions[i].container[x][y][z]);
-              PclPoint indice;
-              indice.x = x;
-              indice.y = y;
-              indice.z = z;
-              indices.push_back(indice);
-            }
-          }
-        }
-        std::vector<size_t> indexes_in_decreasing_order =
-            getIndexesInDecreasingOrdering(probs);
-
-        for (unsigned int j = 0u; j < n_voxels_in_reconstructed_segment; ++j) {
-          point.x = point_min.x +
-                    scale.x *
-                        (static_cast<float>(
-                             indices[indexes_in_decreasing_order[j]].x) -
-                         x_dim_min_1_ / 2.0 + centroid.x) /
-                        x_dim_min_1_;
-          point.y = point_min.y +
-                    scale.y *
-                        (static_cast<float>(
-                             indices[indexes_in_decreasing_order[j]].y) -
-                         y_dim_min_1_ / 2.0 + centroid.y) /
-                        y_dim_min_1_;
-          point.z = point_min.z +
-                    scale.z *
-                        (static_cast<float>(
-                             indices[indexes_in_decreasing_order[j]].z) -
-                         z_dim_min_1_ / 2.0 + centroid.z) /
-                        z_dim_min_1_;
-          reconstruction.points.push_back(point);
         }
       }
 
@@ -370,29 +306,12 @@ void CNNDescriptor::describe(SegmentedCloud* segmented_cloud_ptr) {
       transform.rotate(
           Eigen::AngleAxisf(-alignments_rad[i], Eigen::Vector3f::UnitZ()));
       pcl::transformPointCloud(reconstruction, reconstruction, transform);
-      segment->getLastView().reconstruction = reconstruction;
-
-      // TODO RD remove if compressing reconstruction not needed.
-      /*unsigned int publish_every_x_points = 5;
-      segment->getLastView().reconstruction_compressed.clear();
-      segment->getLastView().reconstruction_compressed.reserve(reconstruction.points.size()
-      / publish_every_x_points); unsigned int z = 0; for (const auto& point :
-      reconstruction.points) { if (z % publish_every_x_points == 0) {
-            segment->getLastView().reconstruction_compressed.points.emplace_back(point.x,
-      point.y, point.z);
-        }
-        ++z;
-      }*/
+      segment->getLastView().reconstruction = reconstruction;*/
     }
     BENCHMARK_STOP("SM.Worker.Describe.SaveFeatures");
   }
 }
 
-void CNNDescriptor::exportData() const {
-  if (save_debug_data_) {
-    database::exportSegmentsAndFeatures("/tmp/aligned_segments",
-                                        aligned_segments_, true);
-  }
-}
+void CNNDescriptor::exportData() const {}
 
 }  // namespace segmatch
