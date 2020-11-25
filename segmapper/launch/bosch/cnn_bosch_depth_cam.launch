@@ -6,18 +6,14 @@
   <!-- boolean: true, false -->
 
   <!-- Bag file path -->
-
-  <!-- bosch_augmented_1_cam.bag -->
-  <!-- train-map-augmented.bag">
-  <!-/- <arg name="bag_file" value="/media/scratch1/mariusbr/bosch.bag"/> -->
   <arg name="bag_file" value="/mnt/scratch1/bosch/2020-10-21/opposite-loop-augmented.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
-  <arg name="rviz_config_file" value="/media/nikhilesh/Nikhilesh/SemSegMap/Bags/KITTI/kitti_localization.rviz"/>
+  <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
-  <rosparam>use_sim_time: true</rosparam>
+  <rosparam>use_sim_time: false</rosparam>
   <rosparam command="load" file="$(find segmapper)/launch/bosch/cnn_bosch_depth_cam.yaml"/>
 
   <!-- Target cloud -->
@@ -51,8 +47,5 @@
   <node pkg="noiser" name="noiser" type="noiser" output="screen">
   <rosparam command="load" file="$(find noiser)/config/noiser_config.yaml"/>
   </node>
-
-  <!-- <include file="$(find noiser)/launch/tf_drift_node.launch"/> -->
-
 
 </launch>
