@@ -41,11 +41,8 @@ cs_add_library(${PROJECT_NAME}
   src/segmenters/segmenter_factory.cpp
   src/segmenters/smoothness_constraints_segmenter.cpp
 )
+
 target_link_libraries(${PROJECT_NAME})
-
-cs_add_executable(fpfh_tester test/fpfh_debug.cpp)
-target_link_libraries(fpfh_tester ${PROJECT_NAME})
-
 find_package(Boost REQUIRED COMPONENTS system thread)
 
 catkin_add_gtest(${PROJECT_NAME}_tests

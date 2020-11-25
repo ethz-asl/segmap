@@ -5,15 +5,13 @@
   <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
 
   <!-- Bag file path -->
-  <!-- <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_09_30_drive_18.bag"/> -->
-  <arg name="bag_file" value="/home/andrei/src/segmap/augmented_bosch.bag"/>
+  <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_09_30_drive_18.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
 
   <!-- Rviz visualization config file path -->
   <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
-  <rosparam>use_sim_time: true</rosparam>
   <rosparam command="load" file="$(find segmapper)/launch/kitti/cnn_kitti_loop_closure.yaml"/>
 
   <!-- rviz node -->
@@ -34,7 +32,7 @@
   </include>
 
     <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -q -r 1 -s 0 --clock --pause $(arg bag_file)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -q -r 1 -s 0 --pause $(arg bag_file)"/>
 
     <!-- Tensorflow interface -->
   <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen">

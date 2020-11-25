@@ -51,7 +51,7 @@ void SegmentedCloud::addSegmentedCloud(
     // Delete the old segment
     valid_segments_.erase(renamed_segment.first);
   }
-  cleanEmptySegments(); 
+  cleanEmptySegments();
 }
 
 void SegmentedCloud::addValidSegment(const Segment& segment_to_add) {
@@ -71,8 +71,6 @@ void SegmentedCloud::addValidSegment(const Segment& segment_to_add) {
     segment_in_cloud.getLastView().centroid = segment_to_add.views[0u].centroid;
     segment_in_cloud.getLastView().timestamp_ns = segment_to_add.views[0u].timestamp_ns;
     segment_in_cloud.getLastView().T_w_linkpose = segment_to_add.views[0u].T_w_linkpose;
-    segment_in_cloud.getLastView().n_occupied_voxels =
-        segment_to_add.views[0u].n_occupied_voxels;
     segment_in_cloud.getLastView().n_points_when_last_described =
         segment_to_add.views[0u].n_points_when_last_described;
   }
@@ -146,12 +144,12 @@ PointCloud SegmentedCloud::centroidsAsPointCloud(
   result.width = getNumberOfValidSegments();
   result.height = 1;
   for (const auto& id_segment: valid_segments_) {
-      
+
     if(!id_segment.second.empty()) {
     PclPoint new_point = id_segment.second.getLastView().centroid;
     result.points.push_back(new_point);
     // Export the segment ids if desired.
-    
+
     segment_id_for_each_point.push_back(id_segment.first);
     } else {
         LOG(INFO) << "was empty";
@@ -162,7 +160,7 @@ PointCloud SegmentedCloud::centroidsAsPointCloud(
 
     CHECK(segment_id_for_each_point.size() == result.size()) <<
         "Each point should have a single segment id.";
-  
+
   return result;
 }
 

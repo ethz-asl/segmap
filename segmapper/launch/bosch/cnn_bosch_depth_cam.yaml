@@ -43,8 +43,8 @@ SegMapper: {
 
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: false,
-  close_loops: true,
+  localize: true,
+  close_loops: false,
 
   distance_between_segmentations_m: 0.0,
 
@@ -94,8 +94,8 @@ SegMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 15, #25
-     knn_feature_dim: 33, #33, #64, #64
+     n_nearest_neighbours: 4, #25
+     knn_feature_dim: 64, #64
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 100, #25
@@ -108,8 +108,8 @@ SegMapper: {
 
     GeometricConsistency: {
       recognizer_type: "Simple", #"Simple", "Partitioned"
-      resolution: 0.6, #0.0001, #0.6,
-      min_cluster_size: 6, #1000, #5,
+      resolution: 0.4,
+      min_cluster_size: 6,
       max_consistency_distance_for_caching: 10.0,
     }
   },

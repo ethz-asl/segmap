@@ -1,5 +1,5 @@
 noise_mean: 0.0
-noise_stddev: 0.1
+noise_stddev: 0.3
 
 input_topic_name: "/augmented_cloud"
 output_topic_name: "/noisy_cloud"

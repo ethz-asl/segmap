@@ -12,9 +12,9 @@ SegMapper: {
     use_odometry_information: true,
 
     odom_frame: "world",
-    sensor_frame: "airsim_drone/Lidar",
+    sensor_frame: "velodyne",
 
-    assembled_cloud_sub_topic: "/augmented_cloud",
+    assembled_cloud_sub_topic: "/velodyne_points",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -69,19 +69,19 @@ SegMapper: {
 
     Segmenters: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
-      min_cluster_size: 50,
+      min_cluster_size: 100,
       max_cluster_size: 15000,
-      radius_for_growing: 0.5
+      radius_for_growing: 0.2
     },
 
     Descriptors: {
-      descriptor_types: ["EigenvalueBased"]
+      descriptor_types: ["CNN"]
     },
 
     Classifier: {
      threshold_to_accept_match: 0.65,
      n_nearest_neighbours: 25, #25
-     knn_feature_dim: 7, #32
+     knn_feature_dim: 64, #32
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 100, #25

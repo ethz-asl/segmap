@@ -114,9 +114,6 @@ class Preprocessor(object):
             if normalize and self._scaler_exists:
                 segments = self._normalize_voxel_matrix(segments)
 
-        if not self.color:
-            segments = segments[..., np.newaxis]
-
         return segments
 
     def get_n_batches(self, train=True):
@@ -318,7 +315,7 @@ class Preprocessor(object):
         if self.color:
             voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (3 + self.n_semcls,))
         else:
-            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels))
+            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (1,))
 
         for i, segment in enumerate(segments):
             # remove out of bounds points

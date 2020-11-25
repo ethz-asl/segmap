@@ -102,7 +102,7 @@ SegMapper::SegMapper(ros::NodeHandle& n) : nh_(n) {
   if (segmatch_worker_params_.localize || segmatch_worker_params_.close_loops) {
     segmatch_worker_.init(n, segmatch_worker_params_, params_.number_of_robots);
   }
-  
+
   for (size_t i = 0u; i < laser_slam_workers_.size(); ++i) {
       skip_counters_.push_back(0u);
       first_points_received_.push_back(false);
@@ -313,9 +313,6 @@ void SegMapper::segMatchThread() {
     skip_counters_[track_id] = 0u;
     BENCHMARK_STOP("SM");
   }
-
-  Benchmarker::logStatistics(LOG(INFO));
-  Benchmarker::saveData();
 }
 
 bool SegMapper::saveMapServiceCall(segmapper::SaveMap::Request& request,
