@@ -1,8 +1,10 @@
 # Script to split augmented cloud into a fully colored one and and full
 # semantic colors with Alpha=1.
 import argparse
+import numpy as np
 import struct
 import sys
+
 
 import rosbag
 import rospy
@@ -39,21 +41,31 @@ def main():
     parser = argparse.ArgumentParser(description="Augment Point Cloud")
     parser.add_argument('input_bag', metavar='input_bag', type=str, help='bag file with LiDAR, image, labels and TF')
     parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
+    parser.add_argument('ids_to_remove', metavar='id2del', type=str, help='comma separated list of semantic IDs to remove')
     args = parser.parse_args()
 
+    print(args.ids_to_remove)
     in_bag = rosbag.Bag(args.input_bag)
     out_bag = rosbag.Bag(args.output_bag, 'w')
+    deletion_lbl_ids = map(int, args.ids_to_remove.split(','))
+    print('Points with the following semantic labels will be removed!')
+    print(deletion_lbl_ids)
+    print(44 in deletion_lbl_ids)
     i=0
     for topic, pcl, t in in_bag.read_messages(topics=['/augmented_cloud']):
         i+=1
         print(i)
         print(t)
         points = point_cloud2.read_points(pcl)
-        color_points = []
-        sem_points = []
+        color_points = [] # Points with real BGR
+        sem_points = [] # Points with semantic BGR
+        aug_point_gs = [] # Points without labels representing ground (road, landscape,...)
 
         for point in points:
+          # Extract BGR and Alpha (semantic label).
           bgra = struct.unpack('BBBB', struct.pack('I', point[3]))  # Why did we call the field rgba, even though it's bgra?
+          
+          # Color cloud.
           color_points.append([point[0],
             point[1],
             point[2],
@@ -61,9 +73,10 @@ def main():
             float(bgra[1] /255.0),
             float(bgra[2] /255.0)])
 
-          # Lookup semantic color.
+          # Lookup semantic label.
           label = int(bgra[3]/7.0)
 
+          # Semantic cloud.
           bgr_sem = segmentation_id_color.get(label,[0,0,0])
           sem_points.append([point[0],
             point[1],
@@ -72,19 +85,35 @@ def main():
             float(bgr_sem[1]),
             float(bgr_sem[2])])
 
-        fields = [PointField('x', 0, PointField.FLOAT32, 1),
+          # Filtered cloud without certain labels.
+          if not(label in deletion_lbl_ids):
+            aug_point_gs.append(point)
+
+
+        fields_xyzbgr = [PointField('x', 0, PointField.FLOAT32, 1),
           PointField('y', 4, PointField.FLOAT32, 1),
           PointField('z', 8, PointField.FLOAT32, 1),
           PointField('b', 12, PointField.FLOAT32, 1),
           PointField('g', 16, PointField.FLOAT32, 1),
           PointField('r', 20, PointField.FLOAT32, 1)]
 
+        fields_xyzbgra = [PointField('x', 0, PointField.FLOAT32, 1),
+          PointField('y', 4, PointField.FLOAT32, 1),
+          PointField('z', 8, PointField.FLOAT32, 1),
+          PointField('rgba', 12, PointField.UINT32, 1)]
+
+
         header = pcl.header
-        color_cloud = point_cloud2.create_cloud(header, fields, color_points)
-        sem_cloud = point_cloud2.create_cloud(header, fields, sem_points)
+        color_cloud = point_cloud2.create_cloud(header, fields_xyzbgr, color_points)
+        sem_cloud = point_cloud2.create_cloud(header, fields_xyzbgr, sem_points)
+        seg_cloud = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs) # Input cloud but with certain labels segmented out.
 
         out_bag.write('/rgb_cloud', color_cloud, color_cloud.header.stamp, False)
         out_bag.write('/sem_cloud', sem_cloud, sem_cloud.header.stamp, False)
+        out_bag.write('/augmented_cloud_no_ground', seg_cloud, seg_cloud.header.stamp, False)
+
+    print('Finished!')
+    out_bag.close()
    
 
 if __name__ == '__main__':
