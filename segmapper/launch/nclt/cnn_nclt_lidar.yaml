@@ -12,8 +12,8 @@ SegMapper: {
     use_odometry_information: true,
 
     odom_frame: "world",
-    sensor_frame: "airsim_drone",
-    assembled_cloud_sub_topic: "/noisy_cloud",
+    sensor_frame: "ground_truth_link",
+    assembled_cloud_sub_topic: "/augmented_cloud_no_ground", #/augmented_cloud", #"/noisy_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -26,7 +26,7 @@ SegMapper: {
     publish_full_map: false,
     map_publication_rate_hz: 3,
     ########ODOMETRY NOISER########
-    enable_drift: true,
+    enable_drift: false,
     sensor_drifted_frame: "airsim_drone_drift",
     noise_x_mean: 0.0,
     noise_y_mean: 0.0,
@@ -74,7 +74,7 @@ SegMapper: {
     LocalMap: {
       voxel_size_m: 0.1,
       min_points_per_voxel: 1,
-      radius_m: 50,
+      radius_m: 50.0,
       min_vertical_distance_m: -999.0,
       max_vertical_distance_m: 999.0,
       neighbors_provider_type: "KdTree",
@@ -82,10 +82,13 @@ SegMapper: {
 
     Segmenters: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
-      min_cluster_size: 50,
-      max_cluster_size: 30000,
-      radius_for_growing: 0.2
+      # (!) Sensor Dependent Tunings (sparser LiDAR -> Less points in cloud & larger gaps).
+      min_cluster_size: 100, # (!) Minimum number of points for a segment to be valid (if too low, noise).
+      max_cluster_size: 15000,  # (!) Maximum number of points for a segment to be valid (if too high, very undefined centroid).
+      radius_for_growing: 0.35 #0.2 # (!) Maximum distance between two points for them to be able to belong to the same cluster. Has to be >= voxel_size from local mapper.
     },
+
+    # (!) Get Local Map and Segmenter right first, then build map, then tune classifier and RANSAC!
 
     Descriptors: {
       descriptor_types: ["FPFH"], # "EigenvalueBased"], # EigenvalueBased
@@ -94,8 +97,8 @@ SegMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 4, #25
-     knn_feature_dim: 64, #64
+     n_nearest_neighbours: 32, #25  # (!) Number of NN (can be tuned from Segmappy plot). Trade off between segment completeness (~50%) & small search space (< 30 NN)
+     knn_feature_dim: 33, #64, #32
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 100, #25
@@ -106,10 +109,13 @@ SegMapper: {
      do_not_use_cars: false,
     },
 
-    GeometricConsistency: {
+    GeometricConsistency: { # (!) Quality Metric: Matched lines in Viz should be parallel, without criss-crosses.
+      # Type of RANSAC to use.
       recognizer_type: "Simple", #"Simple", "Partitioned"
-      resolution: 0.4,
-      min_cluster_size: 6,
+      # (!) The amount of jitter allowed in the centroid distance between segments in the source and target maps.
+      resolution: 0.4,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
+      # (!) Minimum number of inliers needed to calculate transform between two positions in either LC or LOC mode.
+      min_cluster_size: 6, # (!) Between 5-7 usually
       max_consistency_distance_for_caching: 10.0,
     }
   },
