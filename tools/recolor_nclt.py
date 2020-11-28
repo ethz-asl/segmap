@@ -110,40 +110,27 @@ def main():
           #####################################
 
         # GS v2################################
-        print('Number of obvious ground_points: ' + str(len(obvious_ground_pts)))
-        print('Number of potential ground points: ' + str(len(potential_ground_pts)))
-        print('Number of safe points: ' + str(len(aug_point_gs2)))
 
         # Fit RANSAC plane.
         obvious_ground_pts = np.asarray(obvious_ground_pts)
-        print('obvious_ground_pts: ' + str(obvious_ground_pts.shape))
         XY_ground = obvious_ground_pts[:,:2]
         Z_ground = obvious_ground_pts[:,2]
         ransac = linear_model.RANSACRegressor(linear_model.LinearRegression())
         ransac.fit(XY_ground, Z_ground)
-        print('Fitted plane!')
 
         # Second pass for potential ground points.
         del_cand = np.asarray(potential_ground_pts)
-        print('del_cand' + str(del_cand.shape))
         Z_cand = ransac.predict(del_cand[:,:2])
-        print('Z_cand: ' + str(Z_cand.shape))
         keep = np.square((Z_cand - del_cand[:,2])) > np.square(0.7) # Any deletion candidate that is within 70cm of the ground plane is considered ground as well.
-        print('keep: ' + str(keep.shape))
         keep_second = del_cand[keep]
-        print('keep_second: ' + str(keep_second.shape))
-        keep_second = keep_second.tolist()
-        print('keep_second: ' + str(len(keep_second)))
-        print(keep_second[0])
         
         # Final selection of good points.
-        print('safe points: ' + str(len(aug_point_gs2)))
         print(aug_point_gs2[0])
         print(np.array(aug_point_gs2).shape)
-        aug_point_gs2.append(keep_second)   # Something fucks up here....
+        aug_point_gs2 = (np.vstack((np.asarray(aug_point_gs2),np.asarray(keep_second)))).tolist()
+
+        # aug_point_gs2.append(keep_second)   # Something fucks up here....
         print(np.array(aug_point_gs2).shape)
-        print('Final safe points: ' + str(len(aug_point_gs2)))
-        print('Fun: ' + str(np.array(aug_point_gs2).shape))
         ########################################
 
         fields_xyzbgr = [PointField('x', 0, PointField.FLOAT32, 1),
