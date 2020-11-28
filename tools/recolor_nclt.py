@@ -130,7 +130,15 @@ def main():
         aug_point_gs2 = (np.vstack((np.asarray(aug_point_gs2),np.asarray(keep_second)))).tolist()
 
         # aug_point_gs2.append(keep_second)   # Something fucks up here....
-        print(np.array(aug_point_gs2).shape)
+        # print(np.array(aug_point_gs2).shape)
+
+        # For Viz, create a cloud for the found plane.
+        X_plane, Y_plane = np.mgrid[-10:10:40j, -10:10:40j]
+        positions = np.vstack([X_plane.ravel(), Y_plane.ravel()])
+        Z_plane = ransac.predict(positions.transpose())
+        plane_points = np.vstack((positions,Z_plane,np.zeros(positions.shape[1]),np.zeros(positions.shape[1]),np.ones(positions.shape[1])))
+        plane_points = plane_points.transpose()
+        plane_points = plane_points.tolist()
         ########################################
 
         fields_xyzbgr = [PointField('x', 0, PointField.FLOAT32, 1),
@@ -151,11 +159,13 @@ def main():
         sem_cloud = point_cloud2.create_cloud(header, fields_xyzbgr, sem_points)
         seg_cloud = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs) # Input cloud but with certain labels segmented out.
         seg_cloud2 = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs2)
+        ransac_plane = point_cloud2.create_cloud(header, fields_xyzbgr, plane_points)
 
         out_bag.write('/rgb_cloud', color_cloud, color_cloud.header.stamp, False)
         out_bag.write('/sem_cloud', sem_cloud, sem_cloud.header.stamp, False)
         out_bag.write('/augmented_cloud_no_ground', seg_cloud, seg_cloud.header.stamp, False)
         out_bag.write('/augmented_cloud_no_ground2', seg_cloud2, seg_cloud2.header.stamp, False)
+        out_bag.write('/ransac_ground_plane', ransac_plane, ransac_plane.header.stamp, False)
 
     print('Finished!')
     out_bag.close()
