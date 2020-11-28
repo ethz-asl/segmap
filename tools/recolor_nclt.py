@@ -18,7 +18,7 @@ from sklearn import linear_model
 def main():
     # BGR semantic colors.
     segmentation_id_color = {1:[42,174,203], 
-      2:[224,172,177], 
+      2:[224,172,177],  # Vegetation
       3:[145,183,160],  # Bicycle/Motorcycle
       4:[137,241,224], 
       5:[132,224,232],  # Fence
@@ -26,9 +26,9 @@ def main():
       7:[227,217,179], 
       8:[91,214,208], 
       9:[219,213,192], 
-      10:[229,90,95], 
+      10:[229,90,95],   # 
       11:[248,71,170], 
-      12:[199,173,249],
+      12:[199,173,249], # Portapotty (person/rider)
       13:[205,228,85], 
       14:[208,160,121], 
       15:[180,238,141], 
@@ -50,11 +50,21 @@ def main():
     print(args.ids_to_remove)
     in_bag = rosbag.Bag(args.input_bag)
     out_bag = rosbag.Bag(args.output_bag, 'w')
-    deletion_lbl_ids = map(int, args.ids_to_remove.split(','))
-    potential_lbl_ids = map(int, args.potential_ids_to_remove.split(','))
-    print('Points with the following semantic labels will be removed!')
+    if args.ids_to_remove == '':
+      deletion_lbl_ids = [32,33]
+    else:
+      deletion_lbl_ids = map(int, args.ids_to_remove.split(','))
+    if args.potential_ids_to_remove == '':
+      potential_lbl_ids = [0,2, 10, 34]
+    else:
+      potential_lbl_ids = map(int, args.potential_ids_to_remove.split(','))
+    
+    print('Obvious ground labels: ')
     print(deletion_lbl_ids)
-    print(44 in deletion_lbl_ids)
+    print('Potential ground labels')
+    print(potential_lbl_ids)
+
+    # Process clouds
     i=0
     for topic, pcl, t in in_bag.read_messages(topics=['/augmented_cloud']):
         i+=1
@@ -163,8 +173,8 @@ def main():
 
         out_bag.write('/rgb_cloud', color_cloud, color_cloud.header.stamp, False)
         out_bag.write('/sem_cloud', sem_cloud, sem_cloud.header.stamp, False)
-        out_bag.write('/augmented_cloud_no_ground', seg_cloud, seg_cloud.header.stamp, False)
-        out_bag.write('/augmented_cloud_no_ground2', seg_cloud2, seg_cloud2.header.stamp, False)
+        out_bag.write('/augmented_cloud_no_ground_orig', seg_cloud, seg_cloud.header.stamp, False)
+        out_bag.write('/augmented_cloud_no_ground', seg_cloud2, seg_cloud2.header.stamp, False)
         out_bag.write('/ransac_ground_plane', ransac_plane, ransac_plane.header.stamp, False)
 
     print('Finished!')
