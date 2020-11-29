@@ -121,34 +121,59 @@ def main():
 
         # GS v2################################
 
-        # Fit RANSAC plane.
-        obvious_ground_pts = np.asarray(obvious_ground_pts)
-        XY_ground = obvious_ground_pts[:,:2]
-        Z_ground = obvious_ground_pts[:,2]
-        ransac = linear_model.RANSACRegressor(linear_model.LinearRegression())
-        ransac.fit(XY_ground, Z_ground)
+        # Ground Segmentation.
+        # Fit RANSAC plane based on prior.
+        if len(obvious_ground_pts) > 0:
+          obvious_ground_pts = np.asarray(obvious_ground_pts)
+          XY_ground = obvious_ground_pts[:,:2]
+          Z_ground = obvious_ground_pts[:,2]
+          ransac = linear_model.RANSACRegressor(linear_model.LinearRegression())
+          try:
+            ransac.fit(XY_ground, Z_ground)
+            plane_found = True
+          except ValueError:
+            print("RANSAC Value Error!")
+            plane_found = False
 
-        # Second pass for potential ground points.
-        del_cand = np.asarray(potential_ground_pts)
-        Z_cand = ransac.predict(del_cand[:,:2])
-        keep = np.square((Z_cand - del_cand[:,2])) > np.square(0.7) # Any deletion candidate that is within 70cm of the ground plane is considered ground as well.
-        keep_second = del_cand[keep]
-        
-        # Final selection of good points.
-        print(aug_point_gs2[0])
-        print(np.array(aug_point_gs2).shape)
-        aug_point_gs2 = (np.vstack((np.asarray(aug_point_gs2),np.asarray(keep_second)))).tolist()
+          # Second pass for potential ground points.
+          del_cand = np.asarray(potential_ground_pts)
+          if plane_found and len(potential_ground_pts) > 0:
+            Z_cand = ransac.predict(del_cand[:,:2])
+            keep = np.square((Z_cand - del_cand[:,2])) > np.square(0.7) # Any deletion candidate that is within 70cm of the ground plane is considered ground as well.
+            keep_second = del_cand[keep]
+            stack = True
+          elif plane_found and len(potential_ground_pts) == 0:
+            stack = False          
+          else:
+            keep_second = del_cand
+            stack = True
 
-        # aug_point_gs2.append(keep_second)   # Something fucks up here....
-        # print(np.array(aug_point_gs2).shape)
+          # Final selection of good points.
+          if len(aug_point_gs2) > 0 and stack:
+            print(aug_point_gs2[0])
+            print(np.array(aug_point_gs2).shape)
+            aug_point_gs2 = (np.vstack((np.asarray(aug_point_gs2),np.asarray(keep_second)))).tolist()
+        else:
+          plane_found = False
+          # No GS due to lack of priors.
+          if len(potential_ground_pts) > 0 and len(aug_point_gs2) > 0:
+            aug_point_gs2 = (np.vstack((np.asarray(aug_point_gs2),np.asarray(potential_ground_pts)))).tolist()
+
+        # What to do if len(aug_point_gs2) == 0?
+        if len(aug_point_gs2) == 0 and len(potential_ground_pts) > 0:
+          aug_point_gs2 = potential_ground_pts # The best we can do...
+          skip_write = False
+        else:
+          skip_write = True
 
         # For Viz, create a cloud for the found plane.
-        X_plane, Y_plane = np.mgrid[-10:10:40j, -10:10:40j]
-        positions = np.vstack([X_plane.ravel(), Y_plane.ravel()])
-        Z_plane = ransac.predict(positions.transpose())
-        plane_points = np.vstack((positions,Z_plane,np.zeros(positions.shape[1]),np.zeros(positions.shape[1]),np.ones(positions.shape[1])))
-        plane_points = plane_points.transpose()
-        plane_points = plane_points.tolist()
+        if plane_found:
+          X_plane, Y_plane = np.mgrid[-10:10:40j, -10:10:40j]
+          positions = np.vstack([X_plane.ravel(), Y_plane.ravel()])
+          Z_plane = ransac.predict(positions.transpose())
+          plane_points = np.vstack((positions,Z_plane,np.zeros(positions.shape[1]),np.zeros(positions.shape[1]),np.ones(positions.shape[1])))
+          plane_points = plane_points.transpose()
+          plane_points = plane_points.tolist()
         ########################################
 
         fields_xyzbgr = [PointField('x', 0, PointField.FLOAT32, 1),
@@ -167,15 +192,19 @@ def main():
         header = pcl.header
         color_cloud = point_cloud2.create_cloud(header, fields_xyzbgr, color_points)
         sem_cloud = point_cloud2.create_cloud(header, fields_xyzbgr, sem_points)
-        seg_cloud = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs) # Input cloud but with certain labels segmented out.
-        seg_cloud2 = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs2)
-        ransac_plane = point_cloud2.create_cloud(header, fields_xyzbgr, plane_points)
+        if not(skip_write):
+          seg_cloud = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs) # Input cloud but with certain labels segmented out.
+          seg_cloud2 = point_cloud2.create_cloud(header, fields_xyzbgra, aug_point_gs2)
+        if plane_found:
+          ransac_plane = point_cloud2.create_cloud(header, fields_xyzbgr, plane_points)
 
         out_bag.write('/rgb_cloud', color_cloud, color_cloud.header.stamp, False)
         out_bag.write('/sem_cloud', sem_cloud, sem_cloud.header.stamp, False)
-        out_bag.write('/augmented_cloud_no_ground_orig', seg_cloud, seg_cloud.header.stamp, False)
-        out_bag.write('/augmented_cloud_no_ground', seg_cloud2, seg_cloud2.header.stamp, False)
-        out_bag.write('/ransac_ground_plane', ransac_plane, ransac_plane.header.stamp, False)
+        if not(skip_write):
+          out_bag.write('/augmented_cloud_no_ground_orig', seg_cloud, seg_cloud.header.stamp, False)
+          out_bag.write('/augmented_cloud_no_ground', seg_cloud2, seg_cloud2.header.stamp, False)
+        if plane_found:
+          out_bag.write('/ransac_ground_plane', ransac_plane, ransac_plane.header.stamp, False)
 
     print('Finished!')
     out_bag.close()
