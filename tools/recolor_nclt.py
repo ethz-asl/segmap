@@ -26,7 +26,7 @@ def main():
       7:[227,217,179], 
       8:[91,214,208], 
       9:[219,213,192], 
-      10:[229,90,95],   # 
+      10:[229,90,95],   # LightGenerator
       11:[248,71,170], 
       12:[199,173,249], # Portapotty (person/rider)
       13:[205,228,85], 
@@ -39,7 +39,7 @@ def main():
       31:[142,190,77], 
       32:[190,247,227], # Terrain -> Landscape
       33:[216,254,163], 
-      34:[158,253,220]}
+      34:[158,253,220]} # Small house
     parser = argparse.ArgumentParser(description="Augment Point Cloud")
     parser.add_argument('input_bag', metavar='input_bag', type=str, help='bag file with LiDAR, image, labels and TF')
     parser.add_argument('output_bag', metavar='output_bag', type=str, help='bag file with augmented cloud')
@@ -55,7 +55,7 @@ def main():
     else:
       deletion_lbl_ids = map(int, args.ids_to_remove.split(','))
     if args.potential_ids_to_remove == '':
-      potential_lbl_ids = [0,2, 10, 34]
+      potential_lbl_ids = [0,2,10,34]
     else:
       potential_lbl_ids = map(int, args.potential_ids_to_remove.split(','))
     
