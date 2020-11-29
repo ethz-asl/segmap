@@ -163,8 +163,10 @@ def main():
         if len(aug_point_gs2) == 0 and len(potential_ground_pts) > 0:
           aug_point_gs2 = potential_ground_pts # The best we can do...
           skip_write = False
-        else:
+        elif len(aug_point_gs2) == 0 and len(potential_ground_pts) == 0:
           skip_write = True
+        else:
+          skip_write = False
 
         # For Viz, create a cloud for the found plane.
         if plane_found:
