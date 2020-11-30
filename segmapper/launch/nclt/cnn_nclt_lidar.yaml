@@ -73,7 +73,7 @@ SegMapper: {
 
     LocalMap: {
       voxel_size_m: 0.1,
-      min_points_per_voxel: 1,
+      min_points_per_voxel: 2,
       radius_m: 50.0,
       min_vertical_distance_m: -999.0,
       max_vertical_distance_m: 999.0,
@@ -84,7 +84,7 @@ SegMapper: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
       # (!) Sensor Dependent Tunings (sparser LiDAR -> Less points in cloud & larger gaps).
       min_cluster_size: 400, # (!) Minimum number of points for a segment to be valid (if too low, noise).
-      max_cluster_size: 50000,  # (!) Maximum number of points for a segment to be valid (if too high, very undefined centroid).
+      max_cluster_size: 60000,  # (!) Maximum number of points for a segment to be valid (if too high, very undefined centroid).
       radius_for_growing: 0.15 #0.2 # (!) Maximum distance between two points for them to be able to belong to the same cluster. Has to be >= voxel_size from local mapper.
     },
 
