@@ -12,7 +12,7 @@ SegMapper: {
     use_odometry_information: true,
 
     odom_frame: "world",
-    sensor_frame: "ground_truth_link", #"ground_truth_link",
+    sensor_frame: "base_link", #"ground_truth_link",
     assembled_cloud_sub_topic: "/augmented_cloud_no_ground", #/augmented_cloud", #"/noisy_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
@@ -43,8 +43,8 @@ SegMapper: {
 
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: false,
-  close_loops: true,
+  localize: true,
+  close_loops: false,
 
   distance_between_segmentations_m: 0.0,
 
@@ -73,7 +73,7 @@ SegMapper: {
 
     LocalMap: {
       voxel_size_m: 0.1,
-      min_points_per_voxel: 2,
+      min_points_per_voxel: 1, #2,  # Tricky one: 1 -> Trees touching will merge, 2: many segments never even get started..
       radius_m: 50.0,
       min_vertical_distance_m: -999.0,
       max_vertical_distance_m: 999.0,
@@ -113,9 +113,9 @@ SegMapper: {
       # Type of RANSAC to use.
       recognizer_type: "Simple", #"Simple", "Partitioned"
       # (!) The amount of jitter allowed in the centroid distance between segments in the source and target maps.
-      resolution: 0.2,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
+      resolution: 0.6,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
       # (!) Minimum number of inliers needed to calculate transform between two positions in either LC or LOC mode.
-      min_cluster_size: 6, # (!) Between 5-7 usually
+      min_cluster_size: 5, # (!) Between 5-7 usually
       max_consistency_distance_for_caching: 10.0,
     }
   },
