@@ -69,6 +69,7 @@ def main():
         cent_z = np.mean(cloud_xyz[:,2])
         cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
 
+        '''
         # Add a fake satelite cluster (3DSmoothNet related hacking..).
         # Compute radius of actual segment.
         seg_radius = np.sqrt(np.max(
@@ -78,7 +79,7 @@ def main():
 
         # Add a fake keypoint with fake neighbours (far away from actual segment).
         fake_keypt = np.array([cent_x, cent_y, cent_z]) + 3.0*seg_radius
-        fake_nn = np.vstack((fake_keypt
+        fake_nn = np.vstack((fake_keypt,
             fake_keypt + np.array([0,0,1])*seg_radius,
             fake_keypt + np.array([1,0,1])*seg_radius,
             fake_keypt + np.array([1,1,0])*seg_radius,
@@ -87,6 +88,8 @@ def main():
             fake_keypt + np.array([1,1,1])*seg_radius,
             fake_keypt + np.array([0,1,0])*seg_radius))
         cloud_xyz = np.insert(cloud_xyz, 0, fake_nn, axis=0)
+        '''
+        
         # Just for some testing: Add random noise transformation.
         '''
         T_rand = tf.random_rotation_matrix(np.random.rand(3))
