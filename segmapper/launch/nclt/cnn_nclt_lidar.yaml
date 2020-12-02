@@ -43,8 +43,8 @@ SegMapper: {
 
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: true,
-  close_loops: false,
+  localize: false,
+  close_loops: true,
 
   distance_between_segmentations_m: 0.0,
 
