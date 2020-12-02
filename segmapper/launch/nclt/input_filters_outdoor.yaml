@@ -1,11 +1,11 @@
 - FixStepSamplingDataPointsFilter:
     startStep: 9
-- BoundingBoxDataPointsFilter:
+- BoundingBoxDataPointsFilter:  # Looks at absolute values of point cloud, frames have no effect.
     xMin: -inf
     xMax: inf
     yMin: -inf
     yMax: inf
-    zMin: -1.0
+    zMin: -inf #0.0
     zMax: inf
     removeInside: 0
 - MaxDistDataPointsFilter:
