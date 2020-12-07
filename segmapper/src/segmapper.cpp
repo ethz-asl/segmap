@@ -107,14 +107,19 @@ SegMapper::SegMapper(ros::NodeHandle& n) : nh_(n) {
       skip_counters_.push_back(0u);
       first_points_received_.push_back(false);
   }
+
+  // Reset file that stores localizations
+  std::ofstream outfile("/tmp/localizations.txt");
+  outfile.close();
 }
 
 SegMapper::~SegMapper() {}
 
 void SegMapper::publishMapThread() {
   // Check if map publication is required.
-  if (!laser_slam_worker_params_.publish_local_map)
+  if (!laser_slam_worker_params_.publish_local_map) {
     return;
+  }
 
   ros::Rate thread_rate(laser_slam_worker_params_.map_publication_rate_hz);
   while (ros::ok()) {
@@ -149,11 +154,7 @@ void SegMapper::publishTfThread() {
 }
 
 void SegMapper::segMatchThread() {
-  // Terminate the thread if localization and loop closure are not needed.
-  if ((!segmatch_worker_params_.localize &&
-      !segmatch_worker_params_.close_loops) ||
-      laser_slam_workers_.empty())
-    return;
+  CHECK(!laser_slam_workers_.empty());
 
   unsigned int track_id = laser_slam_workers_.size() - 1u;
   // Number of tracks skipped because waiting for new voxels to activate.
@@ -227,7 +228,7 @@ void SegMapper::segMatchThread() {
           << T_b_bgt.getPosition()(2) << std::endl;
         outfile.close();
       }
-    } else {
+    } else if (segmatch_worker_params_.close_loops) {
       // If there is a loop closure.
       if (segmatch_worker_.processLocalMap(local_maps_[track_id], current_pose,
                                            track_id, &loop_closure)) {
