@@ -2,8 +2,9 @@
 # To be used as input into 3DSmoothNet.
 import numpy as np
 import os
-import open3d as o3d
+# import open3d as o3d
 import plyfile as pf
+import decimal
 
 import tf.transformations as tf
 
@@ -21,7 +22,7 @@ def main():
     # Path path to segments_database.csv (what is exported from SegMap).
     base_dir = config.base_dir
     folder = config.cnn_test_folder
-    segment_save_dir = '/home/nikhilesh/Documents/3DSmoothNet/testing/' # base_dir + folder + "/3DSmoothNet/segment_clouds/"
+    segment_save_dir = '/home/nikhilesh/Documents/3DSmoothNet/segments/' # base_dir + folder + "/3DSmoothNet/segment_clouds/"
     print("Data Folder: "+ base_dir + folder)
 
     # Load Dataset.
@@ -62,23 +63,27 @@ def main():
         seg_id = classes[idx]
         view_id = duplicate_ids[idx]
         cloud_xyz = segments[idx][:,:3]
+        num_pts = cloud_xyz.shape[0]
 
         # Compute centroid and add.
         cent_x = np.mean(cloud_xyz[:,0])
         cent_y = np.mean(cloud_xyz[:,1])
         cent_z = np.mean(cloud_xyz[:,2])
-        cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
+        # cloud_xyz = np.insert(cloud_xyz, 0, [cent_x, cent_y, cent_z], axis=0)
 
+        
         # Add a fake satelite cluster (3DSmoothNet related hacking..).
         # Compute radius of actual segment.
         seg_radius = np.sqrt(np.max(
             np.square(cloud_xyz[:,0] - cent_x) 
             + np.square(cloud_xyz[:,1] - cent_y) 
             + np.square(cloud_xyz[:,2] - cent_z)))
+        seg_radius = round(seg_radius,2)
 
+        '''
         # Add a fake keypoint with fake neighbours (far away from actual segment).
         fake_keypt = np.array([cent_x, cent_y, cent_z]) + 3.0*seg_radius
-        fake_nn = np.vstack((fake_keypt
+        fake_nn = np.vstack((fake_keypt,
             fake_keypt + np.array([0,0,1])*seg_radius,
             fake_keypt + np.array([1,0,1])*seg_radius,
             fake_keypt + np.array([1,1,0])*seg_radius,
@@ -87,6 +92,8 @@ def main():
             fake_keypt + np.array([1,1,1])*seg_radius,
             fake_keypt + np.array([0,1,0])*seg_radius))
         cloud_xyz = np.insert(cloud_xyz, 0, fake_nn, axis=0)
+        '''
+        
         # Just for some testing: Add random noise transformation.
         '''
         T_rand = tf.random_rotation_matrix(np.random.rand(3))
@@ -105,7 +112,7 @@ def main():
 
         # Write to file.
         vertex = cloud_xyz_ply
-        filename = segment_save_dir + "segment_" +str(seg_id) + "_view_" + str(view_id) + ".ply"
+        filename = segment_save_dir + "segment_" +str(seg_id) + "_view_" + str(view_id) + "_num_pts_" + str(num_pts) + "_rad_" + str(seg_radius) + "_.ply"
         el = pf.PlyElement.describe(vertex, 'vertex')
         pf.PlyData([el]).write(filename)
 
