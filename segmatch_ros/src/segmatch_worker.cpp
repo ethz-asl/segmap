@@ -65,7 +65,7 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
 
   toggle_publish_target_service_ = nh.advertiseService(
       "toggle_publish_target", &SegMatchWorker::togglePublishTargetServiceCall, this);
-  
+
   export_target_map_ = nh.advertiseService(
       "export_target_map", &SegMatchWorker::exportTargetMap, this);
 
@@ -88,7 +88,7 @@ void SegMatchWorker::init(ros::NodeHandle& nh, const SegMatchWorkerParams& param
   for (unsigned int i = 0u; i < num_tracks_; ++i) {
       publish_local_representation_.push_back(true);
   }
-  
+
   BENCHMARK_RESET_ALL();
 }
 
@@ -107,9 +107,7 @@ bool SegMatchWorker::processLocalMap(
     RelativePose* loop_closure) {
   BENCHMARK_BLOCK("SM.Worker");
 
-  if(params_.close_loops) {
-    CHECK_NOTNULL(loop_closure);
-  }
+  CHECK_NOTNULL(loop_closure);
 
   if ((params_.localize && target_cloud_loaded_) || params_.close_loops) {
     // Check that the robot drove enough since last segmentation.
@@ -151,9 +149,7 @@ bool SegMatchWorker::processLocalMap(
     // Filter matches and try to recognize the local map.
     PairwiseMatches filtered_matches = segmatch_.filterMatches(predicted_matches, track_id);
     const PairwiseMatches& recognized_matches = segmatch_.recognize(filtered_matches,
-                                                                    track_id,
-                                                                    latest_pose.time_ns,
-                                                                    loop_closure);
+        track_id, latest_pose.time_ns, loop_closure);
 
     // TODO move after optimizing and updating target map?
     if (params_.close_loops) {
@@ -506,7 +502,7 @@ std::vector<size_t> getIndexesInDecreasingOrdering(const std::vector<T> &v) {
 bool SegMatchWorker::reconstructSegmentsServiceCall(std_srvs::Empty::Request& req,
                                                     std_srvs::Empty::Response& res) {
   publishTargetReconstruction();
-  return true;  
+  return true;
 }
 
 bool SegMatchWorker::toggleCompressionServiceCall(std_srvs::Empty::Request& req,

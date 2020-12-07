@@ -111,7 +111,7 @@ class SegMatch {
 
   void getSourceReconstruction(PointICloud* source_reconstruction,
                                unsigned int track_id = 0u) const;
-  
+
   void getTargetReconstruction(PointICloud* target_reconstruction,
                                bool get_compressed = false) const;
 

@@ -25,20 +25,17 @@ SegMapper: {
     publish_distant_map: false,
     publish_full_map: false,
     map_publication_rate_hz: 3,
-    ########ODOMETRY NOISER########
-    enable_drift: true,
-    sensor_drifted_frame: "airsim_drone_drift",
+    enable_drift: false,
     noise_x_mean: 0.0,
     noise_y_mean: 0.0,
     noise_z_mean: 0.0,
-    noise_yaw_mean: 0.0,
+    noise_yaw_mean: 0.001,
     noise_att_mean: 0.0,
     noise_x_stddev: 0.001,
-    noise_y_stddev: 0.0,
-    noise_z_stddev: 0.0,
+    noise_y_stddev: 0.001,
+    noise_z_stddev: 0.001,
     noise_yaw_stddev: 0.001,
     noise_att_stddev: 0.0,
-    ###############################
   },
 
   # SegMatchWorker parameters
