@@ -200,8 +200,13 @@ void SegMapper::segMatchThread() {
       local_maps_[track_id].updatePoseAndAddPoints(new_points, current_pose);
     }
 
-    RelativePose loop_closure;
+    std::cout<<"Building Map!"<<std::endl;
+    std::shared_ptr<LaserTrack> laser_track =
+            incremental_estimator_->getLaserTrack(track_id);
+    std::cout<<"Time passed secs: "<<laser_track->getCurrentPose().time_ns/1e9<<std::endl;
 
+    /*
+    RelativePose loop_closure;
     // Process the source cloud.
     if (segmatch_worker_params_.localize) {
       if (segmatch_worker_.processLocalMap(local_maps_[track_id], current_pose, track_id, &loop_closure)) {
@@ -320,7 +325,7 @@ void SegMapper::segMatchThread() {
         worker->publishTrajectories();
       }
     }
-
+    */
     // The track was processed, reset the counter.
     skipped_tracks_count = 0;
     skip_counters_[track_id] = 0u;
