@@ -40,9 +40,7 @@ class Generator(object):
             self._i = 0
 
         batch_segments, batch_classes = self.preprocessor.get_processed(
-            self.batch_ids, train=self.train
-        )
-
+            self.batch_ids, train=self.train)
         batch_classes = to_onehot(batch_classes, self.n_classes)
 
         return batch_segments, batch_classes
