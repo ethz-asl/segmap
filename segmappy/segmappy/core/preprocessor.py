@@ -11,7 +11,6 @@ class Preprocessor(object):
         augment_remove_plane_min=0.0,
         augment_remove_plane_max=0.0,
         augment_jitter=0.0,
-        align="none",
         voxelize=True,
         scale_method="fixed",
         center_method="none",
@@ -29,7 +28,6 @@ class Preprocessor(object):
         self.augment_angle = augment_angle
         self.augment_jitter = augment_jitter
 
-        self.align = align
         self.voxelize = voxelize
         self.scale_method = scale_method
         self.center_method = center_method
@@ -57,10 +55,6 @@ class Preprocessor(object):
         self.segments_class = segments_class
         self.classes = np.array(classes)
 
-        if self.align == "robot":
-            assert positions is not None
-            self.segments = self._align_robot(self.segments, positions)
-
         # check if we need to train a scaler
         if self.remove_mean or self.remove_std:
             if scaler_path is None:
@@ -84,20 +78,17 @@ class Preprocessor(object):
         return batch_segments, batch_classes
 
     def process(self, segments, segments_color, segments_class, train=True, normalize=True):
-        # augment through distorsions
-        if train and self.augment_remove_random_max > 0:
-            segments, segments_color, segments_class = self._augment_remove_random(segments, segments_color, segments_class)
+        if train:
+            if self.augment_remove_random_max > 0:
+                segments, segments_color, segments_class = self._augment_remove_random(
+                    segments, segments_color, segments_class)
 
-        if train and self.augment_remove_plane_max > 0:
-            segments, segments_color, segments_class = self._augment_remove_plane(segments, segments_color, segments_class)
+            if self.augment_remove_plane_max > 0:
+                segments, segments_color, segments_class = self._augment_remove_plane(
+                    segments, segments_color, segments_class)
 
-        # align after distorsions
-        if self.align == "eigen":
-            segments = self._align_eigen(segments)
-
-        # augment rotation
-        if train and self.augment_angle > 0:
-            segments = self._augment_rotation(segments)
+            if self.augment_angle > 0:
+                segments = self._augment_rotation(segments)
 
         if self.voxelize:
             # rescale coordinates and center
@@ -133,55 +124,6 @@ class Preprocessor(object):
 
         return np.array(R_z)
 
-    # align according to the robot's position
-    def _align_robot(self, segments, positions):
-        aligned_segments = []
-        for i, seg in enumerate(segments):
-            center = np.mean(seg, axis=0)
-
-            robot_pos = positions[i] - center
-            seg = seg - center
-
-            # angle between robot and x-axis
-            angle = np.arctan2(robot_pos[1], robot_pos[0])
-
-            # align the segment so the robots perspective is along the x-axis
-            inv_rotation_matrix_z = self._get_rotation_matrix_z(angle)
-            aligned_seg = np.dot(seg, inv_rotation_matrix_z)
-
-            aligned_segments.append(aligned_seg)
-
-        return aligned_segments
-
-    def _align_eigen(self, segments):
-        aligned_segments = []
-        for segment in segments:
-            # Calculate covariance
-            center = np.mean(segment, axis=0)
-
-            covariance_2d = np.cov(segment[:, :2] - center[:2], rowvar=False, bias=True)
-
-            eigenvalues, eigenvectors = np.linalg.eig(covariance_2d)
-            alignment_rad = np.arctan2(eigenvectors[1, 0], eigenvectors[0, 0])
-
-            if eigenvalues[0] < eigenvalues[1]:
-                alignment_rad = alignment_rad + np.pi / 2
-
-            inv_rotation_matrix_z = self._get_rotation_matrix_z(alignment_rad)
-            aligned_segment = np.dot(segment, inv_rotation_matrix_z)
-
-            y_center = np.mean(segment[:, 1])
-            n_below = np.sum(segment[:, 1] < y_center)
-
-            if n_below < segment.shape[0] / 2:
-                alignment_rad = alignment_rad + np.pi
-                inv_rotation_matrix_z = self._get_rotation_matrix_z(np.pi)
-                aligned_segment = np.dot(aligned_segment, inv_rotation_matrix_z)
-
-            aligned_segments.append(aligned_segment)
-
-        return aligned_segments
-
     # augment with multiple rotation of the same segment
     def _augment_rotation(self, segments):
         angle_rad = self.augment_angle * np.pi / 180
@@ -189,35 +131,28 @@ class Preprocessor(object):
         augmented_segments = []
         for segment in segments:
             rotation = np.random.uniform(-angle_rad, angle_rad)
-            segment = np.dot(segment, self._get_rotation_matrix_z(rotation))
+            segment = np.matmul(segment, self._get_rotation_matrix_z(rotation))
             augmented_segments.append(segment)
 
         return augmented_segments
 
     def _augment_remove_random(self, segments, segments_color, segments_class):
-        augmented_segments = []
-        for i, segment in enumerate(segments):
+        for i in enumerate(len(segments)):
             # percentage of points to remove
-            remove = (
-                np.random.random()
-                * (self.augment_remove_random_max - self.augment_remove_random_min)
-                + self.augment_remove_random_min
-            )
+            remove = (np.random.random() * (self.augment_remove_random_max
+                - self.augment_remove_random_min) + self.augment_remove_random_min)
+            n_keep = int(segments[i].shape[0] * (1 - remove))
 
-            # randomly choose the points
-            idx = np.arange(segment.shape[0])
-            np.random.shuffle(idx)
-            idx = idx[int(idx.size * remove) :]
+            # get indices to keep
+            idx = np.random.choice(segments[i].shape[0], n_keep, replace=False)
 
-            segment = segment[idx]
-            augmented_segments.append(segment)
+            segments[i] = segments[i][idx]
             segments_color[i] = segments_color[i][idx]
             segments_class[i] = segments_class[i][idx]
 
-        return augmented_segments, segments_color, segments_class
+        return segments, segments_color, segments_class
 
     def _augment_remove_plane(self, segments, segments_color, segments_class):
-        augmented_segments = []
         for i, segment in enumerate(segments):
             # center segment
             center = np.mean(segment, axis=0)
@@ -246,7 +181,7 @@ class Preprocessor(object):
                         remove_percentage > self.augment_remove_plane_min
                         and remove_percentage < self.augment_remove_plane_max
                     ):
-                        segment = segment[keep]
+                        segments[i] = segments[i][keep]
                         segments_color[i] = segments_color[i][keep]
                         segments_class[i] = segments_class[i][keep]
                         found = True
@@ -255,21 +190,11 @@ class Preprocessor(object):
                 if found:
                     break
 
-            segment = segment + center
-            augmented_segments.append(segment)
-
-        return augmented_segments, segments_color, segments_class
+        return segments, segments_color, segments_class
 
     def _augment_jitter(self, segments):
-        jitter_segments = []
-        for segment in segments:
-            jitter = np.random.random(3) * 2 - 1
-            jitter = jitter * self.augment_jitter * self.voxels / 2
-
-            segment = segment + jitter
-            jitter_segments.append(segment)
-
-        return jitter_segments
+        # TODO(smauq): Implement
+        return segments
 
     def _rescale_coordinates(self, segments):
         # center corner to origin
@@ -306,6 +231,7 @@ class Preprocessor(object):
 
                 segment = segment + (self.voxels - 1) / 2.0 - center
 
+            # TODO(smauq): Take thresholded_scale? Maybe better
             self.last_scales.append(scale)
             rescaled_segments.append(segment)
 

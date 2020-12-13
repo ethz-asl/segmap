@@ -90,8 +90,6 @@ class Config(object):
         self.augment_jitter = config.getfloat("augment", "augment_jitter")
 
         # normalize
-        self.align = config.get("normalize", "align")
-        assert self.align in ("none", "eigen", "robot")
         self.scale_method = config.get("normalize", "scale_method")
         assert self.scale_method in ("fixed", "aspect", "fit")
         self.center_method = config.get("normalize", "center_method")
