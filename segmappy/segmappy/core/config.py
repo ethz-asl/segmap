@@ -100,8 +100,6 @@ class Config(object):
         self.voxels = tuple(
             config.getint("normalize", "voxels_" + axis) for axis in ("x", "y", "z")
         )
-        self.remove_mean = config.getboolean("normalize", "remove_mean")
-        self.remove_std = config.getboolean("normalize", "remove_std")
 
         # train
         try:
@@ -125,7 +123,7 @@ class Config(object):
         self.semantics_model_folder = os.path.abspath(
             os.path.join(self.model_base_dir, self.semantics_folder_name)
         )
-        self.test_size = config.getfloat("train", "test_size")
+        self.validation_size = config.getfloat("train", "validation_size")
         self.n_epochs = config.getint("train", "n_epochs")
         self.batch_size = config.getint("train", "batch_size")
         self.log_path = config.get("train", "log_path")

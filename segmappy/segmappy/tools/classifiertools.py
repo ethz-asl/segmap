@@ -188,12 +188,8 @@ def get_default_preprocessor(config):
         augment_remove_plane_min=config.augment_remove_plane_min,
         augment_remove_plane_max=config.augment_remove_plane_max,
         augment_jitter=config.augment_jitter,
-        scale_method=config.scale_method,
         scale=config.scale,
-        center_method=config.center_method,
         voxels=config.voxels,
-        remove_mean=config.remove_mean,
-        remove_std=config.remove_std,
         batch_size=config.batch_size,
     )
 

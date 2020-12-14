@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
-
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class Preprocessor(object):
     def __init__(
@@ -11,15 +12,9 @@ class Preprocessor(object):
         augment_remove_plane_min=0.0,
         augment_remove_plane_max=0.0,
         augment_jitter=0.0,
-        voxelize=True,
-        scale_method="fixed",
-        center_method="none",
         scale=(1, 1, 1),
         voxels=(1, 1, 1),
-        remove_mean=False,
-        remove_std=False,
-        batch_size=16,
-        scaler_train_passes=1,
+        batch_size=16
     ):
         self.augment_remove_random_min = augment_remove_random_min
         self.augment_remove_random_max = augment_remove_random_max
@@ -28,18 +23,12 @@ class Preprocessor(object):
         self.augment_angle = augment_angle
         self.augment_jitter = augment_jitter
 
-        self.voxelize = voxelize
-        self.scale_method = scale_method
-        self.center_method = center_method
         self.scale = np.array(scale)
         self.voxels = np.array(voxels)
-        self.remove_mean = remove_mean
-        self.remove_std = remove_std
         self.batch_size = batch_size
-        self.scaler_train_passes = scaler_train_passes
-        self.color = True
+
+        self.color = False
         self.n_semcls = 35
-        self._scaler_exists = False
 
         min_voxel_side_length_m = 0.1
         self.min_scale = self.voxels * min_voxel_side_length_m
@@ -47,23 +36,14 @@ class Preprocessor(object):
         self.last_scales = []
 
     def init_segments(
-        self, segments, segments_color, segments_class, classes, positions=None, train_ids=None, scaler_path=None
+        self, segments, segments_color, segments_class, classes
     ):
-
         self.segments = segments
         self.segments_color = segments_color
         self.segments_class = segments_class
         self.classes = np.array(classes)
 
-        # check if we need to train a scaler
-        if self.remove_mean or self.remove_std:
-            if scaler_path is None:
-                assert train_ids is not None
-                self._train_scaler(train_ids)
-            else:
-                self.load_scaler(scaler_path)
-
-    def get_processed(self, segment_ids, train=True, normalize=True):
+    def get_processed(self, segment_ids, train=True):
         batch_segments = []
         batch_segments_color = []
         batch_segments_class = []
@@ -72,12 +52,12 @@ class Preprocessor(object):
             batch_segments_color.append(self.segments_color[i])
             batch_segments_class.append(self.segments_class[i])
 
-        batch_segments = self.process(batch_segments, batch_segments_color, batch_segments_class, train, normalize)
+        batch_segments = self.process(batch_segments, batch_segments_color, batch_segments_class, train)
         batch_classes = self.classes[segment_ids]
 
         return batch_segments, batch_classes
 
-    def process(self, segments, segments_color, segments_class, train=True, normalize=True):
+    def process(self, segments, segments_color, segments_class, train=True):
         if train:
             if self.augment_remove_random_max > 0:
                 segments, segments_color, segments_class = self._augment_remove_random(
@@ -90,20 +70,15 @@ class Preprocessor(object):
             if self.augment_angle > 0:
                 segments = self._augment_rotation(segments)
 
-        if self.voxelize:
-            # rescale coordinates and center
-            segments = self._rescale_coordinates(segments)
+        # rescale coordinates and center
+        segments = self._rescale_coordinates(segments)
 
-            # randomly displace the segment
-            if train and self.augment_jitter > 0:
-                segments = self._augment_jitter(segments)
+        # randomly displace the segment
+        #if train and self.augment_jitter > 0:
+        #    segments = self._augment_jitter(segments)
 
-            # insert into voxel grid
-            segments = self._voxelize(segments, segments_color, segments_class)
-
-            # remove mean and/or std
-            if normalize and self._scaler_exists:
-                segments = self._normalize_voxel_matrix(segments)
+        # insert into voxel grid
+        segments = self._voxelize(segments, segments_color, segments_class)
 
         return segments
 
@@ -128,16 +103,15 @@ class Preprocessor(object):
     def _augment_rotation(self, segments):
         angle_rad = self.augment_angle * np.pi / 180
 
-        augmented_segments = []
-        for segment in segments:
+        for i in range(len(segments)):
             rotation = np.random.uniform(-angle_rad, angle_rad)
-            segment = np.matmul(segment, self._get_rotation_matrix_z(rotation))
-            augmented_segments.append(segment)
+            rotation = self._get_rotation_matrix_z(rotation)
+            segments[i] = np.matmul(segments[i], rotation.T)
 
-        return augmented_segments
+        return segments
 
     def _augment_remove_random(self, segments, segments_color, segments_class):
-        for i in enumerate(len(segments)):
+        for i in range(len(segments)):
             # percentage of points to remove
             remove = (np.random.random() * (self.augment_remove_random_max
                 - self.augment_remove_random_min) + self.augment_remove_random_min)
@@ -207,31 +181,17 @@ class Preprocessor(object):
         # store the last scaling factors that were used
         self.last_scales = []
 
-        # rescale coordinates to fit inside voxel matrix
         rescaled_segments = []
         for segment in segments:
-            # choose scale
-            if self.scale_method == "fixed":
-                scale = self.scale
-                segment = segment / scale * (self.voxels - 1)
-            elif self.scale_method == "aspect":
-                scale = np.tile(np.max(segment), 3)
-                segment = segment / scale * (self.voxels - 1)
-            elif self.scale_method == "fit":
-                scale = np.max(segment, axis=0)
-                thresholded_scale = np.maximum(scale, self.min_scale)
-                segment = segment / thresholded_scale * (self.voxels - 1)
+            # rescale coordinates to fit inside voxel matrix
+            scale = np.max(segment, axis=0)
+            thresholded_scale = np.maximum(scale, self.min_scale)
+            segment = segment / thresholded_scale * (self.voxels - 1)
 
-            # recenter segment
-            if self.center_method != "none":
-                if self.center_method == "mean":
-                    center = np.mean(segment, axis=0)
-                elif self.center_method == "min_max":
-                    center = np.max(segment, axis=0) / 2.0
+            # center segment inside voxel grid
+            center = np.mean(segment, axis=0)
+            segment = segment + (self.voxels - 1) / 2.0 - center
 
-                segment = segment + (self.voxels - 1) / 2.0 - center
-
-            # TODO(smauq): Take thresholded_scale? Maybe better
             self.last_scales.append(scale)
             rescaled_segments.append(segment)
 
@@ -259,39 +219,3 @@ class Preprocessor(object):
                 voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2]] = 1
 
         return voxelized_segments
-
-    def _train_scaler(self, train_ids):
-        from sklearn.preprocessing import StandardScaler
-
-        scaler = StandardScaler(with_mean=self.remove_mean, with_std=self.remove_std)
-
-        for p in range(self.scaler_train_passes):
-            for i in np.arange(0, len(train_ids), self.batch_size):
-                segment_ids = train_ids[i : i + self.batch_size]
-                segments, _ = self.get_processed(segment_ids)
-                segments = np.reshape(segments, (segments.shape[0], -1))
-                scaler.partial_fit(segments)
-
-        self._scaler = scaler
-        self._scaler_exists = True
-
-    # remove mean and std
-    def _normalize_voxel_matrix(self, segments):
-        segments = np.reshape(segments, (segments.shape[0], -1))
-        segments = self._scaler.transform(segments)
-        segments = np.reshape(segments, (segments.shape[0],) + tuple(self.voxels))
-
-        return segments
-
-    def save_scaler(self, path):
-        import pickle
-
-        with open(path, "w") as fp:
-            pickle.dump(self._scaler, fp)
-
-    def load_scaler(self, path):
-        import pickle
-
-        with open(path, "r") as fp:
-            self._scaler = pickle.load(fp)
-            self._scaler_exists = True

@@ -12,62 +12,29 @@ import ensure_segmappy_is_installed
 from segmappy import Dataset
 from segmappy.tools.hull import point_in_hull, n_points_in_hull, are_in_hull
 
-DATASET_FOLDER = "/home/andrei/.segmap/training_datasets/bosch1/"
+DATASET_FOLDER = "/home/andrei/.segmap/training_datasets/bosch_test/"
 FILE_PATH = DATASET_FOLDER + "/matches_database.csv"
 if os.path.isfile(FILE_PATH):
     os.remove(FILE_PATH)
 
-dataset = Dataset(folder=DATASET_FOLDER, use_matches=False, normalize_classes=False)
-segments, _, ids, n_ids, features, matches, labels_dict = dataset.load()
-
-filtered_segments = []
-filtered_ids = []
-filtered_features = []
-previous_id = 9999
-last_n_points = 0
-
-RATIO_POINTS_TO_TAKE_VIEW = 0.1
-
-for i in range(ids.size):
-    save_view = False
-    if ids[i] != previous_id:
-        previous_id = ids[i]
-        save_view = True
-
-    if ids.size == i + 1 | ids[i] != ids[i + 1]:
-        save_view = True
-
-    if float(segments[i].shape[0]) >= float(last_n_points) * (
-        1.0 + RATIO_POINTS_TO_TAKE_VIEW
-    ):
-        save_view = True
-
-    if save_view:
-        last_n_points = segments[i].shape[0]
-        filtered_segments.append(segments[i])
-        filtered_ids.append(ids[i])
-        filtered_features.append(features[i])
-
-print("size before ", ids.size)
-print("size after ", np.array(filtered_ids).size)
-
-segments = filtered_segments
-ids = np.array(filtered_ids)
-features = np.array(filtered_features)
+dataset = Dataset(
+    folder=DATASET_FOLDER, use_matches=False, normalize_classes=False,
+    use_merges=False, require_relevance=0.05)
+segments, _, ids, n_ids, _, _, _ = dataset.load()
 
 # Find the convex hulls of the last view of each segment.
 unique_ids = []
 unique_segments = []
 hulls = []
 unique_centroids = []
-centroids = []
+
 for i in range(ids.size):
     segment = segments[i]
-    centroids.append(np.mean(segment, 0))
 
     # skip if it's not the last duplicate
     if i + 1 < ids.size and ids[i] == ids[i + 1]:
         continue
+
     unique_ids.append(ids[i])
     unique_segments.append(segment)
     hull = ConvexHull(segment)
@@ -77,9 +44,9 @@ for i in range(ids.size):
 CENTROID_DISTANCE_THRESHOLD = 3.0
 SUBSAMPLING_RATE = 5
 HULL_VOLUME_THRESHOLD = 0.33
-N_ID_TO_SKIP = 100
+N_ID_TO_SKIP = 0
 PLOT_3D = False
-PLOT_MAP = True
+PLOT_MAP = False
 
 matches = []
 
@@ -92,7 +59,7 @@ for i in range(n_unique_ids):
         continue
     range_j = range(n_unique_ids - i - 1 - N_ID_TO_SKIP)
     range_j = [x + i + 1 + N_ID_TO_SKIP for x in range_j]
-    print("i: ", i)
+    print("i: ", i, " matches ", len(matches))
     for j in range_j:
         if (
             np.linalg.norm(unique_centroids[i] - unique_centroids[j])

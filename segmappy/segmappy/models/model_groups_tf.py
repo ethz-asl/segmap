@@ -4,8 +4,8 @@ import tensorflow as tf
 def init_model(input_shape, n_classes):
     with tf.name_scope("InputScope") as scope:
         cnn_input = tf.placeholder(
-            dtype=tf.float32, shape=(None,) + input_shape + (3 + 35,), name="input"
-            #dtype=tf.float32, shape=(None,) + input_shape + (1,), name="input"
+            #dtype=tf.float32, shape=(None,) + input_shape + (3 + 35,), name="input"
+            dtype=tf.float32, shape=(None,) + input_shape + (1,), name="input"
         )
 
     # base convolutional layers
@@ -19,7 +19,7 @@ def init_model(input_shape, n_classes):
 
     conv1 = tf.layers.conv3d(
         inputs=cnn_input,
-        filters=64,
+        filters=32,
         kernel_size=(3, 3, 3),
         padding="same",
         activation=tf.nn.relu,
@@ -195,7 +195,13 @@ def init_model(input_shape, n_classes):
     correct_pred = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y_true, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name="accuracy")
 
-    roc_auc = tf.placeholder(dtype=tf.float32, shape=(), name="roc_auc")
+    means = []
+    top95 = []
+    for i in range(10):
+        means.append(tf.placeholder(
+            dtype=tf.float32, shape=(), name="means_" + str(i)))
+        top95.append(tf.placeholder(
+            dtype=tf.float32, shape=(), name="top95_" + str(i)))
 
     with tf.name_scope("summary"):
         tf.summary.scalar("loss", loss, collections=["summary_batch"])
@@ -203,4 +209,9 @@ def init_model(input_shape, n_classes):
         tf.summary.scalar("loss_r", loss_r, collections=["summary_batch"])
         tf.summary.scalar("accuracy", accuracy, collections=["summary_batch"])
 
-        tf.summary.scalar("roc_auc", roc_auc, collections=["summary_epoch"])
+    with tf.name_scope("summary_test"):
+        for i in range(10):
+            tf.summary.scalar(
+                "means_" + str(i + 1), means[i], collections=["summary_epoch"])
+            tf.summary.scalar(
+                "top95_" + str(i + 1), top95[i], collections=["summary_epoch"])
