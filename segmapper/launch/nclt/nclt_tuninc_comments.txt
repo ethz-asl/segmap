@@ -1,0 +1,137 @@
+Config 0:
+	min_cluster_size: 400, 
+	max_cluster_size: 60000,
+	radius_for_growing: 0.2
+	clustering: geometric
+
+Analysis: Overall bad. 	Don't have certain large clusters and facades.
+
+Config 1:
+	min_cluster_size: 400, 
+	max_cluster_size: 60000,
+	radius_for_growing: 0.15*
+	clustering: geometric
+
+Analysis: More segments. Probably, with 0.2 the segments were getting too large and got discarded
+
+Config 2:
+	min_cluster_size: 400, 
+	max_cluster_size: 120000*,
+	radius_for_growing: 0.2*
+	clustering: geometric
+
+Analysis: Overall bad. Seems to have more segments. But also creating very large clusters (several trees) or large building facades
+
+Config 3:
+	min_cluster_size: 400, 
+	max_cluster_size: 100000*,
+	radius_for_growing: 0.2
+	clustering: geometric
+
+Analysis: Overall bad. Some nice tree segments are discared while large clusters with high variance are kept (not good).
+
+Config 4:
+	min_cluster_size: 400, 
+	max_cluster_size: 100000,
+	radius_for_growing: 0.3*
+	clustering: geometric
+
+Analysis: Very bad. Ground removal is not perfect, sparse set of ground points still left as residues -> if grow radius too big, they are included as segments... Furthermore, forests clump together and get discarded...
+
+Config 5:
+	min_cluster_size: 400, 
+	max_cluster_size: 140000*,
+	radius_for_growing: 0.3
+	clustering: geometric
+
+Analysis: Ground plane residuals still a problem, need to reduce growing radius again. Cluster size nice, creates nice building facaded. Might need non-geometric clustering when tree close to bldg.
+
+Config 6:
+	min_cluster_size: 400, 
+	max_cluster_size: 140000,
+	radius_for_growing: 0.2*
+	clustering: geometric
+
+Analysis: Still some ground residues, but less. In general ok, except for some forests clustering. Again, non-geometrics clustering might help for tree/bldg issue.
+
+Config 7:
+	min_cluster_size: 400, 
+	max_cluster_size: 140000,
+	radius_for_growing: 0.15*
+	clustering: geometric
+
+Analysis: Still ground residues :( Other than that pretty good clustering of forests and even trees close to buildings. However, some clusters disappeared (bldg facades and large trees...)
+
+Config 8:
+	min_cluster_size: 400, 
+	max_cluster_size: 100000*,
+	radius_for_growing: 0.15
+	clustering: geometric
+
+Analysis: Overall good! One residue just won't go away. Other than that, pretty nice! Reducing cluster size helped for some reason. Why? But bldg facades aren't that nice anymore... 
+Not sure how different 8 is from 7, need to check screencast..
+
+Config 9:
+	min_cluster_size: 400, 
+	max_cluster_size: 100000,
+	radius_for_growing: 0.17
+	clustering: geometric
+
+Analysis: Overall good. Better with facades! But could still improve. Rest equally good. But now, trees close to bldg connect again :( Might be able to resolve with non-geometric clustering..
+
+Config 10:
+	min_cluster_size: 400, 
+	max_cluster_size: 100000,
+	radius_for_growing: 0.19*
+	clustering: geometric
+
+Analysis: Overall, bad (worse than 9). Even though some facades got bigger. Trees are clumping together, large trees and facades disappeared.
+
+Config 11:
+	min_cluster_size: 400, 
+	max_cluster_size: 150000*,
+	radius_for_growing: 0.19
+	clustering: geometric
+
+Analysis: Overall bad. Getting larger facades, but very large tree clusters and bldg/tree connectiong.
+
+--------------------
+Intermediate anlysis: Make radius smaller again so we don't get huge forests/bushes. Hope for semantic segmenter that trees/bldgs don't connect.
+
+Config 12:
+	min_cluster_size: 400, 
+	max_cluster_size: 150000,
+	radius_for_growing: 0.18*
+	clustering: geometric
+
+Analysis: Overall good. Large facades and trees. Some bad tree clustering, but ok. Hope now for semantic segmenter to disconnect trees from bldgs.
+
+!Compare to config1 (The best so far)
+=> Config 12 > Config 1: Less issues with the large forests. But less segments in general. Keep tuning based on 12...
+
+[BEST] Config 13:
+	min_cluster_size: 400, 
+	max_cluster_size: 150000,
+	radius_for_growing: 0.17*
+	clustering: geometric
+
+Analysis: So far the best :) Getting better with large forests.
+
+Config 14
+	min_cluster_size: 400, 
+	max_cluster_size: 150000,
+	radius_for_growing: 0.16*
+	clustering: geometric
+
+Analysis: Not much difference.
+
+Config 15: 
+	min_cluster_size: 400, 
+	max_cluster_size: 150000,
+	radius_for_growing: 0.15*
+	clustering: geometric
+
+Analysis: Better separation of forests. However, allows for veery large bushes which stay alive because they don't get large enough to be discarded.
+
+==> Use config 13 with semantic segmentation!
+
