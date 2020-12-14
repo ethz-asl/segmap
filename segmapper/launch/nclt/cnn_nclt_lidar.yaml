@@ -43,8 +43,8 @@ SegMapper: {
 
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: false,
-  close_loops: true,
+  localize: true,
+  close_loops: false,
 
   distance_between_segmentations_m: 0.0,
 
@@ -84,8 +84,8 @@ SegMapper: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
       # (!) Sensor Dependent Tunings (sparser LiDAR -> Less points in cloud & larger gaps).
       min_cluster_size: 400, # (!) Minimum number of points for a segment to be valid (if too low, noise).
-      max_cluster_size: 60000,  # (!) Maximum number of points for a segment to be valid (if too high, very undefined centroid).
-      radius_for_growing: 0.15 #0.2 # (!) Maximum distance between two points for them to be able to belong to the same cluster. Has to be >= voxel_size from local mapper.
+      max_cluster_size: 150000,  # (!) Maximum number of points for a segment to be valid (if too high, very undefined centroid).
+      radius_for_growing: 0.17 # (!) Maximum distance between two points for them to be able to belong to the same cluster. Has to be >= voxel_size from local mapper.
     },
 
     # (!) Get Local Map and Segmenter right first, then build map, then tune classifier and RANSAC!
@@ -97,8 +97,8 @@ SegMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 22, #25  # (!) Number of NN (can be tuned from Segmappy plot). Trade off between segment completeness (~50%) & small search space (< 30 NN)
-     knn_feature_dim: 64, #64, #32
+     n_nearest_neighbours: 22, # (!) Number of NN (can be tuned from Segmappy plot). Trade off between segment completeness (~50%) & small search space (< 30 NN)
+     knn_feature_dim: 64,
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
      feature_distance_threshold: 100, #25
@@ -113,9 +113,9 @@ SegMapper: {
       # Type of RANSAC to use.
       recognizer_type: "Simple", #"Simple", "Partitioned"
       # (!) The amount of jitter allowed in the centroid distance between segments in the source and target maps.
-      resolution: 0.4,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
+      resolution: 0.7,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
       # (!) Minimum number of inliers needed to calculate transform between two positions in either LC or LOC mode.
-      min_cluster_size: 5, # (!) Between 5-7 usually
+      min_cluster_size: 5 , # (!) Between 5-7 usually
       max_consistency_distance_for_caching: 10.0,
     }
   },
