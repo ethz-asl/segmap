@@ -13,7 +13,7 @@ SegMapper: {
 
     odom_frame: "world",
     sensor_frame: "airsim_drone",
-    assembled_cloud_sub_topic: "/noisy_cloud",
+    assembled_cloud_sub_topic: "/augmented_cloud", #/noisy_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -40,8 +40,8 @@ SegMapper: {
 
   # SegMatchWorker parameters
   SegMatchWorker: {
-  localize: true,
-  close_loops: false,
+  localize: false,
+  close_loops: true,
 
   distance_between_segmentations_m: 0.0,
 
@@ -85,13 +85,13 @@ SegMapper: {
     },
 
     Descriptors: {
-      descriptor_types: ["FPFH"], # "EigenvalueBased"], # EigenvalueBased
+      descriptor_types: ["FPFH"], #, "FPFH", "EigenvalueBased"], # "EigenvalueBased"], # EigenvalueBased
       fast_point_feature_histograms_normals_search_radius: 0.4
     },
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 4, #25
+     n_nearest_neighbours: 25, #25
      knn_feature_dim: 64, #64
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,
@@ -105,8 +105,8 @@ SegMapper: {
 
     GeometricConsistency: {
       recognizer_type: "Simple", #"Simple", "Partitioned"
-      resolution: 0.4,
-      min_cluster_size: 6,
+      resolution: 0.00004,
+      min_cluster_size: 60000,
       max_consistency_distance_for_caching: 10.0,
     }
   },
