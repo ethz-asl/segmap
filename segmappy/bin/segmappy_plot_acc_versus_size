@@ -19,15 +19,12 @@ config = Config(configfile)
 
 import argparse
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=10)
 parser.add_argument("--ae_model")
 args = parser.parse_args()
 config.bins = args.bins
 config.ae_model = args.ae_model
-
-print(config.base_dir)
 
 # load dataset and preprocessor
 dataset = Dataset(
@@ -46,98 +43,94 @@ preprocessor.init_segments(segments, dataset.segments_color, dataset.segments_cl
 # calculate all feature sets
 feature_sets = []
 
-# gen_test = Generator(
-#     preprocessor,
-#     np.arange(len(segments)),
-#     n_classes,
-#     train=False,
-#     batch_size=config.batch_size,
-#     shuffle=False,
-# )
+gen_test = Generator(
+    preprocessor,
+    np.arange(len(segments)),
+    n_classes,
+    train=False,
+    batch_size=config.batch_size,
+    shuffle=False,
+)
 
-# import tensorflow as tf
+import tensorflow as tf
 
-# FPFH Features
-feature_sets.append(dataset.features[:, :64])
+# eigen features
+feature_sets.append(dataset.features[:, :7])
 
-'''
-# # autoencoder features
-# if config.ae_model:
-#     tf.reset_default_graph()
+# autoencoder features
+'''if config.ae_model:
+    tf.reset_default_graph()
 
-#     # restore variable names from previous session
-#     saver = tf.train.import_meta_graph(config.ae_model + ".meta")
+    # restore variable names from previous session
+    saver = tf.train.import_meta_graph(config.ae_model + ".meta")
 
-#     # get key tensorflow variables
-#     ae_graph = tf.get_default_graph()
+    # get key tensorflow variables
+    ae_graph = tf.get_default_graph()
 
-#     ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
-#     ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
-#     scales = ae_graph.get_tensor_by_name("scales:0")
+    ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
+    ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+    scales = ae_graph.get_tensor_by_name("scales:0")
 
-#     ae_features = []
-#     with tf.Session() as sess:
-#         saver.restore(sess, config.ae_model)
+    ae_features = []
+    with tf.Session() as sess:
+        saver.restore(sess, config.ae_model)
 
-#         for batch in range(gen_test.n_batches):
-#             batch_segments, _ = gen_test.next()
+        for batch in range(gen_test.n_batches):
+            batch_segments, _ = gen_test.next()
 
-#             batch_descriptors = sess.run(
-#                 ae_descriptor,
-#                 feed_dict={
-#                     ae_input: batch_segments,
-#                     scales: preprocessor.last_scales,
-#                 },
-#             )
+            batch_descriptors = sess.run(
+                ae_descriptor,
+                feed_dict={
+                    ae_input: batch_segments,
+                    scales: preprocessor.last_scales,
+                },
+            )
 
-#             for batch_descriptor in batch_descriptors:
-#                 ae_features.append(batch_descriptor)
+            for batch_descriptor in batch_descriptors:
+                ae_features.append(batch_descriptor)
+
     feature_sets.append(np.array(ae_features))
-# cnn features
-#tf.reset_default_graph()
-
-#     feature_sets.append(np.array(ae_features))
-
-# # cnn features
-# tf.reset_default_graph()
-
-# # restore variable names from previous session
-# saver = tf.train.import_meta_graph(
-#     os.path.join(config.cnn_model_folder, "model.ckpt.meta")
-# )
-
-# # get key tensorflow variables
-# cnn_graph = tf.get_default_graph()
-
-# cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
-# scales = cnn_graph.get_tensor_by_name("scales:0")
-# descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
-
-# cnn_features = []
-# with tf.Session() as sess:
-#     saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
-
-#     for batch in range(gen_test.n_batches):
-#         batch_segments, _ = gen_test.next()
-
-#         batch_descriptors = sess.run(
-#             descriptor,
-#             feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
-#         )
-
-#         for batch_descriptor in batch_descriptors:
-#             cnn_features.append(batch_descriptor)
-
-# feature_sets.append(np.array(cnn_features))
 '''
+# cnn features
+tf.reset_default_graph()
+
+# restore variable names from previous session
+saver = tf.train.import_meta_graph(
+    os.path.join(config.cnn_model_folder, "model.ckpt.meta")
+)
+
+# get key tensorflow variables
+cnn_graph = tf.get_default_graph()
+
+cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
+scales = cnn_graph.get_tensor_by_name("scales:0")
+descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+
+cnn_features = []
+with tf.Session() as sess:
+    saver.restore(sess, tf.train.latest_checkpoint(config.cnn_model_folder))
+
+    for batch in range(gen_test.n_batches):
+        batch_segments, _ = gen_test.next()
+
+        batch_descriptors = sess.run(
+            descriptor,
+            feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
+        )
+
+        for batch_descriptor in batch_descriptors:
+            cnn_features.append(batch_descriptor)
+
+feature_sets.append(np.array(cnn_features))
 
 # precompute last ids and the corresponding segment sizes for sequences
 last_ids = []
-test_classes = []   # Will have the size of the filtered matches!!!
+test_classes = []
 last_sizes = {}
 for cls in range(n_classes):
     sequences = duplicate_classes[classes == cls]
     unique_sequences = np.unique(sequences)
+
     for sequence in unique_sequences:
         segment_ids = np.where(sequence == duplicate_classes)[0]
         last_id = np.max(segment_ids)
@@ -146,7 +139,7 @@ for cls in range(n_classes):
 
     if unique_sequences.size > 1:
         test_classes.append(cls)
-last_ids_22 = last_ids
+
 last_ids = np.array(last_ids)
 
 last_classes = classes[last_ids]
@@ -156,29 +149,8 @@ all_ranks = []
 all_sizes = []
 
 n_sets = len(feature_sets)
-
-# 3D SmoothNet Hack.
-print('----------------------------')
-print(np.min(duplicate_classes))
-print(np.max(duplicate_classes))
-print(np.min(classes))
-print(np.max(classes))
-
-print(last_classes.shape)
-print(last_sequences.shape)
-
-# Collect the classes that will be actually used for evaluation (test_classes and last_classes).
-
-# Extract the duplicate_classes and duplicate_ids (how they are named in the database.csv).
-
-# Sanity Check: Set everything to zero except these ones in feature vector (shouldn't affect results).
-
-# Export the respective classes/ids to file to be used by the 3DSN script.
-
-assert 3>4
 for s in range(n_sets):
     features = feature_sets[s]
-    features = np.random.rand(features.shape[0],features.shape[1])  # Check how random descriptors perform..
     last_features = features[last_ids]
 
     ranks = []
@@ -191,7 +163,6 @@ for s in range(n_sets):
             segment_ids = np.where(sequence == duplicate_classes)[0]
 
             for segment_id in segment_ids:
-                last_ids_22.append(segment_id)
                 dists = np.linalg.norm(last_features - features[segment_id], axis=1)
                 order_ids = np.argsort(dists)
 
@@ -214,9 +185,6 @@ for s in range(n_sets):
 
     all_ranks.append(ranks)
     all_sizes.append(sizes)
-    print('gfffff')
-    print(len(last_ids_22))
-    print(np.unique(last_ids_22).shape)
 
 bin_edges = np.linspace(1.0/10, 1, 10)
 
@@ -260,7 +228,7 @@ params = {
     "legend.fontsize": fontsize,
     "xtick.labelsize": fontsize,
     "ytick.labelsize": fontsize,
-    "text.usetex": False,
+    "text.usetex": True,
     "font.family": "serif",
     "font.serif": "Computer Modern Roman",
     "figure.figsize": fig_size,
@@ -270,12 +238,10 @@ plt.rcParams.update(params)
 if config.ae_model:
     colors = ['green', 'orange', 'red']
 else:
-    colors = ['green', 'red', 'blue']
+    colors = ['green', 'red']
 
 xlim = 0
 xticks = []
-print('nsets')
-print(n_sets)
 for i, b in enumerate(bins):
     positions = np.arange(n_sets) + i * (n_sets + 1) + 1
     xlim = max(xlim, positions[-1])
@@ -303,19 +269,18 @@ ax.set_xticklabels(bin_edges.astype(int))
 ax.set_xticks(xticks)
 ax.tick_params(axis="both", direction="in")
 
-lG = mlines.Line2D([], [], color="green", label="CNN", linewidth=lw)
-lR = mlines.Line2D([], [], color="red", label="Eigen", linewidth=lw)
-# lB = mlines.Line2D([], [], color="blue", label="EVB", linewidth=lw)
+lG = mlines.Line2D([], [], color="green", label="Eigen", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="\\textit{SegMap}", linewidth=lw)
 if config.ae_model:
     lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
     handles = [lG, lO, lR]
 else:
-    handles = [lG] #, lR]
+    handles = [lG, lR]
 
 plt.legend(handles=handles, loc=3)
 
-plt.xlabel("Segment completness [-]")
+plt.xlabel("Segment completness [\%]")
 plt.ylabel("k-neighbours needed [-]")
 plt.tight_layout()
 
-plt.savefig("acc_versus_size_CNN_only.pdf")
+plt.savefig("acc_versus_size.pdf")
