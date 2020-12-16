@@ -18,6 +18,7 @@ class Dataset(object):
         require_relevance=0.0,
         require_diff_points=0,
         normalize_classes=True,
+        min_segment_size=0
     ):
         abs_folder = os.path.abspath(os.path.join(base_dir, folder))
         try:
@@ -34,6 +35,7 @@ class Dataset(object):
         self.require_relevance = require_relevance
         self.require_diff_points = require_diff_points
         self.normalize_classes = normalize_classes
+        self.min_segment_size = min_segment_size
 
     # load the segment dataset
     def load(self, preprocessor=None):
@@ -75,11 +77,16 @@ class Dataset(object):
             self._combine_sequences(merges)
             self.duplicate_classes = self.classes.copy()
 
-        # remove small irrelevant segments
+        # remove segments that are too small
+        if self.min_segment_size > 0:
+            self._remove_small()
+
+        # remove segments that change too little in size
         if self.require_relevance > 0:
             self._remove_irrelevant()
 
-        # only use segments that are different enough
+        # only use segments that are different enough according to the
+        # voxelization process
         if self.require_diff_points > 0:
             assert preprocessor is not None
             self._remove_similar(preprocessor)
@@ -258,7 +265,18 @@ class Dataset(object):
         # remove data on the removed classes
         self._trim_data(keep)
 
-    # remove segments that are too small compared to the last
+    # remove segments that are too small
+    def _remove_small(self):
+        keep = np.ones(self.classes.size).astype(np.bool)
+        for i in range(len(self.segments)):
+            if self.segments[i].shape[0] < self.min_segment_size:
+                keep[i] = False
+
+        self._trim_data(keep)
+
+        print("  Found %d segments that are big enough" % len(self.segments))
+
+    # remove segments that change too little in size compared to the last
     # element in the sequence
     def _remove_irrelevant(self):
         keep = np.ones(self.classes.size).astype(np.bool)

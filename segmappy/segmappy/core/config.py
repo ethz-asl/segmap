@@ -70,6 +70,7 @@ class Config(object):
         self.min_class_size = config.getint("general", "min_class_size")
         self.require_relevance = config.getfloat("general", "require_relevance")
         self.require_diff_points = config.getint("general", "require_diff_points")
+        self.min_segment_size = config.getint("general", "min_segment_size")
 
         # augment
         self.augment_angle = config.getfloat("augment", "augment_angle")
@@ -90,10 +91,6 @@ class Config(object):
         self.augment_jitter = config.getfloat("augment", "augment_jitter")
 
         # normalize
-        self.scale_method = config.get("normalize", "scale_method")
-        assert self.scale_method in ("fixed", "aspect", "fit")
-        self.center_method = config.get("normalize", "center_method")
-        assert self.center_method in ("mean", "min_max", "none")
         self.scale = tuple(
             config.getint("normalize", "scale_" + axis) for axis in ("x", "y", "z")
         )

@@ -137,6 +137,7 @@ test_dataset = Dataset(
     require_diff_points=config.require_diff_points,
     keep_match_thresh=config.keep_match_thresh,
     require_relevance=config.require_relevance,
+    min_segment_size=0
 )
 
 test_segments, _, test_classes, test_n_classes, _, _, _ = \

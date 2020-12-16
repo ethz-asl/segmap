@@ -173,6 +173,7 @@ def get_default_dataset(config, folder):
         require_diff_points=config.require_diff_points,
         keep_match_thresh=config.keep_match_thresh,
         require_relevance=config.require_relevance,
+        min_segment_size=config.min_segment_size
     )
 
     return dataset
