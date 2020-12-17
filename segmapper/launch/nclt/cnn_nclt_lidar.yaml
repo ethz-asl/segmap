@@ -97,7 +97,7 @@ SegMapper: {
 
     Classifier: {
      threshold_to_accept_match: 0.65,
-     n_nearest_neighbours: 20, # (!) Number of NN (can be tuned from Segmappy plot). Trade off between segment completeness (~50%) & small search space (< 30 NN)
+     n_nearest_neighbours: 10, # (!) Number of NN (can be tuned from Segmappy plot). Trade off between segment completeness (~50%) & small search space (< 30 NN)
      knn_feature_dim: 64,
      enable_two_stage_retrieval: false,
      apply_hard_threshold_on_feature_distance: false,

@@ -1,3 +1,7 @@
+====================
+SEGMENTER TUNING
+====================
+
 Config 0:
 	min_cluster_size: 400, 
 	max_cluster_size: 60000,
@@ -109,6 +113,7 @@ Analysis: Overall good. Large facades and trees. Some bad tree clustering, but o
 !Compare to config1 (The best so far)
 => Config 12 > Config 1: Less issues with the large forests. But less segments in general. Keep tuning based on 12...
 
+++++++++++++++++++++++++++
 [BEST] Config 13:
 	min_cluster_size: 400, 
 	max_cluster_size: 150000,
@@ -116,6 +121,7 @@ Analysis: Overall good. Large facades and trees. Some bad tree clustering, but o
 	clustering: geometric
 
 Analysis: So far the best :) Getting better with large forests.
++++++++++++++++++++++++++++
 
 Config 14
 	min_cluster_size: 400, 
@@ -133,5 +139,296 @@ Config 15:
 
 Analysis: Better separation of forests. However, allows for veery large bushes which stay alive because they don't get large enough to be discarded.
 
-==> Use config 13 with semantic segmentation!
+Config 16:
+	same as 13
+	Additionally, tried out semantic and color based segmentation
 
+Analysis: 
+1.) Color-based segmentation doesn't work because of noise in color (sky issue with thin objects such as poles or perforated objects such as trees), which would have led to oversegmentation of the only few good segments we have.
+2.) Semantics based segmentation was also bad. The few use cases would have been splitting trees that stand too close to buildings. However, because trees are perforated, the building shimmers through and 3D bldg points project onto pixels that were classified as trees. Hence, the building also gets marked as tree. Furthermore, this is very viewpoint dependent.
+
+==> Use Config13!!!
+
+==============================
+CORRESPONDENCE SEARCH TUNING
+==============================
+Setup: 
+* base_map01.pcd
+* bag: 2012-04-29 (0s - 170s)
+
+
+Config 0:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 22
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.7,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 552
+60% below 0.79m
+
+Config 1:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.7,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 553
+60% below 0.9m
+
+Config 2:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 5*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.7,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 552
+60% below 0.93m
+
+Config 3:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 1*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.7,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 550
+60% below 0.87m
+
++++++CHANGE BAG+++++
+bag: 2013-04-05 (600s - 770s)
+
+Config 3b:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 1*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.7,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 340
+60% below 3.25
+
+[BEST] Config 4:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.4,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 553
+60% below 2.6m
+
+[BAD] Config 5:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 2.0*,  
+      min_cluster_size: 3*
+
+Analysis: To have a really bad example for comparing against.
+
+Config 6:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.3,  
+      min_cluster_size: 6
+
+Analysis:
+# of LOC = 473
+60% below 3.46m
+
+Config 7 (vs 4):
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.4,  
+      min_cluster_size: 7*
+
+Analysis:
+# of LOC = 540
+60% below 2.9
+
+Config 8:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.4,  
+      min_cluster_size: 15*
+
+Analysis:
+# of LOC = 14
+60% below 1.34m
+
+Config 9:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.3*,  
+      min_cluster_size: 7*
+
+Analysis:
+# of LOC = 313
+60% below 3.5
+
+Config 10:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.3,  
+      min_cluster_size: 5*
+
+Analysis:
+# of LOC = 552
+60% below 2.9
+
+Config 4b:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.4,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 552
+60% below 2.6
+
+Config 4c:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.2,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 487
+60% below 3.7
+
+Config 4d:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 20*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.2,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 503
+60% below 4.2
+
+Config 4d:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 15*
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.2,  
+      min_cluster_size: 5
+
+Analysis:
+# of LOC = 503
+60% below 4.2
+
+Config 4e:
+    Descriptors:
+      descriptor_types: ["CNN"]
+
+	Classifier:
+     	n_nearest_neighbours: 10
+	    do_not_use_cars: false
+
+    GeometricConsistency:
+      resolution: 0.3,  
+      min_cluster_size: 7
+
+Analysis:
+# of LOC = 503
+60% below 4.2
+
+ToDo: Try out
+* Bags 2012-05-26, 2013-04-05
