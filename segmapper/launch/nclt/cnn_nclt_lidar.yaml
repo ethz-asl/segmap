@@ -115,7 +115,7 @@ SegMapper: {
       # (!) The amount of jitter allowed in the centroid distance between segments in the source and target maps.
       resolution: 0.4,  # (!) 0.2 is accurate, 0.4-0.6 ar OK, distanceon't go above 1m.
       # (!) Minimum number of inliers needed to calculate transform between two positions in either LC or LOC mode.
-      min_cluster_size: 5 , # (!) Between 5-7 usually
+      min_cluster_size: 6, # (!) Between 5-7 usually
       max_consistency_distance_for_caching: 10.0,
     }
   },
