@@ -30,7 +30,8 @@ config.ae_model = args.ae_model
 dataset = Dataset(
     folder=config.cnn_test_folder,
     base_dir=config.base_dir,
-    keep_match_thresh=0.7
+    keep_match_thresh=0.7,
+    use_merges = False
 )
 
 segments, positions, classes, n_classes, _, _, _ = dataset.load()
@@ -42,7 +43,7 @@ preprocessor.init_segments(segments, dataset.segments_color, dataset.segments_cl
 
 # calculate all feature sets
 feature_sets = []
-
+'''
 gen_test = Generator(
     preprocessor,
     np.arange(len(segments)),
@@ -53,9 +54,15 @@ gen_test = Generator(
 )
 
 import tensorflow as tf
+'''
+# Eigen, CNN, FPFH features.
+# feature_sets.append(dataset.features[:, :7])
+# feature_sets.append(dataset.features[:, 8:72])
+# feature_sets.append(dataset.features[:, 75:])
 
-# eigen features
-feature_sets.append(dataset.features[:, :7])
+# 3DSmoothNet BoW.
+feature_sets.append(dataset.features[:, :16])
+feature_sets.append(dataset.features[:, 16:80])
 
 # autoencoder features
 '''if config.ae_model:
@@ -91,6 +98,7 @@ feature_sets.append(dataset.features[:, :7])
 
     feature_sets.append(np.array(ae_features))
 '''
+'''
 # cnn features
 tf.reset_default_graph()
 
@@ -122,7 +130,7 @@ with tf.Session() as sess:
             cnn_features.append(batch_descriptor)
 
 feature_sets.append(np.array(cnn_features))
-
+'''
 # precompute last ids and the corresponding segment sizes for sequences
 last_ids = []
 test_classes = []
@@ -228,7 +236,7 @@ params = {
     "legend.fontsize": fontsize,
     "xtick.labelsize": fontsize,
     "ytick.labelsize": fontsize,
-    "text.usetex": True,
+    "text.usetex": False,
     "font.family": "serif",
     "font.serif": "Computer Modern Roman",
     "figure.figsize": fig_size,
@@ -238,7 +246,7 @@ plt.rcParams.update(params)
 if config.ae_model:
     colors = ['green', 'orange', 'red']
 else:
-    colors = ['green', 'red']
+    colors = ['green', 'red', 'blue']
 
 xlim = 0
 xticks = []
@@ -269,13 +277,14 @@ ax.set_xticklabels(bin_edges.astype(int))
 ax.set_xticks(xticks)
 ax.tick_params(axis="both", direction="in")
 
-lG = mlines.Line2D([], [], color="green", label="Eigen", linewidth=lw)
-lR = mlines.Line2D([], [], color="red", label="\\textit{SegMap}", linewidth=lw)
+lG = mlines.Line2D([], [], color="green", label="3DSN_BoW16", linewidth=lw)
+lR = mlines.Line2D([], [], color="red", label="3DSN_PCA", linewidth=lw)
+lB = mlines.Line2D([], [], color="blue", label="FPFH", linewidth=lw)
 if config.ae_model:
     lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
     handles = [lG, lO, lR]
 else:
-    handles = [lG, lR]
+    handles = [lG, lR] #, lB] #, lR]
 
 plt.legend(handles=handles, loc=3)
 
