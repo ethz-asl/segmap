@@ -23,6 +23,12 @@ class Preprocessor(object):
         self.augment_angle = augment_angle
         self.augment_jitter = augment_jitter
 
+        # Pointnet values
+        self.augment_scale_low = 0.8
+        self.augment_scale_high = 1.25
+        self.augment_shift_range = 0.1
+        self.n_points = 1024
+
         self.scale = np.array(scale)
         self.voxels = np.array(voxels)
         self.batch_size = batch_size
@@ -43,7 +49,7 @@ class Preprocessor(object):
         self.segments_class = segments_class
         self.classes = np.array(classes)
 
-    def get_processed(self, segment_ids, train=True):
+    def get_processed(self, segment_ids, train=True, pointnet=False):
         batch_segments = []
         batch_segments_color = []
         batch_segments_class = []
@@ -52,7 +58,12 @@ class Preprocessor(object):
             batch_segments_color.append(self.segments_color[i])
             batch_segments_class.append(self.segments_class[i])
 
-        batch_segments = self.process(batch_segments, batch_segments_color, batch_segments_class, train)
+        if not pointnet:
+            batch_segments = self.process(
+                batch_segments, batch_segments_color, batch_segments_class, train)
+        else:
+            batch_segments = self.process_pointnet(
+                batch_segments, batch_segments_color, batch_segments_class, train)
         batch_classes = self.classes[segment_ids]
 
         return batch_segments, batch_classes
@@ -68,7 +79,7 @@ class Preprocessor(object):
                     segments, segments_color, segments_class)
 
             if self.augment_angle > 0:
-                segments = self._augment_rotation(segments)
+                segments = self._augment_rotation_yaw(segments)
 
         # rescale coordinates and center
         segments = self._rescale_coordinates(segments)
@@ -82,11 +93,68 @@ class Preprocessor(object):
 
         return segments
 
+    def process_pointnet(self, segments, segments_color, segments_class, train=True):
+        if train and self.augment_remove_plane_max > 0:
+            segments, segments_color, segments_class = \
+                self._augment_remove_plane(
+                segments, segments_color, segments_class)
+
+        segments, segments_color, segments_class = self._select_npoints(
+            segments, segments_color, segments_class)
+
+        segments = np.array(segments)
+        segments_color = np.array(segments_color)
+        segments_class = np.array(segments_class)
+
+        segments = self._normalize_coordinates(segments)
+
+        if train:
+            if self.augment_angle > 0:
+                segments = self._augment_rotation_yaw(segments)
+            # TODO(smauq): augment by adding tiny rotations in xyz
+            segments = self._augment_scale(segments)
+            segments = self._augment_shift(segments)
+            # TODO(smauq): augment by random point jitter
+            segments, segments_color, segments_class = self._shuffle_points(
+                segments, segments_color, segments_class)
+
+        return segments
+
     def get_n_batches(self, train=True):
         if train:
             return self.n_batches_train
         else:
             return self.n_batches_test
+
+    def _select_npoints(self, segments, segments_color, segments_class):
+        for i in range(len(segments)):
+            idx = np.random.choice(segments[i].shape[0], self.n_points)
+
+            segments[i] = segments[i][idx]
+            segments_color[i] = segments_color[i][idx]
+            segments_class[i] = segments_class[i][idx]
+
+        return segments, segments_color, segments_class
+
+    def _normalize_coordinates(self, segments):
+        centroids = np.mean(segments, axis=1)
+        segments = segments[:, :] - centroids[:, None, :]
+        max_dists = np.max(np.sqrt(np.sum(segments**2, axis=2)), axis=1)
+        segments = segments / max_dists[:, None, None]
+        self.last_scales = max_dists
+
+        return segments
+
+    def _shuffle_points(self, segments, segments_color, segments_class):
+        for i in range(segments.shape[0]):
+            idx = np.arange(segments.shape[1])
+            np.random.shuffle(idx)
+
+            segments[i] = segments[i][idx]
+            segments_color[i] = segments_color[i][idx]
+            segments_class[i] = segments_class[i][idx]
+
+        return segments, segments_color, segments_class
 
     # create rotation matrix that rotates point around
     # the origin by an angle theta, expressed in radians
@@ -100,7 +168,7 @@ class Preprocessor(object):
         return np.array(R_z)
 
     # augment with multiple rotation of the same segment
-    def _augment_rotation(self, segments):
+    def _augment_rotation_yaw(self, segments):
         angle_rad = self.augment_angle * np.pi / 180
 
         for i in range(len(segments)):
@@ -144,7 +212,7 @@ class Preprocessor(object):
                 # find an offset that removes a desired amount of points
                 found = False
                 plane_offsets = np.linspace(
-                    -np.max(self.scale), np.max(self.scale), 100
+                    -np.max(segment), np.max(segment), 100
                 )
                 np.random.shuffle(plane_offsets)
                 for plane_offset in plane_offsets:
@@ -168,6 +236,21 @@ class Preprocessor(object):
 
     def _augment_jitter(self, segments):
         # TODO(smauq): Implement
+        return segments
+
+    def _augment_scale(self, segments):
+        scales = np.random.uniform(
+            self.augment_scale_low, self.augment_scale_high, segments.shape[0])
+        segments *= scales[:, None, None]
+
+        return segments
+
+    def _augment_shift(self, segments):
+        shifts = np.random.uniform(
+            -self.augment_shift_range, self.augment_shift_range,
+            (segments.shape[0] , segments.shape[2]))
+        segments += shifts[:, None, :]
+
         return segments
 
     def _rescale_coordinates(self, segments):

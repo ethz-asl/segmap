@@ -13,6 +13,7 @@ class Generator(object):
         train=True,
         batch_size=16,
         shuffle=False,
+        pointnet=False
     ):
         self.preprocessor = preprocessor
         self.segment_ids = segment_ids
@@ -20,6 +21,7 @@ class Generator(object):
         self.train = train
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.pointnet = pointnet
 
         self.n_segments = len(self.segment_ids)
         self.n_batches = int(np.ceil(float(self.n_segments) / batch_size))
@@ -40,7 +42,7 @@ class Generator(object):
             self._i = 0
 
         batch_segments, batch_classes = self.preprocessor.get_processed(
-            self.batch_ids, train=self.train)
+            self.batch_ids, train=self.train, pointnet=self.pointnet)
         batch_classes = to_onehot(batch_classes, self.n_classes)
 
         return batch_segments, batch_classes

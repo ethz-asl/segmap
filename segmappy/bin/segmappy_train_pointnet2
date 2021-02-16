@@ -9,8 +9,6 @@ from segmappy import Config
 from segmappy import Dataset
 from segmappy import Generator
 from segmappy.tools.classifiertools import get_default_dataset, get_default_preprocessor
-from segmappy.tools.roccurve import get_roc_pairs, get_roc_curve
-from segmappy.models.model_groups_tf import init_model
 
 # read config file
 configfile = "default_training.ini"
@@ -22,13 +20,11 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--log")
-parser.add_argument("--debug", action="store_true")
 parser.add_argument("--retrain")
 parser.add_argument("--keep-best", action="store_true")
 parser.add_argument("--matching-interval", type=int, default=10)
 args = parser.parse_args()
 config.log_name = args.log
-config.debug = args.debug
 config.retrain = args.retrain
 config.keep_best = args.keep_best
 config.matching_interval = args.matching_interval
@@ -115,6 +111,7 @@ gen_train = Generator(
     train=True,
     batch_size=config.batch_size,
     shuffle=True,
+    pointnet=True
 )
 gen_valid = Generator(
     preprocessor,
@@ -123,6 +120,7 @@ gen_valid = Generator(
     train=False,
     batch_size=config.batch_size,
     shuffle=True,
+    pointnet=True
 )
 
 # get test dataset for testing matching performance
@@ -157,6 +155,7 @@ gen_test = Generator(
     train=False,
     batch_size=config.batch_size,
     shuffle=False,
+    pointnet=True
 )
 
 # precompute last ids and the corresponding segment sizes for sequences
@@ -187,49 +186,98 @@ print("Validating with %d segments" % gen_valid.n_segments)
 print("Testing with %d segments" % gen_test.n_segments)
 
 import tensorflow as tf
+import segmappy.models.model_pointnet2 as pointnet2
+import segmappy.tools.tf_util as tf_util
 
 tf.reset_default_graph()
 
-if config.retrain:
-    # restore variable names from previous session
-    saver = tf.train.import_meta_graph(config.retrain + ".meta")
-else:
-    # define a new model
-    init_model(tuple(preprocessor.voxels), n_classes)
+NUM_POINT = 1024
+BASE_LEARNING_RATE = 0.001
+DECAY_STEP = 200000
+DECAY_RATE = 0.7
+BN_INIT_DECAY = 0.5
+BN_DECAY_DECAY_RATE = 0.5
+BN_DECAY_DECAY_STEP = float(DECAY_STEP)
+BN_DECAY_CLIP = 0.99
 
-    # model saver
-    saver = tf.train.Saver(max_to_keep=100)
+def get_learning_rate(batch):
+    learning_rate = tf.train.exponential_decay(
+                        BASE_LEARNING_RATE,  # Base learning rate.
+                        batch * config.batch_size,  # Current index into the dataset.
+                        DECAY_STEP,          # Decay step.
+                        DECAY_RATE,          # Decay rate.
+                        staircase=True)
+    learning_rate = tf.maximum(learning_rate, 0.00001) # CLIP THE LEARNING RATE!
+    #learning_rate = tf.constant(BASE_LEARNING_RATE)
+    return learning_rate
 
-# get key tensorflow variables
-cnn_graph = tf.get_default_graph()
+def get_bn_decay(batch):
+    bn_momentum = tf.train.exponential_decay(
+                      BN_INIT_DECAY,
+                      batch * config.batch_size,
+                      BN_DECAY_DECAY_STEP,
+                      BN_DECAY_DECAY_RATE,
+                      staircase=True)
+    bn_decay = tf.minimum(BN_DECAY_CLIP, 1 - bn_momentum)
+    #bn_decay = tf.constant(0.9)
+    return bn_decay
 
-cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
-y_true = cnn_graph.get_tensor_by_name("y_true:0")
-training = cnn_graph.get_tensor_by_name("training:0")
-scales = cnn_graph.get_tensor_by_name("scales:0")
+pointclouds_pl, labels_pl = pointnet2.placeholder_inputs(NUM_POINT, n_classes)
+is_training_pl = tf.placeholder(tf.bool, shape=())
 
-loss = cnn_graph.get_tensor_by_name("loss:0")
-loss_c = cnn_graph.get_tensor_by_name("loss_c:0")
-loss_r = cnn_graph.get_tensor_by_name("loss_r:0")
+batch = tf.get_variable('batch', [],
+    initializer=tf.constant_initializer(0), trainable=False)
+bn_decay = get_bn_decay(batch)
+tf.summary.scalar('bn_decay', bn_decay, collections=["summary_batch"])
 
-accuracy = cnn_graph.get_tensor_by_name("accuracy:0")
-y_prob = cnn_graph.get_tensor_by_name("y_prob:0")
-descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+# Get model and loss
+pred, end_points = pointnet2.get_model(
+    pointclouds_pl, is_training_pl, n_classes, bn_decay=bn_decay)
+pointnet2.get_loss(pred, labels_pl, end_points)
+losses = tf.get_collection('losses')
+total_loss = tf.add_n(losses, name='total_loss')
+tf.summary.scalar('total_loss', total_loss, collections=["summary_batch"])
+for l in losses + [total_loss]:
+    tf.summary.scalar(l.op.name, l, collections=["summary_batch"])
+
+correct = tf.equal(tf.argmax(pred, 1), tf.argmax(labels_pl, 1))
+accuracy = tf.reduce_sum(tf.cast(correct, tf.float32)) / float(config.batch_size)
+tf.summary.scalar('accuracy', accuracy, collections=["summary_batch"])
+
+learning_rate = get_learning_rate(batch)
+tf.summary.scalar('learning_rate', learning_rate, collections=["summary_batch"])
+optimizer = tf.train.AdamOptimizer(learning_rate)
+train_op = optimizer.minimize(total_loss, global_step=batch)
+
+descriptor = tf.get_default_graph().get_tensor_by_name(
+    "OutputScope/descriptor_read:0")
 
 means_tf = []
 top95_tf = []
 for i in range(10):
-    means_tf.append(cnn_graph.get_tensor_by_name("means_" + str(i) + ":0"))
-    top95_tf.append(cnn_graph.get_tensor_by_name("top95_" + str(i) + ":0"))
+    means_tf.append(tf.placeholder(
+    dtype=tf.float32, shape=(), name="means_" + str(i)))
+    top95_tf.append(tf.placeholder(
+    dtype=tf.float32, shape=(), name="top95_" + str(i)))
 
-global_step = cnn_graph.get_tensor_by_name("global_step:0")
-update_step = cnn_graph.get_tensor_by_name("update_step:0")
-train_op = cnn_graph.get_operation_by_name("train_op")
+with tf.name_scope("summary_test"):
+    for i in range(10):
+        tf.summary.scalar(
+        "means_" + str(i + 1), means_tf[i], collections=["summary_epoch"])
+        tf.summary.scalar(
+        "top95_" + str(i + 1), top95_tf[i], collections=["summary_epoch"])
 
+
+saver = tf.train.Saver(max_to_keep=10)
 summary_batch = tf.summary.merge_all("summary_batch")
 summary_epoch = tf.summary.merge_all("summary_epoch")
 
-with tf.Session() as sess:
+tf_config = tf.ConfigProto()
+tf_config.gpu_options.allow_growth = True
+tf_config.allow_soft_placement = True
+tf_config.log_device_placement = False
+
+with tf.Session(config=tf_config) as sess:
     # tensorboard statistics
     if config.log_name:
         train_writer = tf.summary.FileWriter(
@@ -245,25 +293,30 @@ with tf.Session() as sess:
     # initialize all tf variables
     tf.global_variables_initializer().run()
 
-    if config.retrain:
-        saver.restore(sess, config.retrain)
-
     # remember best epoch accuracy
     if config.keep_best:
         best_accuracy = 0
+
+    ops = {'pointclouds_pl': pointclouds_pl,
+           'labels_pl': labels_pl,
+           'is_training_pl': is_training_pl,
+           'pred': pred,
+           'loss': total_loss,
+           'train_op': train_op,
+           'summary_batch': summary_batch,
+           'summary_epoch': summary_epoch,
+           'step': batch,
+           'end_points': end_points,
+           'descriptor': descriptor}
 
     # sequence of train and validation batches
     batches = np.array([1] * gen_train.n_batches + [0] * gen_valid.n_batches)
     for epoch in range(0, config.n_epochs):
         train_loss = 0
-        train_loss_c = 0
-        train_loss_r = 0
         train_accuracy = 0
         train_step = 0
 
         valid_loss = 0
-        valid_loss_c = 0
-        valid_loss_r = 0
         valid_accuracy = 0
         valid_step = 0
 
@@ -274,49 +327,43 @@ with tf.Session() as sess:
             if train:
                 batch_segments, batch_classes = gen_train.next()
 
-                # run optimizer and calculate loss and accuracy
-                summary, batch_loss, batch_loss_c, batch_loss_r, batch_accuracy, batch_prob, _ = sess.run(
-                    [summary_batch, loss, loss_c, loss_r, accuracy, y_prob, train_op],
-                    feed_dict={
-                        cnn_input: batch_segments,
-                        y_true: batch_classes,
-                        training: True,
-                        scales: preprocessor.last_scales,
-                    },
-                )
+                feed_dict = {ops['pointclouds_pl']: batch_segments,
+                             ops['labels_pl']: batch_classes,
+                             ops['is_training_pl']: True}
+
+                summary, step, _, batch_loss, batch_pred = sess.run([ops['summary_batch'],
+                    ops['step'], ops['train_op'], ops['loss'], ops['pred']],
+                    feed_dict=feed_dict)
 
                 if config.log_name:
-                    train_writer.add_summary(summary, sess.run(global_step))
+                    train_writer.add_summary(summary, step)
+
+                correct = np.sum(
+                    np.argmax(batch_pred, axis=1) == np.argmax(batch_classes, axis=1))
 
                 train_loss += batch_loss
-                train_loss_c += batch_loss_c
-                train_loss_r += batch_loss_r
-                train_accuracy += batch_accuracy
+                train_accuracy += correct / float(batch_segments.shape[0])
                 train_step += 1
             else:
                 batch_segments, batch_classes = gen_valid.next()
 
-                # calculate validation loss and accuracy
-                summary, batch_loss, batch_loss_c, batch_loss_r, batch_accuracy, batch_prob = sess.run(
-                    [summary_batch, loss, loss_c, loss_r, accuracy, y_prob],
-                    feed_dict={
-                        cnn_input: batch_segments,
-                        y_true: batch_classes,
-                        scales: preprocessor.last_scales,
-                    },
-                )
+                # calculate test loss and accuracy
+                feed_dict = {ops['pointclouds_pl']: batch_segments,
+                             ops['labels_pl']: batch_classes,
+                             ops['is_training_pl']: False}
+
+                summary, step, batch_loss, batch_pred = sess.run([ops['summary_batch'],
+                    ops['step'], ops['loss'], ops['pred']], feed_dict=feed_dict)
 
                 if config.log_name:
-                    valid_writer.add_summary(summary, sess.run(global_step))
+                    valid_writer.add_summary(summary, step)
+
+                correct = np.sum(
+                    np.argmax(batch_pred, axis=1) == np.argmax(batch_classes, axis=1))
 
                 valid_loss += batch_loss
-                valid_loss_c += batch_loss_c
-                valid_loss_r += batch_loss_r
-                valid_accuracy += batch_accuracy
+                valid_accuracy += correct / float(batch_segments.shape[0])
                 valid_step += 1
-
-            # update training step
-            sess.run(update_step)
 
             # print results
             sys.stdout.write("\b" * console_output_size)
@@ -324,19 +371,15 @@ with tf.Session() as sess:
             console_output = "epoch %2d " % epoch
 
             if train_step:
-                console_output += "loss %.4f acc %.2f c %.4f r %.4f " % (
+                console_output += "loss %.4f acc %.2f " % (
                     train_loss / train_step,
-                    train_accuracy / train_step * 100,
-                    train_loss_c / train_step,
-                    train_loss_r / train_step,
+                    train_accuracy / train_step * 100
                 )
 
             if valid_step:
-                console_output += "v_loss %.4f v_acc %.2f v_c %.4f v_r %.4f" % (
+                console_output += "v_loss %.4f v_acc %.2f" % (
                     valid_loss / valid_step,
-                    valid_accuracy / valid_step * 100,
-                    valid_loss_c / valid_step,
-                    valid_loss_r / valid_step,
+                    valid_accuracy / valid_step * 100
                 )
 
             console_output_size = len(console_output)
@@ -353,10 +396,12 @@ with tf.Session() as sess:
             for batch in range(gen_test.n_batches):
                 batch_segments, _ = gen_test.next()
 
+                # calculate test loss and accuracy
+                feed_dict = {ops['pointclouds_pl']: batch_segments,
+                             ops['is_training_pl']: False}
+
                 batch_descriptors = sess.run(
-                    descriptor, feed_dict={cnn_input: batch_segments,
-                    scales: test_preprocessor.last_scales},
-                )
+                    [ops['descriptor']], feed_dict=feed_dict)[0]
 
                 for batch_descriptor in batch_descriptors:
                     test_features.append(batch_descriptor)
@@ -430,14 +475,14 @@ with tf.Session() as sess:
                     feed_dict[top95_tf[i]] = top95[i]
 
                 summary = sess.run(summary_epoch, feed_dict=feed_dict)
-                test_writer.add_summary(summary, sess.run(global_step))
+                test_writer.add_summary(summary, step)
 
             # save epoch model
             if not config.keep_best or valid_accuracy > best_accuracy:
                 if config.keep_best:
                     model_name = "model.ckpt"
                 else:
-                    model_name = "model-%d.ckpt" % sess.run(global_step)
+                    model_name = "model-%d.ckpt" % step
 
                 saver.save(sess, os.path.join(config.cnn_model_folder, model_name))
                 tf.train.write_graph(
