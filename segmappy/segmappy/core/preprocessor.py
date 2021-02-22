@@ -64,7 +64,9 @@ class Preprocessor(object):
         else:
             batch_segments = self.process_pointnet(
                 batch_segments, batch_segments_color, batch_segments_class, train)
+
         batch_classes = self.classes[segment_ids]
+        self.last_scales = np.array(self.last_scales)
 
         return batch_segments, batch_classes
 
