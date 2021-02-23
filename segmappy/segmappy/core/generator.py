@@ -142,9 +142,15 @@ class GeneratorTriplet(object):
                 positive_segment = random_positive_segments[i]
                 positive_scale = random_positive_scales[i]
 
-                dp = np.sum(np.square(anchor_descriptor - positive_descriptor))
-                dn = np.sum(np.square(anchor_descriptor - random_negative_descriptors),
-                    axis=1)
+                dp = np.sqrt(np.sum(np.square(
+                    anchor_descriptor - positive_descriptor)) + 1e-16)
+                dn = np.sqrt(np.sum(np.square(
+                    anchor_descriptor - random_negative_descriptors), axis=1)
+                    + 1e-16)
+
+                #dp = np.sum(np.square( anchor_descriptor - positive_descriptor))
+                #dn = np.sum(np.square(
+                #    anchor_descriptor - random_negative_descriptors), axis=1)
                 losses = self.margin + dp - dn
 
                 idx = np.argsort(losses)[::-1]

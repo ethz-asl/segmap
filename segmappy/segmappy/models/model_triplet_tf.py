@@ -41,6 +41,17 @@ def init_model(input_shape, margin=0.1):
                 name="conv1",
             )
 
+            conv1_1 = tf.layers.conv3d(
+                inputs=conv1,
+                filters=32,
+                kernel_size=(3, 3, 3),
+                padding="same",
+                activation=tf.nn.relu,
+                use_bias=True,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                name="conv1_1",
+            )
+
             pool1 = tf.layers.max_pooling3d(
                 inputs=conv1, pool_size=(2, 2, 2), strides=(2, 2, 2), name="pool1"
             )
@@ -53,11 +64,22 @@ def init_model(input_shape, margin=0.1):
                 activation=tf.nn.relu,
                 use_bias=True,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                name="conv3",
+                name="conv2",
+            )
+
+            conv2_2 = tf.layers.conv3d(
+                inputs=conv2,
+                filters=64,
+                kernel_size=(3, 3, 3),
+                padding="same",
+                activation=tf.nn.relu,
+                use_bias=True,
+                kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                name="conv2_2",
             )
 
             pool2 = tf.layers.max_pooling3d(
-                inputs=conv2, pool_size=(2, 2, 2), strides=(2, 2, 2), name="pool2"
+                inputs=conv2_2, pool_size=(2, 2, 2), strides=(2, 2, 2), name="pool2"
             )
 
             conv3 = tf.layers.conv3d(
@@ -68,7 +90,7 @@ def init_model(input_shape, margin=0.1):
                 activation=tf.nn.relu,
                 use_bias=True,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                name="conv5",
+                name="conv3",
             )
 
             flatten = tf.contrib.layers.flatten(inputs=conv3)
@@ -119,8 +141,8 @@ def init_model(input_shape, margin=0.1):
         tf.identity(output_cnn, name="descriptor_read")
 
     # training
-    dist_positive = tf.reduce_sum(tf.square(output_cnn - output_positive), 1)
-    dist_negative = tf.reduce_sum(tf.square(output_cnn - output_negative), 1)
+    dist_positive = tf.sqrt(tf.reduce_sum(tf.square(output_cnn - output_positive), 1) + 1e-16)
+    dist_negative = tf.sqrt(tf.reduce_sum(tf.square(output_cnn - output_negative), 1) + 1e-16)
 
     loss = tf.reduce_mean(tf.maximum(margin + dist_positive - dist_negative,
         0.), name='loss')
