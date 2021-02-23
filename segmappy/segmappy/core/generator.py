@@ -82,42 +82,33 @@ class GeneratorTriplet(object):
         self.tf_descriptor = descriptor
 
     def _get_descriptors(self, get_ids):
-        gen = Generator(
-            self.preprocessor,
-            get_ids,
-            None,
-            train=True,
-            batch_size=self.batch_size,
-            shuffle=False,
+        segments, _ = self.preprocessor.get_processed(
+            get_ids, train=self.train, pointnet=self.pointnet)
+
+        descriptors = self.tf_sess.run(
+            self.tf_descriptor, feed_dict={self.tf_cnn_input: segments,
+            self.tf_cnn_scales: self.preprocessor.last_scales},
         )
 
-        descriptors = []
-        for batch in range(gen.n_batches):
-            batch_segments, _ = gen.next()
+        scales = self.preprocessor.last_scales
 
-            batch_descriptors = self.tf_sess.run(
-                self.tf_descriptor, feed_dict={self.tf_cnn_input: batch_segments,
-                self.tf_cnn_scales: self.preprocessor.last_scales},
-            )
+        return descriptors, segments, scales
 
-            for batch_descriptor in batch_descriptors:
-                descriptors.append(batch_descriptor)
+    def next(self, soft_margin, neg_subset=80, neg_pick=5):
+        batch_segments = []
+        batch_segments_positive = []
+        batch_segments_negative = []
 
-        return np.array(descriptors)
-
-    def next(self):
-        batch_ids = []
-        batch_ids_positive = []
-        batch_ids_negative = []
+        self.cnn_scales = []
+        self.positive_scales = []
+        self.negative_scales = []
 
         # pick set of randoms for negatives
-        num_negative_batches = 8
-        random_negative_ids = np.random.choice(
-            self.segment_ids, self.batch_size * num_negative_batches)
+        random_negative_ids = np.random.choice(self.segment_ids, neg_subset)
         random_negative_classes = self.preprocessor.classes[random_negative_ids]
-        random_negative_descriptors = self._get_descriptors(random_negative_ids)
+        random_negative_descriptors, random_negative_segments, \
+            random_negative_scales = self._get_descriptors(random_negative_ids)
 
-        losses = []
         while True:
             # pick random anchor
             random_id = np.random.choice(self.segment_ids)
@@ -129,56 +120,68 @@ class GeneratorTriplet(object):
             if same_class_ids.size <= 1:
                 continue
 
-            random_positive_descriptors = self._get_descriptors(same_class_ids)
-            anchor_descriptor = random_positive_descriptors[
-                np.where(same_class_ids == random_id)[0][0]]
+            np.random.shuffle(same_class_ids)
+            same_class_ids = same_class_ids[:8]
+
+            idx = np.where(same_class_ids == random_id)[0]
+            if idx.size != 0:
+                same_class_ids[idx[0]] = same_class_ids[-1]
+            same_class_ids[-1] = random_id
+
+            random_positive_descriptors, random_positive_segments, \
+                random_positive_scales = self._get_descriptors(same_class_ids)
+
+            anchor_descriptor = random_positive_descriptors[-1]
+            anchor_segment = random_positive_segments[-1]
+            anchor_scale = random_positive_scales[-1]
 
             # Form triplets
-            for i in range(same_class_ids.size):
+            for i in range(same_class_ids.size - 1):
                 positive_id = same_class_ids[i]
-                if positive_id == random_id:
-                    continue
                 positive_descriptor = random_positive_descriptors[i]
-
-                while True:
-                    index = np.random.choice(len(random_negative_ids))
-                    negative_id = random_negative_ids[index]
-                    negative_descriptor = random_negative_descriptors[index]
-                    if self.preprocessor.classes[negative_id] != random_class:
-                        break
-
-                batch_ids.append(random_id)
-                batch_ids_positive.append(positive_id)
-                batch_ids_negative.append(negative_id)
+                positive_segment = random_positive_segments[i]
+                positive_scale = random_positive_scales[i]
 
                 dp = np.sum(np.square(anchor_descriptor - positive_descriptor))
-                dn = np.sum(np.square(anchor_descriptor - negative_descriptor))
-                l = max(self.margin + dp - dn, 0)
-                losses.append(l)
+                dn = np.sum(np.square(anchor_descriptor - random_negative_descriptors),
+                    axis=1)
+                losses = self.margin + dp - dn
 
-                if len(batch_ids) == self.batch_size:
+                idx = np.argsort(losses)[::-1]
+                idx = np.random.choice(idx[:neg_pick])
+                negative_id = random_negative_ids[idx]
+                negative_class = random_negative_classes[idx]
+
+                if losses[idx] <= 0 or negative_class == random_class:
+                    continue
+
+                if losses[idx] >= self.margin:
+                    continue
+
+                negative_segment = random_negative_segments[idx]
+                negative_scale = random_negative_scales[idx]
+
+                batch_segments.append(anchor_segment)
+                batch_segments_positive.append(positive_segment)
+                batch_segments_negative.append(negative_segment)
+
+                self.cnn_scales.append(anchor_scale)
+                self.positive_scales.append(positive_scale)
+                self.negative_scales.append(negative_scale)
+
+                if len(batch_segments) == self.batch_size:
                     break
 
-            if len(batch_ids) == self.batch_size:
+            if len(batch_segments) == self.batch_size:
                 break
 
-        #print("Estimated loss: ", np.mean(losses))
+        batch_segments = np.array(batch_segments)
+        batch_segments_positive = np.array(batch_segments_positive)
+        batch_segments_negative = np.array(batch_segments_negative)
 
-        batch_segments, _ = self.preprocessor.get_processed(
-            batch_ids, train=self.train, pointnet=self.pointnet)
-        self.cnn_scales = self.preprocessor.last_scales
-
-        batch_segments_positive, _ = self.preprocessor.get_processed(
-            batch_ids_positive, train=self.train, pointnet=self.pointnet)
-        self.positive_scales = self.preprocessor.last_scales
-
-        batch_segments_negative, _ = self.preprocessor.get_processed(
-            batch_ids_negative, train=self.train, pointnet=self.pointnet)
-        self.negative_scales = self.preprocessor.last_scales
-
-        self.cnn_scales[:] = 0
-        self.positive_scales[:] = 0
-        self.negative_scales[:] = 0
+        self.cnn_scales = np.array(self.cnn_scales)
+        self.positive_scales = np.array(self.positive_scales)
+        self.negative_scales = np.array(self.negative_scales)
 
         return batch_segments, batch_segments_positive, batch_segments_negative
 

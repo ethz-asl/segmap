@@ -85,7 +85,7 @@ def init_model(input_shape, margin=0.1):
             flatten = tf.concat([flatten, dense_scales], axis=1, name="flatten")
 
             dropout_flatten = tf.layers.dropout(
-                flatten, rate=0.25, training=training, name="dropout_flatten"
+                flatten, rate=0.5, training=training, name="dropout_flatten"
             )
 
             # classification network
@@ -99,7 +99,7 @@ def init_model(input_shape, margin=0.1):
             )
 
             dropout_dense1 = tf.layers.dropout(
-                dense1, rate=0.25, training=training, name="dropout_dense1"
+                dense1, rate=0.5, training=training, name="dropout_dense1"
             )
 
             descriptor = tf.layers.dense(

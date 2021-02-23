@@ -1,0 +1,383 @@
+#!/usr/bin/env python
+from __future__ import print_function
+import numpy as np
+import sys
+import os
+
+import ensure_segmappy_is_installed
+from segmappy import Config
+from segmappy import Dataset
+from segmappy import Generator, GeneratorTriplet
+from segmappy.tools.classifiertools import get_default_dataset, get_default_preprocessor
+from segmappy.tools.roccurve import get_roc_pairs, get_roc_curve
+from segmappy.models.model_triplet_tf import init_model
+
+# read config file
+configfile = "default_training.ini"
+config = Config(configfile)
+config.margin = 1.0
+
+# add command line arguments to config
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--log")
+parser.add_argument("--debug", action="store_true")
+parser.add_argument("--retrain")
+parser.add_argument("--matching-interval", type=int, default=10)
+args = parser.parse_args()
+config.log_name = args.log
+config.debug = args.debug
+config.retrain = args.retrain
+config.matching_interval = args.matching_interval
+
+# create or empty the model folder
+if not os.path.exists(config.cnn_model_folder):
+    os.makedirs(config.cnn_model_folder)
+else:
+    import glob
+
+    model_files = glob.glob(os.path.join(config.cnn_model_folder, "*"))
+    for model_file in model_files:
+        os.remove(model_file)
+
+# load preprocessor
+preprocessor = get_default_preprocessor(config)
+
+segments = []
+segments_color = []
+segments_class = []
+classes = np.array([], dtype=np.int)
+n_classes = 0
+duplicate_classes = np.array([], dtype=np.int)
+max_duplicate_class = 0
+duplicate_ids = np.array([], dtype=np.int)
+
+runs = config.cnn_train_folders.split(",")
+for run in runs:
+    dataset = get_default_dataset(config, run)
+
+    run_segments, _, run_classes, run_n_classes, _, _, _ = dataset.load(
+        preprocessor=preprocessor
+    )
+    run_duplicate_classes = dataset.duplicate_classes
+    run_duplicate_ids = dataset.duplicate_ids
+
+    run_classes += n_classes
+    run_duplicate_classes += max_duplicate_class
+
+    segments += run_segments
+    segments_color += dataset.segments_color
+    segments_class += dataset.segments_class
+    classes = np.concatenate((classes, run_classes), axis=0)
+    n_classes += run_n_classes
+    duplicate_classes = np.concatenate(
+        (duplicate_classes, run_duplicate_classes), axis=0
+    )
+    duplicate_ids = np.concatenate((duplicate_ids, run_duplicate_ids), axis=0)
+
+    max_duplicate_class = np.max(duplicate_classes) + 1
+
+# initialize preprocessor
+preprocessor.init_segments(segments, segments_color, segments_class, classes)
+
+# initialize segment batch generators
+train_ids = np.arange(len(segments))
+gen_train = GeneratorTriplet(
+    preprocessor,
+    train_ids,
+    margin=config.margin,
+    train=True,
+    batch_size=config.batch_size
+)
+
+# get test dataset for testing matching performance
+test_preprocessor = get_default_preprocessor(config)
+
+test_dataset = Dataset(
+    folder=config.cnn_test_folder,
+    base_dir=config.base_dir,
+    use_merges=config.use_merges,
+    use_matches=config.use_matches,
+    min_class_size=config.min_class_size,
+    require_diff_points=config.require_diff_points,
+    keep_match_thresh=config.keep_match_thresh,
+    require_relevance=config.require_relevance,
+    min_segment_size=0
+)
+
+test_segments, _, test_classes, test_n_classes, _, _, _ = \
+    test_dataset.load(preprocessor=test_preprocessor)
+
+test_duplicate_classes = test_dataset.duplicate_classes
+test_duplicate_ids = test_dataset.duplicate_ids
+
+test_preprocessor.init_segments(
+    test_segments, test_dataset.segments_color, test_dataset.segments_class,
+    test_classes)
+
+gen_test = Generator(
+    test_preprocessor,
+    np.arange(len(test_segments)),
+    test_n_classes,
+    train=False,
+    batch_size=config.batch_size,
+    shuffle=False,
+)
+
+# precompute last ids and the corresponding segment sizes for sequences
+test_last_ids = []
+test_match_classes = []
+test_last_sizes = {}
+for cls in range(test_n_classes):
+    test_sequences = test_duplicate_classes[test_classes == cls]
+    test_unique_sequences = np.unique(test_sequences)
+
+    if test_unique_sequences.size <= 1:
+        continue
+
+    for test_sequence in test_unique_sequences:
+        test_segment_ids = np.where(test_sequence == test_duplicate_classes)[0]
+        test_last_id = np.max(test_segment_ids)
+        test_last_ids.append(test_last_id)
+        test_last_sizes[test_sequence] = test_segments[test_last_id].shape[0]
+
+    test_match_classes.append(cls)
+
+test_last_ids = np.array(test_last_ids)
+test_last_classes = test_classes[test_last_ids]
+test_last_sequences = test_duplicate_classes[test_last_ids]
+
+print("Training with %d segments" % gen_train.n_segments)
+print("Testing with %d segments" % gen_test.n_segments)
+
+import tensorflow as tf
+
+tf.reset_default_graph()
+
+if config.retrain:
+    # restore variable names from previous session
+    saver = tf.train.import_meta_graph(config.retrain + ".meta")
+else:
+    # define a new model
+    init_model(tuple(preprocessor.voxels), config.margin)
+
+    # model saver
+    saver = tf.train.Saver(max_to_keep=config.n_epochs)
+
+# get key tensorflow variables
+cnn_graph = tf.get_default_graph()
+
+cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
+positive_input = cnn_graph.get_tensor_by_name("positive:0")
+negative_input = cnn_graph.get_tensor_by_name("negative:0")
+
+cnn_scales = cnn_graph.get_tensor_by_name("scales:0")
+positive_scales = cnn_graph.get_tensor_by_name("positive_scales:0")
+negative_scales = cnn_graph.get_tensor_by_name("negative_scales:0")
+
+training = cnn_graph.get_tensor_by_name("training:0")
+loss = cnn_graph.get_tensor_by_name("loss:0")
+
+descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
+
+means_tf = []
+top95_tf = []
+for i in range(10):
+    means_tf.append(cnn_graph.get_tensor_by_name("means_" + str(i) + ":0"))
+    top95_tf.append(cnn_graph.get_tensor_by_name("top95_" + str(i) + ":0"))
+
+global_step = cnn_graph.get_tensor_by_name("global_step:0")
+update_step = cnn_graph.get_tensor_by_name("update_step:0")
+train_op = cnn_graph.get_operation_by_name("train_op")
+
+summary_batch = tf.summary.merge_all("summary_batch")
+summary_epoch = tf.summary.merge_all("summary_epoch")
+
+with tf.Session() as sess:
+    # tensorboard statistics
+    if config.log_name:
+        train_writer = tf.summary.FileWriter(
+            os.path.join(config.log_path, config.log_name, "train"), sess.graph
+        )
+        test_writer = tf.summary.FileWriter(
+            os.path.join(config.log_path, config.log_name, "test")
+        )
+
+    # initialize generator
+    gen_train.init_model(sess, cnn_input, cnn_scales, descriptor)
+
+    # initialize all tf variables
+    tf.global_variables_initializer().run()
+
+    #if config.retrain:
+    #    saver.restore(sess, config.retrain)
+
+    for epoch in range(0, config.n_epochs):
+        train_loss = 0
+        train_step = 0
+
+        if epoch < 8:
+            neg_subset = 48
+            neg_pick = 48
+            soft_margin = config.margin
+        elif epoch < 24:
+            neg_subset = 80
+            neg_pick = 10
+            soft_margin = config.margin
+        elif epoch < 48:
+            neg_subset = 80
+            neg_pick = 5
+            soft_margin = 1.4 * config.margin
+        elif epoch < 64:
+            neg_subset = 80
+            neg_pick = 5
+            soft_margin = 2.0 * config.margin
+        else:
+            neg_subset = 80
+            neg_pick = 5
+            soft_margin = 4.0 * config.margin
+
+        console_output_size = 0
+        for step in range(gen_train.n_batches):
+            batch_segments, batch_segments_positive, batch_segments_negative = \
+                gen_train.next(soft_margin, neg_subset, neg_pick)
+
+            # run optimizer and calculate loss and accuracy
+            summary, batch_loss, _ = sess.run(
+                [summary_batch, loss, train_op],
+                feed_dict={
+                    cnn_input: batch_segments,
+                    positive_input: batch_segments_positive,
+                    negative_input: batch_segments_negative,
+                    training: True,
+                    cnn_scales: gen_train.cnn_scales,
+                    positive_scales: gen_train.positive_scales,
+                    negative_scales: gen_train.negative_scales,
+                },
+            )
+
+            #print("Actual loss: ", batch_loss)
+
+            if config.log_name:
+                train_writer.add_summary(summary, sess.run(global_step))
+
+            train_loss += batch_loss
+            train_step += 1
+
+            # update training step
+            sess.run(update_step)
+
+            # print results
+            sys.stdout.write("\b" * console_output_size)
+
+            console_output = "epoch %2d " % epoch
+
+            console_output += "loss %.4f " % (
+                train_loss / train_step
+            )
+
+            console_output_size = len(console_output)
+
+            sys.stdout.write(console_output)
+            sys.stdout.flush()
+
+        print()
+
+        # calculate matching performance
+        if (epoch + 1) % config.matching_interval == 0:
+            test_features = []
+            print("Calculating feature matching performance")
+            for batch in range(gen_test.n_batches):
+                batch_segments, _ = gen_test.next()
+
+                batch_descriptors = sess.run(
+                    descriptor, feed_dict={cnn_input: batch_segments,
+                    cnn_scales: test_preprocessor.last_scales},
+                )
+
+                for batch_descriptor in batch_descriptors:
+                    test_features.append(batch_descriptor)
+
+            test_features = np.array(test_features)
+            test_last_features = test_features[test_last_ids]
+
+            ranks = []
+            sizes = []
+            for cls in test_match_classes:
+                test_sequences = test_duplicate_classes[test_classes == cls]
+                test_unique_sequences = np.unique(test_sequences)
+
+                for test_sequence in test_unique_sequences:
+                    test_segment_ids = np.where(
+                        test_sequence == test_duplicate_classes)[0]
+
+                    for test_segment_id in test_segment_ids:
+                        dists = np.linalg.norm(
+                            test_last_features - test_features[test_segment_id],
+                            axis=1)
+                        order_ids = np.argsort(dists)
+
+                        found_self = False
+                        for i, order_id in enumerate(order_ids):
+                            if test_last_sequences[order_id] != test_sequence:
+                                if test_last_classes[order_id] == cls:
+                                    if found_self:
+                                        ranks.append(i)
+                                    else:
+                                        ranks.append(i + 1)
+                                    break
+                            else:
+                                found_self = True
+
+                        sizes.append(
+                            float(test_segments[test_segment_id].shape[0]) /
+                                test_last_sizes[test_sequence])
+
+            bin_edges = np.linspace(1.0/10, 1, 10)
+            bins = []
+            for i in range(bin_edges.size):
+                bins.append([])
+
+            for rank, size in zip(ranks, sizes):
+                for i, bin_edge in enumerate(bin_edges):
+                    if bin_edge >= size:
+                        bins[i].append(rank)
+                        break
+
+            means = []
+            top95 = []
+            for bin in bins:
+                bin = np.sort(bin)
+                means.append(np.mean(bin))
+                top95.append(bin[int(bin.size * 0.95)])
+
+            console_log_means = 'Means:'
+            console_log_top95 = 'Top95:'
+            for i in range(bin_edges.size):
+                console_log_means += ' %6.1f' % means[i]
+                console_log_top95 += ' %6.1f' % top95[i]
+
+            print(console_log_means)
+            print(console_log_top95)
+
+            if config.log_name:
+                feed_dict = {}
+                for i in range(10):
+                    feed_dict[means_tf[i]] = means[i]
+                    feed_dict[top95_tf[i]] = top95[i]
+
+                summary = sess.run(summary_epoch, feed_dict=feed_dict)
+                test_writer.add_summary(summary, sess.run(global_step))
+
+            # save epoch model
+            model_name = "model-%d.ckpt" % sess.run(global_step)
+            saver.save(sess, os.path.join(config.cnn_model_folder, model_name))
+            tf.train.write_graph(
+                sess.graph.as_graph_def(), config.cnn_model_folder, "graph.pb"
+            )
+
+        # flush tensorboard log
+        if config.log_name:
+            train_writer.flush()
+            test_writer.flush()
