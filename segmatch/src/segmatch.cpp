@@ -354,14 +354,16 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
       }
     }
 
-    source_track_time_ns =  findTimeOfClosestPose(head_poses, source_segments);
-    target_track_time_ns =  findTimeOfClosestPose(tail_poses, target_segments);
+    source_track_time_ns = findTimeOfClosestPose(head_poses, source_segments);
+    target_track_time_ns = findTimeOfClosestPose(tail_poses, target_segments);
   }
 
   loop_closure->time_a_ns = target_track_time_ns;
   loop_closure->time_b_ns = source_track_time_ns;
   loop_closure->track_id_a = target_track_id;
   loop_closure->track_id_b = source_track_id;
+  loop_closure->inlier_count =
+    recognizer->getCandidateClusters().front().size();
 
   // Again, assume that the best transformation is the correct one.
   CHECK_GT(recognizer->getCandidateTransformations().size(), 0u);

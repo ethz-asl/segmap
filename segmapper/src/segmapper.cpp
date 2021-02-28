@@ -223,9 +223,14 @@ void SegMapper::segMatchThread() {
 
         std::ofstream outfile("/tmp/localizations.txt", std::ios_base::app);
         outfile << laser_track->getCurrentPose().time_ns << ","
-          << T_b_bgt.getPosition()(0) << ","
-          << T_b_bgt.getPosition()(1) << ","
-          << T_b_bgt.getPosition()(2) << std::endl;
+          << T_b_bgt.getPosition().x() << ","
+          << T_b_bgt.getPosition().y() << ","
+          << T_b_bgt.getPosition().z() << ","
+          << T_b_bgt.getRotation().x() << ","
+          << T_b_bgt.getRotation().y() << ","
+          << T_b_bgt.getRotation().z() << ","
+          << T_b_bgt.getRotation().w() << ","
+          << loop_closure.inlier_count << std::endl;
         outfile.close();
       }
     } else if (segmatch_worker_params_.close_loops) {

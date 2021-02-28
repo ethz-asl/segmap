@@ -12,9 +12,9 @@ SegMapper: {
     use_odometry_information: true,
 
     odom_frame: "world",
-    sensor_frame: "airsim_drone",
+    sensor_frame: "ground_truth_link",
+    assembled_cloud_sub_topic: "/augmented_cloud_no_ground",
 
-    assembled_cloud_sub_topic: "/noisy_cloud",
     trajectory_pub_topic: "trajectory",
     odometry_trajectory_pub_topic: "odometry_trajectory",
     full_map_pub_topic: "full_map",
@@ -31,12 +31,12 @@ SegMapper: {
     noise_x_mean: 0.0,
     noise_y_mean: 0.0,
     noise_z_mean: 0.0,
-    noise_yaw_mean: 0.001,
+    noise_yaw_mean: 0.0,
     noise_att_mean: 0.0,
-    noise_x_stddev: 0.001,
-    noise_y_stddev: 0.001,
-    noise_z_stddev: 0.001,
-    noise_yaw_stddev: 0.001,
+    noise_x_stddev: 0.0,
+    noise_y_stddev: 0.0,
+    noise_z_stddev: 0.0,
+    noise_yaw_stddev: 0.0,
     noise_att_stddev: 0.0,
   },
 
@@ -82,16 +82,17 @@ SegMapper: {
     Segmenters: {
       segmenter_type: "IncrementalEuclideanDistance", # IncrementalSmoothnessConstraints, SimpleSmoothnessConstraints
       min_cluster_size: 50,
-      max_cluster_size: 50000,
+      max_cluster_size: 100000,
       radius_for_growing: 0.2
     },
 
     Descriptors: {
-      descriptor_types: ["CNN"] # CNN, EigenvalueBased
+      descriptor_types: ["CNN"] # EigenvalueBased
     },
 
     Classifier: {
      threshold_to_accept_match: 0.65,
+     # Number of nearest neighbours to query using the descriptor
      n_nearest_neighbours: 32, #25
      knn_feature_dim: 64, #64
      enable_two_stage_retrieval: false,
@@ -105,7 +106,8 @@ SegMapper: {
     },
 
     GeometricConsistency: {
-      recognizer_type: "Simple", #"Simple", "Partitioned"
+      # Type of RANSAC to use
+      recognizer_type: "Simple",
       resolution: 0.6,
       min_cluster_size: 6,
       max_consistency_distance_for_caching: 10.0,

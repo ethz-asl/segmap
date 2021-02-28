@@ -30,7 +30,6 @@ struct L2_Segmatch {
         if (size > 4) {
             diff = abs(*a++ - *b++);
             if (diff < 0.1 || diff > 0.9) {
-              //result += color_weight*diff*diff;
               result += color_weight;
             }
         }
@@ -46,8 +45,8 @@ struct L2_Segmatch {
 
   private:
     // TODO(smauq): parameter tuniung required
-    static constexpr ResultType class_penalty = static_cast<ResultType>(0.0);
-    static constexpr ResultType color_weight = static_cast<ResultType>(0.0);
+    static constexpr ResultType class_penalty = static_cast<ResultType>(0.01);
+    static constexpr ResultType color_weight = static_cast<ResultType>(0.0001);
 };
 }
 
