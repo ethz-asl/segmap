@@ -106,8 +106,12 @@ def init_model(input_shape, margin=0.1):
 
             flatten = tf.concat([flatten, dense_scales], axis=1, name="flatten")
 
+            bn_flatten = tf.layers.batch_normalization(
+                flatten, training=training, name="bn_flatten"
+            )
+
             dropout_flatten = tf.layers.dropout(
-                flatten, rate=0.5, training=training, name="dropout_flatten"
+                bn_flatten, rate=0.2, training=training, name="dropout_flatten"
             )
 
             # classification network
@@ -120,8 +124,12 @@ def init_model(input_shape, margin=0.1):
                 name="dense1",
             )
 
+            bn_dense1 = tf.layers.batch_normalization(
+                dense1, training=training, name="bn_dense1"
+            )
+
             dropout_dense1 = tf.layers.dropout(
-                dense1, rate=0.5, training=training, name="dropout_dense1"
+                bn_dense1, rate=0.2, training=training, name="dropout_dense1"
             )
 
             descriptor = tf.layers.dense(
@@ -161,12 +169,12 @@ def init_model(input_shape, margin=0.1):
 
     # statistics
     means = []
-    top95 = []
+    top75 = []
     for i in range(10):
         means.append(tf.placeholder(
             dtype=tf.float32, shape=(), name="means_" + str(i)))
-        top95.append(tf.placeholder(
-            dtype=tf.float32, shape=(), name="top95_" + str(i)))
+        top75.append(tf.placeholder(
+            dtype=tf.float32, shape=(), name="top75_" + str(i)))
 
     with tf.name_scope("summary"):
         tf.summary.scalar("loss", loss, collections=["summary_batch"])
@@ -176,4 +184,4 @@ def init_model(input_shape, margin=0.1):
             tf.summary.scalar(
                 "means_" + str(i + 1), means[i], collections=["summary_epoch"])
             tf.summary.scalar(
-                "top95_" + str(i + 1), top95[i], collections=["summary_epoch"])
+                "top75_" + str(i + 1), top75[i], collections=["summary_epoch"])

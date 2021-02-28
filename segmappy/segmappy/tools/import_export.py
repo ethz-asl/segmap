@@ -19,8 +19,13 @@ def load_segments(folder=database_folder, filename="segments_database.csv"):
     segment_ids = extracted_data[:, 0].astype(int)
     duplicate_ids = extracted_data[:, 1].astype(int)
     points = extracted_data[:, 2:5]
-    points_color = extracted_data[:, 5:8] / 255.0
-    points_class = extracted_data[:, 8].astype(int)
+
+    if extracted_data.shape[1] == 9:
+        points_color = extracted_data[:, 5:8] / 255.0
+        points_class = extracted_data[:, 8].astype(int)
+    else:
+        points_color = np.zeros(points.shape)
+        points_class = np.zeros(segment_ids.shape)
 
     complete_ids = list(zip(segment_ids, duplicate_ids))
     id_changes = []
@@ -97,6 +102,27 @@ def load_positions(folder=database_folder, filename="positions_database.csv"):
 
     print("  Found positions for " + str(len(positions)) + " segments")
     return positions, segment_ids, duplicate_ids
+
+
+def load_timestamps(folder=database_folder, filename="timestamps_database.csv"):
+    segment_ids = []
+    duplicate_ids = []
+    timestamps = []
+
+    file_path = os.path.join(folder, filename)
+    if os.path.isfile(file_path):
+        with open(file_path) as inputfile:
+            for line in inputfile:
+                split_line = line.strip().split(" ")
+
+                segment_ids.append(int(split_line[0]))
+                duplicate_ids.append(int(split_line[1]))
+
+                segment_timestamp = float(split_line[2]) / float(1e9)
+                timestamps.append(segment_timestamp)
+
+    print("  Found timestamps for " + str(len(timestamps)) + " segments")
+    return timestamps, segment_ids, duplicate_ids
 
 
 def load_labels(folder=database_folder, filename="labels_database.csv"):

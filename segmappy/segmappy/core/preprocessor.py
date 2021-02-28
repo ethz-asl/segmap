@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
 
 class Preprocessor(object):
     def __init__(
@@ -33,13 +33,14 @@ class Preprocessor(object):
         self.voxels = np.array(voxels)
         self.batch_size = batch_size
 
-        self.color = False
-        self.n_semcls = 35
+        self.use_semantics = True
+        self.n_semantic_classes = 35
 
         min_voxel_side_length_m = 0.1
         self.min_scale = self.voxels * min_voxel_side_length_m
 
         self.last_scales = []
+        self.last_semantics = []
 
     def init_segments(
         self, segments, segments_color, segments_class, classes
@@ -214,7 +215,7 @@ class Preprocessor(object):
                 # find an offset that removes a desired amount of points
                 found = False
                 plane_offsets = np.linspace(
-                    -np.max(segment), np.max(segment), 100
+                    -np.max(self.scale), np.max(self.scale), 100
                 )
                 np.random.shuffle(plane_offsets)
                 for plane_offset in plane_offsets:
@@ -283,24 +284,47 @@ class Preprocessor(object):
         return rescaled_segments
 
     def _voxelize(self, segments, segments_color, segments_class):
-        if self.color:
-            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (3 + self.n_semcls,))
-        else:
-            voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (1,))
+        voxelized_segments = np.zeros((len(segments),) + tuple(self.voxels) + (1,))
+
+        if self.use_semantics:
+            self.last_semantics = np.zeros(
+                (len(segments), self.n_semantic_classes), dtype=np.float)
+            #self.last_colors = np.zeros((len(segments), 24), dtype=np.float)
 
         for i, segment in enumerate(segments):
+            if self.use_semantics:
+                for c in segments_class[i]:
+                    self.last_semantics[i][c] += 1
+                self.last_semantics[i] /= segments_color[i].shape[0]
+
+                '''x_center = self.voxels[0] / 2
+                x_idx0 = segment[:, 0] > x_center
+                x_idx1 = np.logical_not(x_idx0)
+
+                y_center = self.voxels[1] / 2
+                y_idx0 = segment[:, 1] > y_center
+                y_idx1 = np.logical_not(y_idx0)
+
+                z_center = self.voxels[2] / 2
+                z_idx0 = segment[:, 2] > z_center
+                z_idx1 = np.logical_not(z_idx0)
+
+                k = 0
+                for xi in [x_idx0, x_idx1]:
+                    for yi in [y_idx0, y_idx1]:
+                        for zi in [z_idx0, z_idx1]:
+                            idx = xi & yi & zi
+                            self.last_colors[i][k:k + 3] = np.mean(
+                                segments_color[i][idx], axis=0)
+                            k += 3
+                self.last_colors[i] = np.nan_to_num(self.last_colors[i])'''
+
             # remove out of bounds points
             keep = np.logical_and(np.all(segment < self.voxels, axis=1), np.all(segment >= 0, axis=1))
             segment = segment[keep]
 
             # round coordinates
             segment = segment.astype(np.int)
-
-            # fill voxel grid
-            if self.color:
-                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2], :3] = segments_color[i][keep]
-                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2], segments_class[i][keep] + 3] = 1
-            else:
-                voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2]] = 1
+            voxelized_segments[i, segment[:, 0], segment[:, 1], segment[:, 2]] = 1
 
         return voxelized_segments

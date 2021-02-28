@@ -10,10 +10,10 @@ TensorflowInterface::TensorflowInterface() {
   sem_input_publisher_ = nh.advertise<segmatch::sem_input_msg>(
       "tf_interface_topic/sem_input_topic", 50u);
   cnn_output_subscriber_ =
-      nh.subscribe("tf_interface_topic/cnn_output_topic", 1,
+      nh.subscribe("tf_interface_topic/cnn_output_topic", 50u,
                    &TensorflowInterface::cnn_output_callback, this);
   sem_output_subscriber_ =
-      nh.subscribe("tf_interface_topic/sem_output_topic", 1,
+      nh.subscribe("tf_interface_topic/sem_output_topic", 50u,
                    &TensorflowInterface::sem_output_callback, this);
 }
 
@@ -88,7 +88,9 @@ void TensorflowInterface::batchFullForwardPass(
   auto msg_time_stamp = ros::Time::now().toNSec();
   msg.timestamp = msg_time_stamp;
   ROS_DEBUG_STREAM("Sending CNN Input: " << msg.timestamp);
+  //std::cout << "Publishing message " << msg_time_stamp << std::endl;
   cnn_input_publisher_.publish(msg);
+  //std::cout << "Published message " << msg_time_stamp << std::endl;
   ros::spinOnce();
 
   ros::Rate wait_rate(10);
@@ -116,10 +118,10 @@ void TensorflowInterface::batchFullForwardPass(
     return;
   }
 
-  if (out_msg.reconstructions.data.empty()) {
+  /*if (out_msg.reconstructions.data.empty()) {
     ROS_WARN_STREAM("No reconstruction data");
     return;
-  }
+  }*/
 
   descriptors.clear();
   reconstructions.clear();
@@ -153,6 +155,7 @@ void TensorflowInterface::batchFullForwardPass(
 }
 
 void TensorflowInterface::cnn_output_callback(segmatch::cnn_output_msg msg) {
+  //std::cout << "Received " << msg.timestamp << std::endl;
   returned_cnn_msgs_.insert(make_pair(msg.timestamp, msg));
 }
 

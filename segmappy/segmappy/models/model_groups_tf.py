@@ -1,22 +1,23 @@
 import tensorflow as tf
 
 # define the cnn model
-def init_model(input_shape, n_classes):
+def init_model(input_shape, n_classes, n_semantic_classes):
     with tf.name_scope("InputScope") as scope:
         cnn_input = tf.placeholder(
             #dtype=tf.float32, shape=(None,) + input_shape + (3 + 35,), name="input"
             dtype=tf.float32, shape=(None,) + input_shape + (1,), name="input"
         )
-
-    # base convolutional layers
-    y_true = tf.placeholder(dtype=tf.float32, shape=(None, n_classes), name="y_true")
-
     scales = tf.placeholder(dtype=tf.float32, shape=(None, 3), name="scales")
+    semantics = tf.placeholder(
+        dtype=tf.float32, shape=(None, n_semantic_classes), name="semantics")
+    #colors = tf.placeholder(dtype=tf.float32, shape=(None, 24), name="colors")
+    y_true = tf.placeholder(dtype=tf.float32, shape=(None, n_classes), name="y_true")
 
     training = tf.placeholder_with_default(
         tf.constant(False, dtype=tf.bool), shape=(), name="training"
     )
 
+    # base convolutional layers
     conv1 = tf.layers.conv3d(
         inputs=cnn_input,
         filters=32,
@@ -40,7 +41,7 @@ def init_model(input_shape, n_classes):
         activation=tf.nn.relu,
         use_bias=True,
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
-        name="conv3",
+        name="conv2",
     )
 
     pool2 = tf.layers.max_pooling3d(
@@ -55,11 +56,52 @@ def init_model(input_shape, n_classes):
         activation=tf.nn.relu,
         use_bias=True,
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
-        name="conv5",
+        name="conv3",
     )
 
     flatten = tf.contrib.layers.flatten(inputs=conv3)
-    flatten = tf.concat([flatten, scales], axis=1, name="flatten")
+
+    dense_scales = tf.layers.dense(
+        inputs=scales,
+        units=16,
+        activation=tf.nn.relu,
+        kernel_initializer=tf.contrib.layers.xavier_initializer(),
+        use_bias=True,
+        name="dense_scales",
+    )
+
+    bn_scales = tf.layers.batch_normalization(
+        dense_scales, training=training, name="bn_scales"
+    )
+
+    dense_semantics = tf.layers.dense(
+        inputs=semantics,
+        units=64,
+        activation=tf.nn.relu,
+        kernel_initializer=tf.contrib.layers.xavier_initializer(),
+        use_bias=True,
+        name="dense_semantics",
+    )
+
+    bn_semantics = tf.layers.batch_normalization(
+        dense_semantics, training=training, name="bn_semantics"
+    )
+
+    '''dense_colors = tf.layers.dense(
+        inputs=colors,
+        units=64,
+        activation=tf.nn.relu,
+        kernel_initializer=tf.contrib.layers.xavier_initializer(),
+        use_bias=True,
+        name="dense_colors",
+    )
+
+    bn_colors = tf.layers.batch_normalization(
+        dense_colors, training=training, name="bn_colors"
+    )'''
+
+    flatten = tf.concat([flatten, bn_scales, bn_semantics],
+        axis=1, name="flatten")
 
     # classification network
     dense1 = tf.layers.dense(
@@ -75,12 +117,8 @@ def init_model(input_shape, n_classes):
         dense1, training=training, name="bn_dense1"
     )
 
-    dropout_dense1 = tf.layers.dropout(
-        bn_dense1, rate=0.75, training=training, name="dropout_dense1"
-    )
-
     descriptor = tf.layers.dense(
-        inputs=dropout_dense1,
+        inputs=bn_dense1,
         units=64,
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
         activation=tf.nn.relu,
@@ -93,15 +131,10 @@ def init_model(input_shape, n_classes):
     )
 
     with tf.name_scope("OutputScope") as scope:
-        tf.add(bn_descriptor, 0, name="descriptor_bn_read")
         tf.add(descriptor, 0, name="descriptor_read")
 
-    dropout_descriptor = tf.layers.dropout(
-        bn_descriptor, rate=0.5, training=training, name="dropout_descriptor"
-    )
-
     y_pred = tf.layers.dense(
-        inputs=dropout_descriptor,
+        inputs=descriptor,
         units=n_classes,
         kernel_initializer=tf.contrib.layers.xavier_initializer(),
         activation=None,
@@ -173,10 +206,11 @@ def init_model(input_shape, n_classes):
     tf.identity(loss_r, "loss_r")
 
     # training
-    LOSS_R_WEIGHT = 0
+    LOSS_R_WEIGHT = 200
     LOSS_C_WEIGHT = 1
     loss = tf.add(LOSS_C_WEIGHT * loss_c, LOSS_R_WEIGHT * loss_r, name="loss")
 
+    # training
     global_step = tf.Variable(0, trainable=False, name="global_step")
     update_step = tf.assign(
         global_step, tf.add(global_step, tf.constant(1)), name="update_step"
@@ -196,12 +230,12 @@ def init_model(input_shape, n_classes):
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name="accuracy")
 
     means = []
-    top95 = []
+    top75 = []
     for i in range(10):
         means.append(tf.placeholder(
             dtype=tf.float32, shape=(), name="means_" + str(i)))
-        top95.append(tf.placeholder(
-            dtype=tf.float32, shape=(), name="top95_" + str(i)))
+        top75.append(tf.placeholder(
+            dtype=tf.float32, shape=(), name="top75_" + str(i)))
 
     with tf.name_scope("summary"):
         tf.summary.scalar("loss", loss, collections=["summary_batch"])
@@ -214,4 +248,4 @@ def init_model(input_shape, n_classes):
             tf.summary.scalar(
                 "means_" + str(i + 1), means[i], collections=["summary_epoch"])
             tf.summary.scalar(
-                "top95_" + str(i + 1), top95[i], collections=["summary_epoch"])
+                "top75_" + str(i + 1), top75[i], collections=["summary_epoch"])

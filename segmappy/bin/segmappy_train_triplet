@@ -15,7 +15,7 @@ from segmappy.models.model_triplet_tf import init_model
 # read config file
 configfile = "default_training.ini"
 config = Config(configfile)
-config.margin = 1.0
+config.margin = 0.4
 
 # add command line arguments to config
 import argparse
@@ -78,8 +78,24 @@ for run in runs:
 
     max_duplicate_class = np.max(duplicate_classes) + 1
 
+# precalculate relative sizes
+relative_sizes = np.zeros(len(segments))
+for cls in range(n_classes):
+    sequences = duplicate_classes[classes == cls]
+    unique_sequences = np.unique(sequences)
+
+    for sequence in unique_sequences:
+        segment_ids = np.where(sequence == duplicate_classes)[0]
+        last_id = np.max(segment_ids)
+        last_size = segments[last_id].shape[0]
+
+        for segment_id in segment_ids:
+            relative_sizes[segment_id] = \
+                float(segments[segment_id].shape[0]) / last_size
+
 # initialize preprocessor
 preprocessor.init_segments(segments, segments_color, segments_class, classes)
+preprocessor.relative_sizes = relative_sizes
 
 # initialize segment batch generators
 train_ids = np.arange(len(segments))
@@ -133,16 +149,14 @@ for cls in range(test_n_classes):
     test_sequences = test_duplicate_classes[test_classes == cls]
     test_unique_sequences = np.unique(test_sequences)
 
-    if test_unique_sequences.size <= 1:
-        continue
-
     for test_sequence in test_unique_sequences:
         test_segment_ids = np.where(test_sequence == test_duplicate_classes)[0]
         test_last_id = np.max(test_segment_ids)
         test_last_ids.append(test_last_id)
         test_last_sizes[test_sequence] = test_segments[test_last_id].shape[0]
 
-    test_match_classes.append(cls)
+    if test_unique_sequences.size > 1:
+        test_match_classes.append(cls)
 
 test_last_ids = np.array(test_last_ids)
 test_last_classes = test_classes[test_last_ids]
@@ -182,10 +196,10 @@ loss = cnn_graph.get_tensor_by_name("loss:0")
 descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
 
 means_tf = []
-top95_tf = []
+top75_tf = []
 for i in range(10):
     means_tf.append(cnn_graph.get_tensor_by_name("means_" + str(i) + ":0"))
-    top95_tf.append(cnn_graph.get_tensor_by_name("top95_" + str(i) + ":0"))
+    top75_tf.append(cnn_graph.get_tensor_by_name("top75_" + str(i) + ":0"))
 
 global_step = cnn_graph.get_tensor_by_name("global_step:0")
 update_step = cnn_graph.get_tensor_by_name("update_step:0")
@@ -217,22 +231,18 @@ with tf.Session() as sess:
         train_loss = 0
         train_step = 0
 
-        if epoch < 8:
-            neg_subset = 48
-            neg_pick = 48
+        if epoch < 3:
+            neg_subset = 80
+            neg_pick = 80
             soft_margin = config.margin
-        elif epoch < 16:
+        elif epoch < 8:
             neg_subset = 80
-            neg_pick = 10
-            soft_margin = 1.6 * config.margin
-        elif epoch < 32:
-            neg_subset = 80
-            neg_pick = 5
+            neg_pick = 20
             soft_margin = 2.0 * config.margin
         else:
             neg_subset = 80
-            neg_pick = 5
-            soft_margin = 10000
+            neg_pick = 10
+            soft_margin = 2.0 * config.margin
 
         console_output_size = 0
         for step in range(gen_train.n_batches):
@@ -342,26 +352,26 @@ with tf.Session() as sess:
                         break
 
             means = []
-            top95 = []
+            top75 = []
             for bin in bins:
                 bin = np.sort(bin)
-                means.append(np.mean(bin))
-                top95.append(bin[int(bin.size * 0.95)])
+                means.append(np.median(bin))
+                top75.append(bin[int(bin.size * 0.75)])
 
             console_log_means = 'Means:'
-            console_log_top95 = 'Top95:'
+            console_log_top75 = 'Top75:'
             for i in range(bin_edges.size):
                 console_log_means += ' %6.1f' % means[i]
-                console_log_top95 += ' %6.1f' % top95[i]
+                console_log_top75 += ' %6.1f' % top75[i]
 
             print(console_log_means)
-            print(console_log_top95)
+            print(console_log_top75)
 
             if config.log_name:
                 feed_dict = {}
                 for i in range(10):
                     feed_dict[means_tf[i]] = means[i]
-                    feed_dict[top95_tf[i]] = top95[i]
+                    feed_dict[top75_tf[i]] = top75[i]
 
                 summary = sess.run(summary_epoch, feed_dict=feed_dict)
                 test_writer.add_summary(summary, sess.run(global_step))

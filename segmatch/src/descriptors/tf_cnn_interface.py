@@ -11,13 +11,10 @@ import numpy as np
 import os
 import tensorflow as tf
 import copy
+from threading import Lock
 
 class TensorflowCNNInterface:
     def cnn_input_callback(self, msg):
-        input_tensor_name = msg.input_tensor_name
-        scales_tensor_name = msg.scales_tensor_name
-        descriptor_values_name = msg.descriptor_values_name
-        reconstruction_values_name = msg.reconstruction_values_name
         message_id = msg.timestamp
 
         # Scales
@@ -32,50 +29,54 @@ class TensorflowCNNInterface:
         n_segments = msg.input_indexes.layout.dim[0].size
         stride = msg.inputs.layout.dim[1].stride
 
-        use_semantics = False
         voxels = np.array((32, 32, 16))
-        if use_semantics:
-            inputs = np.zeros((n_segments,) + tuple(voxels) + (38,))
+        inputs = np.zeros((n_segments,) + tuple(voxels) + (1,))
+        if self.use_semantics:
+            semantics = np.zeros(
+                (n_segments, self.n_classes), dtype=np.float)
         else:
-            inputs = np.zeros((n_segments,) + tuple(voxels) + (1,))
+            semantics = []
 
         start_index = 0
         for s in range(n_segments):
             end_index = msg.input_indexes.data[s]
+
             for i in range(start_index, end_index):
                 x = msg.inputs.data[i * stride]
                 y = msg.inputs.data[i * stride + 1]
                 z = msg.inputs.data[i * stride + 2]
 
-                if use_semantics:
-                    r = msg.inputs.data[i * stride + 3] / 255.0
-                    g = msg.inputs.data[i * stride + 4] / 255.0
-                    b = msg.inputs.data[i * stride + 5] / 255.0
+                if self.use_semantics:
+                    #r = msg.inputs.data[i * stride + 3] / 255.0
+                    #g = msg.inputs.data[i * stride + 4] / 255.0
+                    #b = msg.inputs.data[i * stride + 5] / 255.0
                     semantic_class = msg.inputs.data[i * stride + 6]
-
-                    inputs[s][x][y][z][0] = r
-                    inputs[s][x][y][z][1] = g
-                    inputs[s][x][y][z][2] = b
-                    inputs[s][x][y][z][semantic_class] = 1.0
+                    #semantics[s][semantic_class] += 1
+                    semantics[s][0] += 1
                 else:
                     inputs[s][x][y][z][0] = 1.0
+            semantics[s] /= float(end_index - start_index)
 
             start_index = end_index
 
+        self.mutex.acquire()
         self.tf_interface(
-            inputs, scales, input_tensor_name, scales_tensor_name, descriptor_values_name, reconstruction_values_name, message_id)
+            inputs, scales, message_id, semantics=semantics)
 
-    def tf_interface(self, inputs, scales, input_tensor_name,
-                     scales_tensor_name, descriptor_values_name, reconstruction_values_name, message_id):
+    def tf_interface(self, inputs, scales, message_id, semantics=None):
+        feed_dict = {
+            self.cnn_input: inputs,
+            self.cnn_scales: scales}
+        if self.use_semantics:
+            feed_dict[self.cnn_semantics] = semantics
 
-        descriptors = self.cnn_sess.run(self.cnn_descriptor, feed_dict={
-            self.cnn_input: inputs, self.cnn_scales: scales})
-        reconstructions = self.cnn_sess.run(self.cnn_reconstruction, feed_dict={
-            self.cnn_input: inputs, self.cnn_scales: scales})
+        descriptors = self.cnn_sess.run(self.cnn_descriptor, feed_dict=feed_dict)
+        #reconstructions = self.cnn_sess.run(self.cnn_reconstruction, feed_dict)
+        reconstructions = np.array([])
+
         self.publish_cnn_output(reconstructions, descriptors, message_id)
 
     def publish_cnn_output(self, reconstructions, descriptors, message_id):
-
         out_msg = cnn_output_msg()
         layout_dim = MultiArrayDimension()
         out_msg.timestamp = message_id
@@ -94,8 +95,7 @@ class TensorflowCNNInterface:
                 out_msg.descriptors.data.append(descriptors[i][j])
 
         # Reconstructions
-
-        layout_dim.size = reconstructions.shape[0]
+        '''layout_dim.size = reconstructions.shape[0]
         layout_dim.stride = reconstructions.shape[0] * \
             reconstructions.shape[1] * \
             reconstructions.shape[2] * reconstructions.shape[3]
@@ -119,9 +119,11 @@ class TensorflowCNNInterface:
                 for k in range(0, out_msg.reconstructions.layout.dim[2].size):
                     for l in range(0, out_msg.reconstructions.layout.dim[3].size):
                         out_msg.reconstructions.data.append(
-                            reconstructions[i][j][k][l][0])
+                            reconstructions[i][j][k][l][0])'''
 
+        #print("Sending now!!", message_id)
         self.cnn_output_publisher.publish(out_msg)
+        self.mutex.release()
 
     def setup(self):
         rospy.init_node('listener', anonymous=True)
@@ -133,6 +135,11 @@ class TensorflowCNNInterface:
 
         self.cnn_model_path = rospy.get_param(
             '/SegMapper/SegMatchWorker/SegMatch/Descriptors/cnn_model_path')
+
+        self.use_semantics = rospy.get_param(
+            '/SegMapper/SegMatchWorker/SegMatch/Descriptors/use_semantics')
+
+        self.mutex = Lock()
 
         # CNN features
         tf.compat.v1.get_default_graph()
@@ -146,6 +153,10 @@ class TensorflowCNNInterface:
             'OutputScope/descriptor_read:0')
         self.cnn_reconstruction = cnn_graph.get_tensor_by_name(
             'ReconstructionScopeAE/ae_reconstruction_read:0')
+        if self.use_semantics:
+            self.cnn_semantics = cnn_graph.get_tensor_by_name("semantics:0")
+            self.n_classes = 35
+
         gpu_options = tf.GPUOptions(allow_growth=True)
         self.cnn_sess = tf.compat.v1.Session(
             config=tf.ConfigProto(gpu_options=gpu_options))

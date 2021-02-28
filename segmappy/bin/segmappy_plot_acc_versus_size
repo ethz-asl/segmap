@@ -4,9 +4,6 @@ import numpy as np
 import sys
 import os
 
-COMPARE_WITH_AE = True
-LOAD_DATA_FROM_FILE = False
-
 import ensure_segmappy_is_installed
 from segmappy import Config
 from segmappy import Dataset
@@ -21,16 +18,14 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bins", type=int, default=10)
-parser.add_argument("--ae_model")
 args = parser.parse_args()
 config.bins = args.bins
-config.ae_model = args.ae_model
 
 # load dataset and preprocessor
 dataset = Dataset(
     folder=config.cnn_test_folder,
     base_dir=config.base_dir,
-    keep_match_thresh=0.7
+    keep_match_thresh=0.3
 )
 
 segments, positions, classes, n_classes, _, _, _ = dataset.load()
@@ -38,7 +33,7 @@ duplicate_classes = dataset.duplicate_classes
 duplicate_ids = dataset.duplicate_ids
 
 preprocessor = get_default_preprocessor(config)
-preprocessor.init_segments(segments, dataset.segments_color, dataset.segments_class, classes, positions=positions)
+preprocessor.init_segments(segments, dataset.segments_color, dataset.segments_class, classes)
 
 # calculate all feature sets
 feature_sets = []
@@ -55,42 +50,9 @@ gen_test = Generator(
 import tensorflow as tf
 
 # eigen features
-feature_sets.append(dataset.features[:, :7])
+#feature_sets.append(dataset.features[:, :7])
+feature_sets.append(dataset.features[:, -32:])
 
-# autoencoder features
-'''if config.ae_model:
-    tf.reset_default_graph()
-
-    # restore variable names from previous session
-    saver = tf.train.import_meta_graph(config.ae_model + ".meta")
-
-    # get key tensorflow variables
-    ae_graph = tf.get_default_graph()
-
-    ae_input = ae_graph.get_tensor_by_name("InputScope/input:0")
-    ae_descriptor = ae_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
-    scales = ae_graph.get_tensor_by_name("scales:0")
-
-    ae_features = []
-    with tf.Session() as sess:
-        saver.restore(sess, config.ae_model)
-
-        for batch in range(gen_test.n_batches):
-            batch_segments, _ = gen_test.next()
-
-            batch_descriptors = sess.run(
-                ae_descriptor,
-                feed_dict={
-                    ae_input: batch_segments,
-                    scales: preprocessor.last_scales,
-                },
-            )
-
-            for batch_descriptor in batch_descriptors:
-                ae_features.append(batch_descriptor)
-
-    feature_sets.append(np.array(ae_features))
-'''
 # cnn features
 tf.reset_default_graph()
 
@@ -104,6 +66,8 @@ cnn_graph = tf.get_default_graph()
 
 cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
 scales = cnn_graph.get_tensor_by_name("scales:0")
+#semantics = cnn_graph.get_tensor_by_name("semantics:0")
+#colors = cnn_graph.get_tensor_by_name("colors:0")
 descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
 
 cnn_features = []
@@ -115,13 +79,21 @@ with tf.Session() as sess:
 
         batch_descriptors = sess.run(
             descriptor,
-            feed_dict={cnn_input: batch_segments, scales: preprocessor.last_scales},
+            feed_dict={
+                cnn_input: batch_segments,
+                scales: preprocessor.last_scales,
+                #semantics: preprocessor.last_semantics,
+                #colors: preprocessor.last_colors,
+            },
         )
 
         for batch_descriptor in batch_descriptors:
             cnn_features.append(batch_descriptor)
 
-feature_sets.append(np.array(cnn_features))
+cnn_features = np.array(cnn_features)
+feature_sets.append(cnn_features)
+
+np.savetxt("descriptors-nclt-test-segmap.csv", cnn_features)
 
 # precompute last ids and the corresponding segment sizes for sequences
 last_ids = []
@@ -235,10 +207,7 @@ params = {
 }
 plt.rcParams.update(params)
 
-if config.ae_model:
-    colors = ['green', 'orange', 'red']
-else:
-    colors = ['green', 'red']
+colors = ['green', 'red']
 
 xlim = 0
 xticks = []
@@ -271,11 +240,7 @@ ax.tick_params(axis="both", direction="in")
 
 lG = mlines.Line2D([], [], color="green", label="Eigen", linewidth=lw)
 lR = mlines.Line2D([], [], color="red", label="\\textit{SegMap}", linewidth=lw)
-if config.ae_model:
-    lO = mlines.Line2D([], [], color="orange", label="AE", linewidth=lw)
-    handles = [lG, lO, lR]
-else:
-    handles = [lG, lR]
+handles = [lG, lR]
 
 plt.legend(handles=handles, loc=3)
 

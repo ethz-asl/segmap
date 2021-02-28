@@ -24,14 +24,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--log")
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--retrain")
-parser.add_argument("--keep-best", action="store_true")
 parser.add_argument("--matching-interval", type=int, default=10)
 args = parser.parse_args()
 config.log_name = args.log
 config.debug = args.debug
 config.retrain = args.retrain
-config.keep_best = args.keep_best
 config.matching_interval = args.matching_interval
+config.n_semantic_classes = 35
 
 # create or empty the model folder
 if not os.path.exists(config.cnn_model_folder):
@@ -131,13 +130,7 @@ test_preprocessor = get_default_preprocessor(config)
 test_dataset = Dataset(
     folder=config.cnn_test_folder,
     base_dir=config.base_dir,
-    use_merges=config.use_merges,
-    use_matches=config.use_matches,
-    min_class_size=config.min_class_size,
-    require_diff_points=config.require_diff_points,
-    keep_match_thresh=config.keep_match_thresh,
-    require_relevance=config.require_relevance,
-    min_segment_size=0
+    keep_match_thresh=0.7
 )
 
 test_segments, _, test_classes, test_n_classes, _, _, _ = \
@@ -167,16 +160,14 @@ for cls in range(test_n_classes):
     test_sequences = test_duplicate_classes[test_classes == cls]
     test_unique_sequences = np.unique(test_sequences)
 
-    if test_unique_sequences.size <= 1:
-        continue
-
     for test_sequence in test_unique_sequences:
         test_segment_ids = np.where(test_sequence == test_duplicate_classes)[0]
         test_last_id = np.max(test_segment_ids)
         test_last_ids.append(test_last_id)
         test_last_sizes[test_sequence] = test_segments[test_last_id].shape[0]
 
-    test_match_classes.append(cls)
+        if test_unique_sequences.size > 1:
+            test_match_classes.append(cls)
 
 test_last_ids = np.array(test_last_ids)
 test_last_classes = test_classes[test_last_ids]
@@ -195,10 +186,10 @@ if config.retrain:
     saver = tf.train.import_meta_graph(config.retrain + ".meta")
 else:
     # define a new model
-    init_model(tuple(preprocessor.voxels), n_classes)
+    init_model(tuple(preprocessor.voxels), n_classes, config.n_semantic_classes)
 
     # model saver
-    saver = tf.train.Saver(max_to_keep=100)
+    saver = tf.train.Saver(max_to_keep=config.n_epochs)
 
 # get key tensorflow variables
 cnn_graph = tf.get_default_graph()
@@ -206,21 +197,21 @@ cnn_graph = tf.get_default_graph()
 cnn_input = cnn_graph.get_tensor_by_name("InputScope/input:0")
 y_true = cnn_graph.get_tensor_by_name("y_true:0")
 training = cnn_graph.get_tensor_by_name("training:0")
+semantics = cnn_graph.get_tensor_by_name("semantics:0")
+#colors = cnn_graph.get_tensor_by_name("colors:0")
 scales = cnn_graph.get_tensor_by_name("scales:0")
 
 loss = cnn_graph.get_tensor_by_name("loss:0")
-loss_c = cnn_graph.get_tensor_by_name("loss_c:0")
-loss_r = cnn_graph.get_tensor_by_name("loss_r:0")
 
 accuracy = cnn_graph.get_tensor_by_name("accuracy:0")
 y_prob = cnn_graph.get_tensor_by_name("y_prob:0")
 descriptor = cnn_graph.get_tensor_by_name("OutputScope/descriptor_read:0")
 
 means_tf = []
-top95_tf = []
+top75_tf = []
 for i in range(10):
     means_tf.append(cnn_graph.get_tensor_by_name("means_" + str(i) + ":0"))
-    top95_tf.append(cnn_graph.get_tensor_by_name("top95_" + str(i) + ":0"))
+    top75_tf.append(cnn_graph.get_tensor_by_name("top75_" + str(i) + ":0"))
 
 global_step = cnn_graph.get_tensor_by_name("global_step:0")
 update_step = cnn_graph.get_tensor_by_name("update_step:0")
@@ -248,22 +239,14 @@ with tf.Session() as sess:
     if config.retrain:
         saver.restore(sess, config.retrain)
 
-    # remember best epoch accuracy
-    if config.keep_best:
-        best_accuracy = 0
-
     # sequence of train and validation batches
     batches = np.array([1] * gen_train.n_batches + [0] * gen_valid.n_batches)
     for epoch in range(0, config.n_epochs):
         train_loss = 0
-        train_loss_c = 0
-        train_loss_r = 0
         train_accuracy = 0
         train_step = 0
 
         valid_loss = 0
-        valid_loss_c = 0
-        valid_loss_r = 0
         valid_accuracy = 0
         valid_step = 0
 
@@ -275,13 +258,15 @@ with tf.Session() as sess:
                 batch_segments, batch_classes = gen_train.next()
 
                 # run optimizer and calculate loss and accuracy
-                summary, batch_loss, batch_loss_c, batch_loss_r, batch_accuracy, batch_prob, _ = sess.run(
-                    [summary_batch, loss, loss_c, loss_r, accuracy, y_prob, train_op],
+                summary, batch_loss, batch_accuracy, batch_prob, _ = sess.run(
+                    [summary_batch, loss, accuracy, y_prob, train_op],
                     feed_dict={
                         cnn_input: batch_segments,
                         y_true: batch_classes,
                         training: True,
                         scales: preprocessor.last_scales,
+                        semantics: preprocessor.last_semantics,
+                        #colors: preprocessor.last_colors,
                     },
                 )
 
@@ -289,20 +274,20 @@ with tf.Session() as sess:
                     train_writer.add_summary(summary, sess.run(global_step))
 
                 train_loss += batch_loss
-                train_loss_c += batch_loss_c
-                train_loss_r += batch_loss_r
                 train_accuracy += batch_accuracy
                 train_step += 1
             else:
                 batch_segments, batch_classes = gen_valid.next()
 
                 # calculate validation loss and accuracy
-                summary, batch_loss, batch_loss_c, batch_loss_r, batch_accuracy, batch_prob = sess.run(
-                    [summary_batch, loss, loss_c, loss_r, accuracy, y_prob],
+                summary, batch_loss, batch_accuracy, batch_prob = sess.run(
+                    [summary_batch, loss, accuracy, y_prob],
                     feed_dict={
                         cnn_input: batch_segments,
                         y_true: batch_classes,
                         scales: preprocessor.last_scales,
+                        semantics: preprocessor.last_semantics,
+                        #colors: preprocessor.last_colors,
                     },
                 )
 
@@ -310,8 +295,6 @@ with tf.Session() as sess:
                     valid_writer.add_summary(summary, sess.run(global_step))
 
                 valid_loss += batch_loss
-                valid_loss_c += batch_loss_c
-                valid_loss_r += batch_loss_r
                 valid_accuracy += batch_accuracy
                 valid_step += 1
 
@@ -324,19 +307,15 @@ with tf.Session() as sess:
             console_output = "epoch %2d " % epoch
 
             if train_step:
-                console_output += "loss %.4f acc %.2f c %.4f r %.4f " % (
+                console_output += "loss %.4f acc %.2f " % (
                     train_loss / train_step,
-                    train_accuracy / train_step * 100,
-                    train_loss_c / train_step,
-                    train_loss_r / train_step,
+                    train_accuracy / train_step * 100
                 )
 
             if valid_step:
-                console_output += "v_loss %.4f v_acc %.2f v_c %.4f v_r %.4f" % (
+                console_output += "v_loss %.4f v_acc %.2f" % (
                     valid_loss / valid_step,
-                    valid_accuracy / valid_step * 100,
-                    valid_loss_c / valid_step,
-                    valid_loss_r / valid_step,
+                    valid_accuracy / valid_step * 100
                 )
 
             console_output_size = len(console_output)
@@ -354,8 +333,12 @@ with tf.Session() as sess:
                 batch_segments, _ = gen_test.next()
 
                 batch_descriptors = sess.run(
-                    descriptor, feed_dict={cnn_input: batch_segments,
-                    scales: test_preprocessor.last_scales},
+                    descriptor, feed_dict={
+                        cnn_input: batch_segments,
+                        scales: test_preprocessor.last_scales,
+                        semantics: test_preprocessor.last_semantics,
+                        #colors: test_preprocessor.last_colors,
+                    },
                 )
 
                 for batch_descriptor in batch_descriptors:
@@ -408,41 +391,36 @@ with tf.Session() as sess:
                         break
 
             means = []
-            top95 = []
+            top75 = []
             for bin in bins:
                 bin = np.sort(bin)
-                means.append(np.mean(bin))
-                top95.append(bin[int(bin.size * 0.95)])
+                means.append(np.median(bin))
+                top75.append(bin[int(bin.size * 0.75)])
 
             console_log_means = 'Means:'
-            console_log_top95 = 'Top95:'
+            console_log_top75 = 'Top75:'
             for i in range(bin_edges.size):
                 console_log_means += ' %6.1f' % means[i]
-                console_log_top95 += ' %6.1f' % top95[i]
+                console_log_top75 += ' %6.1f' % top75[i]
 
             print(console_log_means)
-            print(console_log_top95)
+            print(console_log_top75)
 
             if config.log_name:
                 feed_dict = {}
                 for i in range(10):
                     feed_dict[means_tf[i]] = means[i]
-                    feed_dict[top95_tf[i]] = top95[i]
+                    feed_dict[top75_tf[i]] = top75[i]
 
                 summary = sess.run(summary_epoch, feed_dict=feed_dict)
                 test_writer.add_summary(summary, sess.run(global_step))
 
             # save epoch model
-            if not config.keep_best or valid_accuracy > best_accuracy:
-                if config.keep_best:
-                    model_name = "model.ckpt"
-                else:
-                    model_name = "model-%d.ckpt" % sess.run(global_step)
-
-                saver.save(sess, os.path.join(config.cnn_model_folder, model_name))
-                tf.train.write_graph(
-                    sess.graph.as_graph_def(), config.cnn_model_folder, "graph.pb"
-                )
+            model_name = "model-%d.ckpt" % sess.run(global_step)
+            saver.save(sess, os.path.join(config.cnn_model_folder, model_name))
+            tf.train.write_graph(
+                sess.graph.as_graph_def(), config.cnn_model_folder, "graph.pb"
+            )
 
         # flush tensorboard log
         if config.log_name:

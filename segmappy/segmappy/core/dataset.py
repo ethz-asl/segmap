@@ -39,7 +39,7 @@ class Dataset(object):
 
     # load the segment dataset
     def load(self, preprocessor=None):
-        from ..tools.import_export import load_segments, load_positions, load_features
+        from ..tools.import_export import load_segments, load_positions, load_features, load_timestamps
 
         # load all the csv files
         self.segments, self.segments_color, self.segments_class, sids, duplicate_sids = load_segments(folder=self.folder)
@@ -47,11 +47,15 @@ class Dataset(object):
         self.features, self.feature_names, fids, duplicate_fids = load_features(
             folder=self.folder
         )
+        self.timestamps, tids, duplicate_tids = load_timestamps(
+            folder=self.folder
+        )
 
         self.classes = np.array(sids)
         self.duplicate_classes = self.classes.copy()
         self.positions = np.array(self.positions)
         self.features = np.array(self.features)
+        self.timestamps = np.array(self.timestamps)
         self.duplicate_ids = np.array(duplicate_sids)
 
         # load labels
@@ -347,6 +351,8 @@ class Dataset(object):
             self.positions = self.positions[ordered_ids]
         if self.features.size > 0:
             self.features = self.features[ordered_ids]
+        if self.timestamps.size > 0:
+            self.timestamps = self.timestamps[ordered_ids]
 
         self.duplicate_ids = self.duplicate_ids[ordered_ids]
         self.duplicate_classes = self.duplicate_classes[ordered_ids]
@@ -362,6 +368,8 @@ class Dataset(object):
             self.positions = self.positions[keep]
         if self.features.size > 0:
             self.features = self.features[keep]
+        if self.timestamps.size > 0:
+            self.timestamps = self.timestamps[keep]
 
         self.duplicate_ids = self.duplicate_ids[keep]
         self.duplicate_classes = self.duplicate_classes[keep]

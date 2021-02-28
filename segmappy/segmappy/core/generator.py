@@ -70,7 +70,17 @@ class GeneratorTriplet(object):
 
         self.n_segments = len(self.segment_ids)
         self.n_batches = int(np.ceil(float(self.n_segments) / batch_size) / 10)
-        self.segment_classes = self.preprocessor.classes[self.segment_ids]
+
+        self.classes = self.preprocessor.classes[self.segment_ids]
+        self.relative_sizes = self.preprocessor.relative_sizes[self.segment_ids]
+
+        # Small precomputations
+        self.possible_anchors = self.segment_ids[self.relative_sizes > 0.5]
+        self.possible_positives = {}
+        for cls in np.unique(self.classes):
+            self.possible_positives[cls] = self.segment_ids[np.logical_and(
+                self.classes == cls, self.relative_sizes > 0.3)]
+
 
     def __iter__(self):
         return self
@@ -111,21 +121,15 @@ class GeneratorTriplet(object):
 
         while True:
             # pick random anchor
-            random_id = np.random.choice(self.segment_ids)
+            random_id = np.random.choice(self.possible_anchors)
             random_class = self.preprocessor.classes[random_id]
 
             # find positives
-            same_class_ids = self.segment_ids[np.where(
-                self.segment_classes == random_class)[0]]
+            same_class_ids = self.possible_positives[random_class]
             if same_class_ids.size <= 1:
                 continue
 
-            np.random.shuffle(same_class_ids)
-            same_class_ids = same_class_ids[:8]
-
-            idx = np.where(same_class_ids == random_id)[0]
-            if idx.size != 0:
-                same_class_ids[idx[0]] = same_class_ids[-1]
+            same_class_ids = np.random.choice(same_class_ids, 8)
             same_class_ids[-1] = random_id
 
             random_positive_descriptors, random_positive_segments, \
@@ -147,11 +151,11 @@ class GeneratorTriplet(object):
                 dn = np.sqrt(np.sum(np.square(
                     anchor_descriptor - random_negative_descriptors), axis=1)
                     + 1e-16)
-
-                #dp = np.sum(np.square( anchor_descriptor - positive_descriptor))
-                #dn = np.sum(np.square(
-                #    anchor_descriptor - random_negative_descriptors), axis=1)
                 losses = self.margin + dp - dn
+                #print(dn)
+                #print(dp)
+                #print(losses)
+                #print('----------')
 
                 idx = np.argsort(losses)[::-1]
                 idx = np.random.choice(idx[:neg_pick])
@@ -161,7 +165,7 @@ class GeneratorTriplet(object):
                 if losses[idx] <= 0 or negative_class == random_class:
                     continue
 
-                if losses[idx] >= self.margin:
+                if losses[idx] >= soft_margin:
                     continue
 
                 negative_segment = random_negative_segments[idx]

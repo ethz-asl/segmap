@@ -26,25 +26,25 @@ def get_model(point_cloud, is_training, n_classes, bn_decay=None):
     # Note: When using NCHW for layer 2, we see increased GPU memory usage (in TF1.4).
     # So we only use NCHW for layer 1 until this issue can be resolved.
     l1_xyz, l1_points, l1_indices = pointnet_sa_module(
-        l0_xyz, l0_points, npoint=512, radius=0.2, nsample=32, mlp=[64,64,128],
+        l0_xyz, l0_points, npoint=1024, radius=0.2, nsample=32, mlp=[32,32,64],
         mlp2=None, group_all=False, is_training=is_training, bn_decay=bn_decay,
         scope='layer1', use_nchw=True)
     l2_xyz, l2_points, l2_indices = pointnet_sa_module(
-        l1_xyz, l1_points, npoint=128, radius=0.4, nsample=64, mlp=[128,128,256],
+        l1_xyz, l1_points, npoint=512, radius=0.4, nsample=64, mlp=[64,64,128],
         mlp2=None, group_all=False, is_training=is_training, bn_decay=bn_decay,
         scope='layer2', use_nchw=True)
-    l2_xyz, l2_points, l2_indices = pointnet_sa_module(
-        l1_xyz, l1_points, npoint=128, radius=0.4, nsample=64, mlp=[128,128,256],
-        mlp2=None, group_all=False, is_training=is_training, bn_decay=bn_decay,
-        scope='layer2', use_nchw=True)
-    last_size = 1024
     l3_xyz, l3_points, l3_indices = pointnet_sa_module(
-        l2_xyz, l2_points, npoint=None, radius=None, nsample=None, mlp=[256,512,last_size],
-        mlp2=None, group_all=True, is_training=is_training, bn_decay=bn_decay,
+        l2_xyz, l2_points, npoint=256, radius=0.6, nsample=64, mlp=[128,128,256],
+        mlp2=None, group_all=False, is_training=is_training, bn_decay=bn_decay,
         scope='layer3', use_nchw=True)
+    last_size = 512
+    l4_xyz, l4_points, l4_indices = pointnet_sa_module(
+        l3_xyz, l3_points, npoint=None, radius=None, nsample=None, mlp=[256,256,last_size],
+        mlp2=None, group_all=True, is_training=is_training, bn_decay=bn_decay,
+        scope='layer4', use_nchw=True)
 
     # Fully connected layers
-    net = tf.reshape(l3_points, [batch_size, last_size])
+    net = tf.reshape(l4_points, [batch_size, last_size])
     net = tf_util.fully_connected(
         net, 512, bn=True, is_training=is_training, scope='fc1', bn_decay=bn_decay)
     net = tf_util.dropout(net, keep_prob=1.0, is_training=is_training, scope='dp1')
