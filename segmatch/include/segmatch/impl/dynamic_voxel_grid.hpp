@@ -20,22 +20,32 @@
 inline static uint8_t getBestSemanticsClass(
     std::shared_ptr<std::vector<uint8_t>> semantic_class_counter) {
   std::sort(semantic_class_counter->begin(), semantic_class_counter->end());
-  static int curr_class, curr_class_length, max_class, max_class_length;
-  curr_class_length = 0;
-  max_class_length = 0;
+
+  uint8_t cur_class = semantic_class_counter->front();
+  uint8_t cur_class_count = 0;
+  uint8_t max_class = 0;
+  uint8_t max_class_count = 0;
+
   for (auto it = semantic_class_counter->begin();
        it != semantic_class_counter->end(); ++it) {
-    if (*it == curr_class) {
-      curr_class_length++;
+    if (*it == cur_class) {
+      cur_class_count++;
     } else {
-      curr_class = *it;
-      curr_class_length = 1;
-    }
-    if (curr_class_length > max_class_length) {
-      max_class = curr_class;
-      max_class_length = curr_class_length;
+      if (cur_class_count > max_class_count) {
+        max_class = cur_class;
+        max_class_count = cur_class_count;
+      }
+
+      cur_class = *it;
+      cur_class_count = 1;
     }
   }
+
+  if (cur_class_count > max_class_count) {
+    max_class = cur_class;
+    max_class_count = cur_class_count;
+  }
+
   return max_class;
 }
 
@@ -53,8 +63,8 @@ inline static uint32_t getAverageColor(
   b_average /= color_counter->size();
   g_average /= color_counter->size();
 
-  return ((uint8_t)r_average << 16) + ((uint8_t)g_average << 8) +
-         (uint8_t)b_average;
+  return ((uint32_t)r_average << 16) + ((uint32_t)g_average << 8) +
+         (uint32_t)b_average;
 }
 
 namespace segmatch {
