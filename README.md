@@ -1,8 +1,10 @@
-## *SegMap* 
+## *SegMap*
 
 SegMap is a map representation based on 3D segments allowing for robot localization, environment reconstruction, and semantics extraction. The SegMap code is open-source (BSD License) and has been tested under Ubuntu 14.04, 16.04 and ROS Indigo, Kinetic. Please remember that this is on-going research code which is subject to changes in the future.
 
 ### Related Publications
+
+R. Dubé, A. Cramariuc, D. Dugas, H. Sommer, M. Dymczyk, J. Nieto, R. Siegwart, and C. Cadena. **SegMap: Segment-based mapping and localization using data-driven descriptors** *The International Journal of Robotics Research (IJRR), 2019* [pdf](https://arxiv.org/pdf/1909.12837.pdf)
 
 R. Dubé, A. Cramariuc, D. Dugas, J. Nieto, R. Siegwart, and C. Cadena. **"SegMap: 3D Segment Mapping using Data-Driven Descriptors."** *Robotics: Science and Systems (RSS), 2018.* [pdf](http://www.roboticsproceedings.org/rss14/p03.pdf) - [video](https://youtu.be/CMk4w4eRobg)
 
@@ -117,7 +119,7 @@ An online SLAM example can be run with
 $ roslaunch segmapper kitti_loop_closure.launch
 ```
 
-#### Run localization against known map example 
+#### Run localization against known map example
 
 A localization example can be run with
 ```
@@ -141,6 +143,20 @@ More details on the demonstrations can be found [here](https://github.com/ethz-a
 SegMap is released under [BSD 3-Clause License](https://github.com/ethz-asl/segmap/blob/master/LICENSE)
 
 Thank you for citing the related publication if you use SegMap in academic work:
+
+```
+@article{doi:10.1177/0278364919863090,
+  title ={SegMap: Segment-based mapping and localization using data-driven descriptors},
+  author = {Renaud Dubé and Andrei Cramariuc and Daniel Dugas and Hannes Sommer and Marcin Dymczyk and Juan Nieto and Roland Siegwart and Cesar Cadena},
+  journal = {The International Journal of Robotics Research},
+  volume = {39},
+  number = {2-3},
+  pages = {339-355},
+  year = {2020},
+  doi = {10.1177/0278364919863090}
+}
+```
+
 ```
 @inproceedings{segmap2018,
   title={{SegMap}: 3D Segment Mapping using Data-Driven Descriptors},
