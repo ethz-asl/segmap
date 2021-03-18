@@ -23,5 +23,10 @@
   <depend>minkindr</depend>
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>
-  <depend>tf_graph_executor</depend>
+  <depend>std_msgs</depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  
+  <!-- <depend>tf_graph_executor</depend> -->
 </package>

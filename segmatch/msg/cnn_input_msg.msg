@@ -1,0 +1,7 @@
+uint64 timestamp
+string input_tensor_name
+string scales_tensor_name
+string descriptor_values_name
+string reconstruction_values_name
+std_msgs/Float32MultiArray scales
+std_msgs/Float64MultiArray inputs

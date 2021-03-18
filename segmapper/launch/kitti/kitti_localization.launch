@@ -28,7 +28,7 @@
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
   
   <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r $(arg play_rate) -s 333 --clock --pause $(arg bag_file)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args="-r $(arg play_rate) -s 333 --clock --pause $(arg bag_file)"/>
 
   <!-- segmapper node -->
   <include file="$(find segmapper)/launch/segmapper.launch">

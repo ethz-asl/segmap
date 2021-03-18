@@ -1,49 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <launch>
-  
-  <arg name="respawn_value" default="false" /> <!-- boolean: true, false -->
-  
-  <!-- Bag file path -->  
-  <!-- <arg name="bag_file" value="$(env HOME)/.segmap/kitti/2011_09_30_drive_18.bag"/> -->
-  <arg name="bag_file" value="/media/scratch1/mariusbr/2011_09_30_drive_18.bag"/>
+
+  <arg name="respawn_value" default="false" />
+  <!-- boolean: true, false -->
+
+  <!-- Bag file path -->
+  <!-- <arg name="bag_file" value="$(env HOME)/.segmap/bosch/bosch.bag"/> -->
+  <arg name="bag_file" value="/media/scratch1/mariusbr/bosch.bag"/>
   <rosparam param="LaserMapper/bag_file" subst_value="True">$(arg bag_file)</rosparam>
-	
+
   <!-- Rviz visualization config file path -->
   <arg name="rviz_config_file" value="$(env HOME)/.segmap/kitti/kitti_loop_closure.rviz"/>
 
   <!-- ROS parameters -->
   <rosparam>use_sim_time: true</rosparam>
-  <rosparam command="load" file="$(find segmapper)/launch/kitti/cnn_kitti_loop_closure.yaml"/>
+  <rosparam command="load" file="$(find segmapper)/launch/bosch/cnn_bosch_depth_cam.yaml"/>
 
   <!-- rviz node -->
   <node name="visualizer" pkg="rviz" type="rviz" output="screen" respawn="$(arg respawn_value)" args="-d $(arg rviz_config_file)" />
-  
+
   <!-- CNN model path -->
   <arg name="cnn_model_path" value="$(env HOME)/.segmap/trained_models/segmap64/"/>
   <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Descriptors/cnn_model_path" subst_value="True">$(arg cnn_model_path)</rosparam>
-  
+
   <!-- Semantics nn path -->
   <arg name="semantics_nn_path" value="$(env HOME)/.segmap/trained_models/segmap64_semantics/"/>
   <rosparam param="/SegMapper/SegMatchWorker/SegMatch/Descriptors/semantics_nn_path" subst_value="True">$(arg semantics_nn_path)</rosparam>
-  
+
   <!-- segmapper node -->
   <include file="$(find segmapper)/launch/segmapper.launch">
-    <arg name="icp_configuration_file" value="$(find segmapper)/launch/kitti/icp_dynamic_outdoor.yaml"/>
-    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/kitti/input_filters_outdoor.yaml"/>
+    <arg name="icp_configuration_file" value="$(find segmapper)/launch/bosch/icp_dynamic_outdoor.yaml"/>
+    <arg name="icp_input_filters_file" value="$(find segmapper)/launch/bosch/input_filters_outdoor_depth_cam.yaml"/>
   </include>
-  
-    <!-- rosbag player node -->
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 0.5 -s 0 --clock --pause $(arg bag_file)"/>
-  
-    <!-- Tensorflow interface -->
+
+  <!-- rosbag player node -->
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1 -s 0 --clock --pause $(arg bag_file)"/>
+
+  <!-- Tensorflow interface -->
   <node pkg="segmatch" name="tf_cnn_interface" type="tf_cnn_interface.py" output="screen">
-  
+
   </node> -->
-	
-  <node pkg="segmatch" name="tf_sem_interface" type="tf_sem_interface.py" output="screen">  
-  
+
+  <node pkg="segmatch" name="tf_sem_interface" type="tf_sem_interface.py" output="screen">
+
   </node> -->
-	
- 
+
+
 </launch>
